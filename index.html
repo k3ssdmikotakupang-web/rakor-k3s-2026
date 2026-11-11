@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>SIM-RAKOR 2026 | K3S SD/MI Kota Kupang</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -10,403 +13,602 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0f172a;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .app-shell {
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      background-color: #f8fafc;
+      position: relative;
+      box-shadow: 0 0 40px rgba(0,0,0,0.5);
+      overflow-x: hidden;
+    }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-view { animation: fadeIn 0.22s ease-out forwards; }
   </style>
 </head>
-<body class="text-slate-800 pb-24">
+<body>
 
-  <!-- HEADER UTAMA -->
-  <header class="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white sticky top-0 z-40 shadow-lg">
-    <div class="max-w-md mx-auto px-4 py-3.5 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-amber-400 text-blue-950 flex items-center justify-center font-extrabold text-lg shadow">
-          K3S
-        </div>
-        <div>
-          <h1 class="font-extrabold text-sm tracking-wide leading-tight">RAKOR KEPALA SD/MI 2026</h1>
-          <p class="text-[11px] text-blue-200 font-medium">K3S SD/MI Kota Kupang • 158 Sekolah</p>
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <button onclick="openApiModal()" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs" title="Pengaturan Koneksi">
-          <i class="fa-solid fa-key text-amber-300"></i>
-        </button>
-        <button id="btnLogout" onclick="logoutUser()" class="hidden p-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/40 text-rose-200 text-xs" title="Keluar / Ganti Akun">
-          <i class="fa-solid fa-right-from-bracket"></i>
-        </button>
-      </div>
-    </div>
-  </header>
+  <div class="app-shell flex flex-col justify-between">
 
-  <!-- KONTAINER UTAMA (MOBILE-FIRST MAX-W-MD) -->
-  <main class="max-w-md mx-auto px-4 pt-4 space-y-4">
-
-    <!-- BANNER STATUS KONEKSI SUPABASE -->
-    <div id="apiWarningBanner" class="hidden bg-amber-50 border border-amber-300 rounded-2xl p-4 shadow-sm">
-      <div class="flex items-start gap-3">
-        <i class="fa-solid fa-triangle-exclamation text-amber-500 text-lg mt-0.5"></i>
-        <div class="flex-1">
-          <h3 class="font-bold text-xs text-amber-900">Kunci API Supabase Belum Diisi</h3>
-          <p class="text-[11px] text-amber-800 mt-0.5">Tempelkan kode <b>anon public</b> (<code>eyJ...</code>) dari Supabase agar data 158 sekolah & panitia tampil otomatis.</p>
-          <button onclick="openApiModal()" class="mt-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm">
-            Masukkan Kunci API Sekarang
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- LAYAR 0: PILIH AKSES MASUK (LOGIN MUDAH)   -->
-    <!-- ========================================== -->
-    <section id="viewLogin" class="space-y-4">
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-        <div class="flex items-center gap-2 text-blue-800 font-bold text-xs uppercase tracking-wider mb-1">
-          <i class="fa-solid fa-circle-nodes"></i> Portal Terpadu Satu Pintu
-        </div>
-        <h2 class="text-lg font-extrabold text-slate-900">Selamat Datang di SIM-RAKOR</h2>
-        <p class="text-xs text-slate-500 mt-1">Pilih jalur masuk sesuai peran Anda pada Rapat Koordinasi Kepala SD/MI Kota Kupang 2026.</p>
-
-        <!-- Tab Pilihan Login -->
-        <div class="grid grid-cols-2 gap-2 mt-4 bg-slate-100 p-1 rounded-xl">
-          <button id="tabLoginPanitia" onclick="switchLoginTab('panitia')" class="py-2 text-xs font-bold rounded-lg bg-white text-blue-900 shadow-sm transition">
-            <i class="fa-solid fa-users-gear mr-1"></i> Panitia / Sub Rayon
-          </button>
-          <button id="tabLoginPeserta" onclick="switchLoginTab('peserta')" class="py-2 text-xs font-bold rounded-lg text-slate-600 transition">
-            <i class="fa-solid fa-school mr-1"></i> Peserta (Kepsek)
-          </button>
-        </div>
-
-        <!-- Form Login Panitia & Ketua Sub Rayon -->
-        <div id="boxLoginPanitia" class="mt-4 space-y-3">
-          <label class="block text-xs font-bold text-slate-700">Pilih Nama Panitia / Ketua Sub Rayon:</label>
-          <select id="selectPanitiaUser" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600">
-            <option value="">-- Memuat Data 19 Panitia... --</option>
-          </select>
-          <p class="text-[11px] text-slate-500 bg-blue-50/70 p-2.5 rounded-xl border border-blue-100">
-            <i class="fa-solid fa-circle-info text-blue-600 mr-1"></i>
-            <b>Multi-Role Otomatis:</b> Jika Anda juga menjabat sebagai <b>Ketua Sub Rayon</b>, menu Checklist Pendaftaran Sekolah wilayah Anda akan langsung terbuka otomatis.
-          </p>
-          <button onclick="loginAsPanitia()" class="w-full bg-blue-800 hover:bg-blue-900 active:scale-[0.99] text-white font-bold py-3 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2">
-            <span>Masuk ke Dashboard Kepanitiaan</span>
-            <i class="fa-solid fa-arrow-right"></i>
-          </button>
-        </div>
-
-        <!-- Form Login Peserta Kepala Sekolah -->
-        <div id="boxLoginPeserta" class="hidden mt-4 space-y-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Filter Sub Rayon (Kecamatan):</label>
-            <select id="filterLoginSubrayon" onchange="populateLoginSekolah()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-semibold">
-              <option value="ALL">Semua Sub Rayon (158 Sekolah)</option>
-              <option value="Maulafa">Sub Rayon Maulafa (34)</option>
-              <option value="Alak">Sub Rayon Alak (31)</option>
-              <option value="Kota Raja">Sub Rayon Kota Raja (29)</option>
-              <option value="Oebobo">Sub Rayon Oebobo (27)</option>
-              <option value="Kelapa Lima">Sub Rayon Kelapa Lima (19)</option>
-              <option value="Kota Lama">Sub Rayon Kota Lama (18)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Pilih Nama Sekolah Anda:</label>
-            <select id="selectPesertaSekolah" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-3 text-xs font-semibold">
-              <option value="">-- Pilih Sekolah --</option>
-            </select>
-          </div>
-          <button onclick="loginAsPeserta()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2">
-            <span>Buka Portal Peserta & Tiket QR</span>
-            <i class="fa-solid fa-qrcode"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Ringkasan Cepat Live (Publik) -->
-      <div class="grid grid-cols-3 gap-2.5">
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 text-center shadow-sm">
-          <div id="statPublicTotalSekolah" class="text-xl font-extrabold text-blue-900">158</div>
-          <div class="text-[10px] font-semibold text-slate-500 mt-0.5">Total SD/MI</div>
-        </div>
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 text-center shadow-sm">
-          <div id="statPublicIkut" class="text-xl font-extrabold text-emerald-600">0</div>
-          <div class="text-[10px] font-semibold text-slate-500 mt-0.5">Sekolah Ikut</div>
-        </div>
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-200 text-center shadow-sm">
-          <div id="statPublicProgresTugas" class="text-xl font-extrabold text-amber-600">0%</div>
-          <div class="text-[10px] font-semibold text-slate-500 mt-0.5">Kinerja Panitia</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- KARTU IDENTITAS USER AKTIF -->
-    <div id="userActiveCard" class="hidden bg-white rounded-2xl p-3.5 shadow-sm border border-blue-200 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div id="userAvatar" class="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 font-extrabold flex items-center justify-center text-sm">
-          U
-        </div>
-        <div>
-          <div id="userNameDisplay" class="font-extrabold text-xs text-slate-900">Nama Pengguna</div>
-          <div id="userRoleBadges" class="flex flex-wrap gap-1 mt-1"></div>
-        </div>
-      </div>
-      <button onclick="refreshAllData()" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs" title="Muat Ulang Data">
-        <i class="fa-solid fa-rotate"></i>
-      </button>
-    </div>
-
-    <!-- ===================================================== -->
-    <!-- TAB 1: DASHBOARD MONITOR UTAMA (KINERJA & SUB RAYON)  -->
-    <!-- ===================================================== -->
-    <section id="viewMonitor" class="hidden space-y-4">
+    <!-- ========================================================== -->
+    <!-- LAYAR LOGIN ANDROID (FULL SCREEN SPLASH & LOGIN CARD)      -->
+    <!-- ========================================================== -->
+    <div id="loginScreen" class="min-h-dvh bg-gradient-to-b from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col justify-between p-6 relative overflow-hidden">
       
-      <!-- Skor Gabungan Kesiapan Rakor -->
-      <div class="bg-gradient-to-br from-blue-900 to-indigo-950 text-white rounded-2xl p-5 shadow-md">
-        <div class="flex items-center justify-between">
-          <div>
-            <span class="text-[10px] uppercase tracking-wider font-bold text-amber-300 bg-amber-400/10 px-2.5 py-1 rounded-full">
-              <i class="fa-solid fa-chart-line mr-1"></i> Pantauan Real-Time K3S
-            </span>
-            <h2 class="text-base font-extrabold mt-2">Indeks Kinerja Kepanitiaan</h2>
-            <p class="text-[11px] text-blue-200">Perencanaan • Persiapan • Pelaksanaan • Evaluasi</p>
-          </div>
-          <div class="text-right">
-            <div id="mainKpiPercentage" class="text-3xl font-extrabold text-amber-400">0%</div>
-            <div id="mainKpiCount" class="text-[10px] text-blue-200">0/49 Tugas Selesai</div>
-          </div>
-        </div>
-        <div class="w-full bg-white/15 h-3 rounded-full mt-3 overflow-hidden">
-          <div id="mainKpiBar" class="bg-gradient-to-r from-amber-400 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
-        </div>
+      <!-- Dekorasi Cahaya Latar -->
+      <div class="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute top-40 -left-20 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <!-- 4 Tahapan Ringkas -->
-        <div id="tahapanGridSummary" class="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-white/10 text-center"></div>
-      </div>
-
-      <!-- Kinerja Masing-Masing Divisi Panitia -->
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <h3 class="font-extrabold text-sm text-slate-900">
-              <i class="fa-solid fa-Bolt text-amber-500 mr-1"></i> Progres Kinerja per Divisi
-            </h3>
-            <p class="text-[11px] text-slate-500">Klik nama divisi untuk melihat detail tugasnya</p>
-          </div>
-          <button onclick="openTaskModal()" class="bg-blue-800 hover:bg-blue-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1">
-            <i class="fa-solid fa-plus"></i> Tugas
-          </button>
-        </div>
-        <div id="divisiProgressList" class="space-y-3"></div>
-      </div>
-
-      <!-- Progres Pendaftaran Sekolah oleh 6 Ketua Sub Rayon -->
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <h3 class="font-extrabold text-sm text-slate-900">
-              <i class="fa-solid fa-map-location-dot text-emerald-600 mr-1"></i> Progres 6 Sub Rayon (158 SD/MI)
-            </h3>
-            <p class="text-[11px] text-slate-500">Rekap checklist keikutsertaan sekolah per wilayah</p>
-          </div>
-          <span id="badgeTotalIkutHeader" class="text-xs font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg">0 / 158 Ikut</span>
-        </div>
-        <div id="subrayonProgressList" class="space-y-3"></div>
-      </div>
-
-    </section>
-
-    <!-- ===================================================== -->
-    <!-- TAB 2: MANAJEMEN TUGAS DIVISI (TAMBAH, EDIT, HAPUS)   -->
-    <!-- ===================================================== -->
-    <section id="viewTugas" class="hidden space-y-4">
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="font-extrabold text-sm text-slate-900">Manajemen Tugas Kepanitiaan</h3>
-            <p class="text-[11px] text-slate-500">Centang status, edit, tambah, atau hapus rincian tugas</p>
-          </div>
-          <button onclick="openTaskModal()" class="bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow flex items-center gap-1.5">
-            <i class="fa-solid fa-plus"></i> Tambah Tugas
-          </button>
-        </div>
-
-        <!-- Filter Tahapan & Divisi -->
-        <div class="grid grid-cols-2 gap-2 pt-1">
-          <select id="filterTugasTahapan" onchange="renderTugasList()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-semibold">
-            <option value="ALL">Semua Tahapan (4)</option>
-            <option value="Perencanaan">1. Perencanaan</option>
-            <option value="Persiapan">2. Persiapan</option>
-            <option value="Pelaksanaan">3. Pelaksanaan</option>
-            <option value="Pasca-Acara">4. Pasca-Acara (Evaluasi)</option>
-          </select>
-          <select id="filterTugasDivisi" onchange="renderTugasList()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-semibold">
-            <option value="ALL">Semua Divisi (8)</option>
-            <option value="Penanggung Jawab">Penanggung Jawab</option>
-            <option value="Ketua Panitia">Ketua Panitia</option>
-            <option value="Sekretaris">Sekretaris</option>
-            <option value="Bendahara">Bendahara</option>
-            <option value="Seksi Kesekretariatan">Seksi Kesekretariatan</option>
-            <option value="Seksi Acara dan Humas">Seksi Acara dan Humas</option>
-            <option value="Seksi Konsumsi">Seksi Konsumsi</option>
-            <option value="Seksi Perlengkapan, Dokumentasi, dan Publikasi">Seksi Perlengkapan & Dok.</option>
-            <option value="Seksi Keamanan dan Ketertiban">Seksi Keamanan</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Daftar Kartu Tugas (Ramah Jempol HP) -->
-      <div id="tugasContainer" class="space-y-2.5"></div>
-    </section>
-
-    <!-- ===================================================== -->
-    <!-- TAB 3: CHECKLIST PENDAFTARAN 6 SUB RAYON              -->
-    <!-- ===================================================== -->
-    <section id="viewSubrayon" class="hidden space-y-4">
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="font-extrabold text-sm text-slate-900">Checklist Sekolah per Sub Rayon</h3>
-            <p id="subrayonPICInfo" class="text-[11px] text-emerald-700 font-semibold">Klik Ikut / Tidak Ikut untuk memvalidasi kehadiran</p>
-          </div>
-          <button onclick="markAllSubrayonIkut()" class="text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-xl">
-            <i class="fa-solid fa-check-double mr-1"></i> Ikut Semua
-          </button>
-        </div>
-
-        <!-- Pilihan Sub Rayon & Pencarian -->
-        <div class="grid grid-cols-2 gap-2">
-          <select id="selectActiveSubrayon" onchange="renderSubrayonSchools()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-bold text-blue-900">
-            <option value="Alak">Sub Rayon Alak (31)</option>
-            <option value="Maulafa">Sub Rayon Maulafa (34)</option>
-            <option value="Oebobo">Sub Rayon Oebobo (27)</option>
-            <option value="Kelapa Lima">Sub Rayon Kelapa Lima (19)</option>
-            <option value="Kota Raja">Sub Rayon Kota Raja (29)</option>
-            <option value="Kota Lama">Sub Rayon Kota Lama (18)</option>
-          </select>
-          <input id="searchSchoolInput" oninput="renderSubrayonSchools()" type="text" placeholder="Cari sekolah / NPSN..." class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs" />
-        </div>
-
-        <!-- Bar Statistik Wilayah Aktif -->
-        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <div class="flex justify-between text-xs font-bold mb-1">
-            <span id="subrayonStatLabel" class="text-slate-700">Progres Pendaftaran</span>
-            <span id="subrayonStatNumbers" class="text-emerald-700">0 / 0 Sekolah (0%)</span>
-          </div>
-          <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-            <div id="subrayonStatBar" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Daftar Sekolah untuk Di-Checklist -->
-      <div id="subrayonSchoolList" class="space-y-2.5"></div>
-    </section>
-
-    <!-- ===================================================== -->
-    <!-- TAB 4: PORTAL PESERTA (TIKET QR, JADWAL, MATERI)      -->
-    <!-- ===================================================== -->
-    <section id="viewPeserta" class="hidden space-y-4">
-      <!-- Kartu ID & QR Code Peserta -->
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 text-center relative overflow-hidden">
-        <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-700 via-amber-400 to-emerald-500"></div>
-        <span id="pesertaBadgeStatus" class="inline-block text-[11px] font-extrabold px-3 py-1 rounded-full bg-amber-100 text-amber-800">
-          Status: Menunggu Checklist Ketua Sub Rayon
+      <!-- Tombol Pengaturan Kunci API di Pojok Kanan Atas -->
+      <div class="flex justify-between items-center z-10">
+        <span class="text-[11px] font-bold tracking-widest uppercase text-blue-300 bg-white/10 px-3 py-1 rounded-full">
+          <i class="fa-solid fa-mobile-screen-button mr-1"></i> Android App v2.6
         </span>
-        <h2 id="pesertaNamaSekolah" class="text-base font-extrabold text-slate-900 mt-2">NAMA SEKOLAH</h2>
-        <p id="pesertaDetailSekolah" class="text-xs text-slate-500">NPSN: - • Sub Rayon: -</p>
+        <button onclick="openApiModal()" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-amber-300 shadow" title="Koneksi Database">
+          <i class="fa-solid fa-key text-sm"></i>
+        </button>
+      </div>
 
-        <!-- QR Code Box -->
-        <div class="my-4 flex justify-center">
-          <div id="qrcodeContainer" class="p-3 bg-white border-2 border-dashed border-slate-300 rounded-2xl inline-block"></div>
+      <!-- Identitas Aplikasi & Logo K3S -->
+      <div class="my-auto py-4 z-10">
+        <div class="text-center mb-6">
+          <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 mx-auto flex flex-col items-center justify-center shadow-2xl shadow-amber-500/30 border-4 border-white/20">
+            <i class="fa-solid fa-graduation-cap text-2xl"></i>
+            <span class="font-extrabold text-xs tracking-tighter mt-0.5">K3S KUPANG</span>
+          </div>
+          <h1 class="text-2xl font-extrabold tracking-tight mt-4">SIM-RAKOR 2026</h1>
+          <p class="text-xs text-blue-200 mt-1">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang</p>
         </div>
-        <p class="text-[11px] text-slate-500">Tunjukkan QR Code ini di Meja Registrasi Rakor K3S Kota Kupang</p>
 
-        <!-- Update Nama Kepala Sekolah Cepat -->
-        <div class="mt-4 pt-4 border-t border-slate-100 text-left">
-          <label class="block text-[11px] font-bold text-slate-600 mb-1">Nama Kepala Sekolah yang Hadir:</label>
-          <div class="flex gap-2">
-            <input id="inputNamaKepsek" type="text" placeholder="Ketik Nama Lengkap & Gelar..." class="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold" />
-            <button onclick="saveNamaKepsek()" class="bg-blue-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl">
-              Simpan
+        <!-- Peringatan Kunci API jika belum diisi -->
+        <div id="loginApiAlert" class="hidden mb-4 bg-amber-500/20 border border-amber-400/50 rounded-2xl p-3.5 text-left">
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-triangle-exclamation text-amber-300 mt-0.5"></i>
+            <div class="flex-1">
+              <p class="text-xs font-bold text-amber-200">Kunci API Supabase Belum Aktif</p>
+              <p class="text-[11px] text-amber-100/90 mt-0.5">Klik tombol di bawah untuk menempelkan kode <code>eyJ...</code> milikmu.</p>
+              <button onclick="openApiModal()" class="mt-2 bg-amber-400 text-slate-950 font-extrabold text-[11px] px-3 py-1.5 rounded-lg">
+                Tempel Kunci API Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kotak Kartu Login Utama -->
+        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-3xl p-5 shadow-2xl">
+          
+          <!-- Switch Peran Login -->
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-950/60 p-1.5 rounded-2xl mb-4">
+            <button id="btnRolePeserta" onclick="setLoginRole('peserta')" class="py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition">
+              <i class="fa-solid fa-school mr-1"></i> Peserta (Kepsek)
+            </button>
+            <button id="btnRolePanitia" onclick="setLoginRole('panitia')" class="py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
+              <i class="fa-solid fa-user-shield mr-1"></i> Panitia / Rayon
             </button>
           </div>
+
+          <!-- FORM 1: MASUK SEBAGAI PESERTA (KEPALA SEKOLAH) -->
+          <div id="loginFormPeserta" class="space-y-3.5">
+            <div>
+              <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Wilayah Sub Rayon:</label>
+              <select id="loginSubrayonSelect" onchange="filterLoginSchools()" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
+                <option value="ALL">Semua Wilayah (158 SD/MI)</option>
+                <option value="Maulafa">Sub Rayon Maulafa (34 Sekolah)</option>
+                <option value="Alak">Sub Rayon Alak (31 Sekolah)</option>
+                <option value="Kota Raja">Sub Rayon Kota Raja (29 Sekolah)</option>
+                <option value="Oebobo">Sub Rayon Oebobo (27 Sekolah)</option>
+                <option value="Kelapa Lima">Sub Rayon Kelapa Lima (19 Sekolah)</option>
+                <option value="Kota Lama">Sub Rayon Kota Lama (18 Sekolah)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Sekolah Anda (atau Cari NPSN):</label>
+              <select id="loginSchoolSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
+                <option value="">-- Memuat 158 Sekolah... --</option>
+              </select>
+            </div>
+            <button onclick="handleLoginSubmit('peserta')" class="w-full bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 active:scale-[0.99] text-slate-950 font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition">
+              <span>MASUK PORTAL PESERTA</span>
+              <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            </button>
+          </div>
+
+          <!-- FORM 2: MASUK SEBAGAI PANITIA & KETUA SUB RAYON -->
+          <div id="loginFormPanitia" class="hidden space-y-3.5">
+            <div>
+              <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Nama Anggota Panitia / Ketua Sub Rayon:</label>
+              <select id="loginPanitiaSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
+                <option value="">-- Memuat 19 Panitia... --</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-blue-200 mb-1">PIN Akses Kepanitiaan (Default: 2026):</label>
+              <input id="loginPinInput" type="password" inputmode="numeric" value="2026" placeholder="Masukkan PIN 2026" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-bold tracking-widest text-center text-amber-300 focus:outline-none focus:border-amber-400" />
+            </div>
+            <button onclick="handleLoginSubmit('panitia')" class="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition">
+              <span>MASUK DASHBOARD PANITIA</span>
+              <i class="fa-solid fa-shield-halved"></i>
+            </button>
+          </div>
+
         </div>
       </div>
 
-      <!-- Infografis Alur & Jadwal Kegiatan (3 Hari) -->
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-        <h3 class="font-extrabold text-sm text-slate-900 mb-3">
-          <i class="fa-solid fa-calendar-check text-blue-700 mr-1.5"></i> Lini Masa Pelaksanaan Rakor 2026
-        </h3>
-        <div class="space-y-3 text-xs">
-          <div class="flex gap-3 items-start p-3 rounded-xl bg-blue-50/60 border border-blue-100">
-            <div class="w-9 h-9 rounded-xl bg-blue-800 text-white font-extrabold flex items-center justify-center shrink-0">H1</div>
-            <div>
-              <div class="font-extrabold text-blue-950">Hari Ke-1 • Kamis, 24 Sept 2026</div>
-              <p class="text-[11px] text-slate-600 mt-0.5">Registrasi Peserta, Pembukaan Resmi Rakor K3S, Materi Kebijakan Dinas Pendidikan, Snack Sore & Makan Malam.</p>
-            </div>
-          </div>
-          <div class="flex gap-3 items-start p-3 rounded-xl bg-amber-50/60 border border-amber-100">
-            <div class="w-9 h-9 rounded-xl bg-amber-500 text-white font-extrabold flex items-center justify-center shrink-0">H2</div>
-            <div>
-              <div class="font-extrabold text-amber-950">Hari Ke-2 • Jumat, 25 Sept 2026</div>
-              <p class="text-[11px] text-slate-600 mt-0.5">Sidang Komisi Program Kerja K3S per Sub Rayon, Pleno Komisi, Penyusunan Rencana Strategis 2026/2027.</p>
-            </div>
-          </div>
-          <div class="flex gap-3 items-start p-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
-            <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white font-extrabold flex items-center justify-center shrink-0">H3</div>
-            <div>
-              <div class="font-extrabold text-emerald-950">Hari Ke-3 • Sabtu, 26 Sept 2026</div>
-              <p class="text-[11px] text-slate-600 mt-0.5">Penetapan Hasil Rakor K3S SD/MI Kota Kupang, Penutupan, dan Penerbitan E-Sertifikat.</p>
-            </div>
-          </div>
-        </div>
+      <!-- Footer Login -->
+      <div class="text-center text-[11px] text-slate-400 z-10">
+        Dikelola oleh K3S SD/MI Kota Kupang • Provinsi NTT
       </div>
-    </section>
-
-  </main>
-
-  <!-- ===================================================== -->
-  <!-- NAVIGASI BAWAH LAYAR HP (BOTTOM BAR)                  -->
-  <!-- ===================================================== -->
-  <nav id="bottomNav" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 shadow-2xl">
-    <div class="max-w-md mx-auto grid grid-cols-4 py-1.5 px-2">
-      <button id="navBtnMonitor" onclick="switchMainView('monitor')" class="flex flex-col items-center py-1.5 text-blue-800 font-bold">
-        <i class="fa-solid fa-chart-pie text-base"></i>
-        <span class="text-[10px] mt-0.5">Monitor</span>
-      </button>
-      <button id="navBtnTugas" onclick="switchMainView('tugas')" class="flex flex-col items-center py-1.5 text-slate-400 font-semibold">
-        <i class="fa-solid fa-list-check text-base"></i>
-        <span class="text-[10px] mt-0.5">Tugas Divisi</span>
-      </button>
-      <button id="navBtnSubrayon" onclick="switchMainView('subrayon')" class="flex flex-col items-center py-1.5 text-slate-400 font-semibold">
-        <i class="fa-solid fa-square-check text-base"></i>
-        <span class="text-[10px] mt-0.5">Sub Rayon</span>
-      </button>
-      <button id="navBtnPeserta" onclick="switchMainView('peserta')" class="flex flex-col items-center py-1.5 text-slate-400 font-semibold">
-        <i class="fa-solid fa-id-card text-base"></i>
-        <span class="text-[10px] mt-0.5">Tiket Peserta</span>
-      </button>
     </div>
-  </nav>
 
-  <!-- ===================================================== -->
-  <!-- MODAL TAMBAH / EDIT TUGAS PANITIA                     -->
-  <!-- ===================================================== -->
-  <div id="taskModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-3 shadow-2xl">
+    <!-- ========================================================== -->
+    <!-- LAYAR UTAMA APLIKASI ANDROID (DENGAN 5 MENU FOOTER)        -->
+    <!-- ========================================================== -->
+    <div id="mainAppScreen" class="hidden flex-1 flex flex-col pb-24">
+
+      <!-- TOP BAR ANDROID -->
+      <header class="bg-slate-900 text-white px-4 pt-4 pb-3.5 sticky top-0 z-30 shadow-md flex items-center justify-between">
+        <div class="flex items-center gap-3 min-w-0">
+          <div id="topUserAvatar" class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 font-extrabold flex items-center justify-center text-sm shrink-0 shadow">
+            K3S
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span id="topUserRoleBadge" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30">Peserta</span>
+              <span id="topUserSubrayonBadge" class="hidden text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">Rayon</span>
+            </div>
+            <h2 id="topUserName" class="font-extrabold text-xs text-white truncate mt-0.5">Nama Pengguna</h2>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button onclick="refreshAllData(true)" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-slate-200" title="Refresh Data">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+          <button onclick="openApiModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-amber-300" title="Kunci API">
+            <i class="fa-solid fa-key"></i>
+          </button>
+          <button onclick="logoutApp()" class="w-8 h-8 rounded-xl bg-rose-500/20 hover:bg-rose-500/40 flex items-center justify-center text-xs text-rose-300" title="Keluar">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- ISI KONTEN 5 MENU -->
+      <main class="p-4 space-y-4 flex-1">
+
+        <!-- ================================================== -->
+        <!-- MENU 1: BERANDA (HOME DASHBOARD)                   -->
+        <!-- ================================================== -->
+        <section id="tabContentBeranda" class="animate-view space-y-4">
+          
+          <!-- Banner Hero Rakor -->
+          <div class="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-amber-400/15 rounded-full blur-xl"></div>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+                24–26 September 2026
+              </span>
+              <span id="homeLiveIndicator" class="text-[10px] font-bold text-emerald-300 flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Database
+              </span>
+            </div>
+            <h3 class="text-base font-extrabold mt-2.5 leading-snug">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang Tahun 2026</h3>
+            <p class="text-[11px] text-blue-200 mt-1">Sinergitas Program Kerja K3S SD/MI Kota Kupang Menuju Pendidikan Berkualitas.</p>
+
+            <!-- 3 Metrik Utama di Beranda -->
+            <div class="grid grid-cols-3 gap-2 mt-4 pt-3.5 border-t border-white/10 text-center">
+              <div class="bg-white/10 rounded-2xl p-2.5">
+                <div id="homeMetricTotalSekolah" class="text-lg font-extrabold text-white">158</div>
+                <div class="text-[10px] text-blue-200">Total SD/MI</div>
+              </div>
+              <div class="bg-white/10 rounded-2xl p-2.5">
+                <div id="homeMetricIkut" class="text-lg font-extrabold text-emerald-300">0</div>
+                <div class="text-[10px] text-blue-200">Sekolah Ikut</div>
+              </div>
+              <div class="bg-white/10 rounded-2xl p-2.5">
+                <div id="homeMetricKinerja" class="text-lg font-extrabold text-amber-300">0%</div>
+                <div class="text-[10px] text-blue-200">Kesiapan Panitia</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Akses Cepat (Quick Actions) -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <button onclick="switchTab('qr')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 text-left active:scale-95 transition">
+              <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shrink-0">
+                <i class="fa-solid fa-qrcode"></i>
+              </div>
+              <div>
+                <div class="text-xs font-extrabold text-slate-900">Buka ID & QR</div>
+                <div class="text-[10px] text-slate-500">Tiket Presensi Rapat</div>
+              </div>
+            </button>
+            <button onclick="switchTab('subrayon')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 text-left active:scale-95 transition">
+              <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shrink-0">
+                <i class="fa-solid fa-map-location-dot"></i>
+              </div>
+              <div>
+                <div class="text-xs font-extrabold text-slate-900">Cek Sub Rayon</div>
+                <div class="text-[10px] text-slate-500">Data 6 Kecamatan</div>
+              </div>
+            </button>
+          </div>
+
+          <!-- Papan Pengumuman Resmi K3S -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-2.5">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-bullhorn text-amber-500"></i> Pengumuman Kepanitiaan
+              </h4>
+              <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">Terbaru</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs space-y-1">
+              <div class="font-extrabold text-amber-950">1. Pendataan Keikutsertaan Sekolah per Sub Rayon</div>
+              <p class="text-[11px] text-amber-900 leading-relaxed">Para Ketua Sub Rayon (Alak, Maulafa, Oebobo, Kelapa Lima, Kota Raja, Kota Lama) diharapkan melakukan checklist sekolah yang hadir melalui menu <b>Sub Rayon</b>.</p>
+            </div>
+            <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-xs space-y-1">
+              <div class="font-extrabold text-blue-950">2. Pemantauan Progres 49 Tugas Divisi</div>
+              <p class="text-[11px] text-blue-900 leading-relaxed">Koordinator dan anggota tiap seksi kepanitiaan dapat memperbarui status tugas pada menu <b>Kinerja</b>.</p>
+            </div>
+          </div>
+
+          <!-- Ringkasan Sebaran 6 Sub Rayon di Beranda -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                <i class="fa-solid fa-chart-simple text-emerald-600 mr-1"></i> Progres Pendaftaran Sub Rayon
+              </h4>
+              <button onclick="switchTab('subrayon')" class="text-[11px] font-bold text-blue-700">Lihat Detail &rarr;</button>
+            </div>
+            <div id="homeSubrayonBars" class="space-y-2.5"></div>
+          </div>
+
+        </section>
+
+        <!-- ================================================== -->
+        <!-- MENU 2: JADWAL & MATERI (RUNDOWN ACARA)            -->
+        <!-- ================================================== -->
+        <section id="tabContentJadwal" class="hidden animate-view space-y-4">
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs">
+            <h3 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-calendar-days text-blue-700"></i> Jadwal & Alur Kegiatan Rakor
+            </h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">Rangkaian kegiatan Rapat Koordinasi Kepala SD/MI Kota Kupang selama 3 hari.</p>
+
+            <!-- Pilih Hari -->
+            <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-2xl mt-3">
+              <button id="btnDay1" onclick="filterScheduleDay(1)" class="py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow">Hari Ke-1</button>
+              <button id="btnDay2" onclick="filterScheduleDay(2)" class="py-2 rounded-xl text-xs font-bold text-slate-600">Hari Ke-2</button>
+              <button id="btnDay3" onclick="filterScheduleDay(3)" class="py-2 rounded-xl text-xs font-bold text-slate-600">Hari Ke-3</button>
+            </div>
+
+            <!-- Timeline Hari 1 -->
+            <div id="scheduleDay1" class="mt-4 space-y-3">
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-blue-900 text-white font-extrabold text-[11px] shrink-0">08.00</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Registrasi & Check-In Peserta (Scan QR)</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Pembagian Workshop Kit, ID Card & Absensi Hari Ke-1 oleh Seksi Kesekretariatan & Perlengkapan.</p>
+                </div>
+              </div>
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-blue-900 text-white font-extrabold text-[11px] shrink-0">09.30</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Upacara Pembukaan Rakor K3S 2026</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Sambutan Ketua Panitia, Ketua K3S SD/MI Kota Kupang, dan Pembukaan Resmi oleh Kepala Dinas Pendidikan.</p>
+                </div>
+              </div>
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-[11px] shrink-0">15.30</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Sesi Materi Kebijakan & Snack Sore</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Pemaparan Narasumber Utama dilanjutkan istirahat Snack Sore & Makan Malam Hari Ke-1.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Timeline Hari 2 -->
+            <div id="scheduleDay2" class="hidden mt-4 space-y-3">
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-blue-900 text-white font-extrabold text-[11px] shrink-0">07.30</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Sarapan Pagi & Presensi Hari Ke-2</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Final Check Absensi Hari Ke-2 oleh Seksi Perlengkapan & Konsumsi.</p>
+                </div>
+              </div>
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white font-extrabold text-[11px] shrink-0">09.00</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Sidang Komisi & Penyusunan Program K3S</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Pembahasan program kerja tahunan per komisi dan koordinasi antar 6 Sub Rayon.</p>
+                </div>
+              </div>
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-[11px] shrink-0">13.00</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Makan Siang, Pleno Komisi & Makan Malam</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Pemaparan hasil sidang tiap komisi dan penyelarasan program tingkat Kota Kupang.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Timeline Hari 3 -->
+            <div id="scheduleDay3" class="hidden mt-4 space-y-3">
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-blue-900 text-white font-extrabold text-[11px] shrink-0">08.00</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Presensi Hari Ke-3 & Perumusan Hasil Akhir</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Penandatanganan kesepakatan program kerja K3S SD/MI Kota Kupang 2026.</p>
+                </div>
+              </div>
+              <div class="flex gap-3 items-start p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white font-extrabold text-[11px] shrink-0">11.00</div>
+                <div>
+                  <div class="font-extrabold text-xs text-slate-900">Penutupan Resmi, Makan Siang & E-Sertifikat</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Penyelesaian administrasi transpor peserta dan penerbitan E-Sertifikat Rakor 2026.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kartu Info Kostum & Unduh Materi -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
+            <h4 class="font-extrabold text-xs text-slate-900 uppercase tracking-wider">
+              <i class="fa-solid fa-folder-open text-amber-500 mr-1"></i> Dokumen & Panduan Peserta
+            </h4>
+            <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
+              <div class="flex items-center gap-3">
+                <i class="fa-solid fa-book text-blue-700 text-lg"></i>
+                <div>
+                  <div class="text-xs font-extrabold text-slate-900">Buku Panduan Workshop & Rakor 2026</div>
+                  <div class="text-[10px] text-slate-500">Disediakan oleh Seksi Kesekretariatan</div>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-lg">Siap</span>
+            </div>
+            <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
+              <div class="flex items-center gap-3">
+                <i class="fa-solid fa-certificate text-emerald-600 text-lg"></i>
+                <div>
+                  <div class="text-xs font-extrabold text-slate-900">E-Sertifikat Peserta & Panitia</div>
+                  <div class="text-[10px] text-slate-500">Terbit otomatis pada tahap Pasca-Acara</div>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-lg">25 Sept</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================== -->
+        <!-- MENU 3 (TENGAH): ID CARD DIGITAL & QR CODE         -->
+        <!-- ================================================== -->
+        <section id="tabContentQr" class="hidden animate-view space-y-4">
+          <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-md text-center relative overflow-hidden">
+            <div class="absolute top-0 inset-x-0 h-3 bg-gradient-to-r from-blue-900 via-amber-400 to-emerald-500"></div>
+            
+            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-900 border border-blue-200">
+              <i class="fa-solid fa-id-badge"></i> KARTU IDENTITAS DIGITAL RAKOR 2026
+            </div>
+
+            <h3 id="qrCardTitle" class="text-base font-extrabold text-slate-900 mt-3 leading-snug">NAMA SEKOLAH / PANITIA</h3>
+            <p id="qrCardSubtitle" class="text-xs font-semibold text-slate-500 mt-0.5">NPSN / Jabatan</p>
+
+            <div class="my-4">
+              <span id="qrStatusPill" class="inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800">
+                Status Kehadiran
+              </span>
+            </div>
+
+            <!-- QR Code Generator Box -->
+            <div class="flex justify-center my-3">
+              <div id="qrCodeCanvas" class="p-4 bg-white rounded-3xl border-2 border-dashed border-slate-300 shadow-inner inline-block"></div>
+            </div>
+            <p class="text-[11px] text-slate-400 font-medium">Tunjukkan QR Code ini kepada Seksi Perlengkapan / Registrasi</p>
+
+            <!-- Form Simpan Nama Kepala Sekolah (Jika Login Peserta) -->
+            <div id="qrKepsekFormBox" class="mt-5 pt-4 border-t border-slate-100 text-left">
+              <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Nama Lengkap Kepala Sekolah:</label>
+              <div class="flex gap-2">
+                <input id="qrInputNamaKepsek" type="text" placeholder="Ketik Nama & Gelar Kepala Sekolah..." class="flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold" />
+                <button onclick="saveKepsekName()" class="bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-2xl shadow">
+                  Simpan
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================== -->
+        <!-- MENU 4: SUB RAYON (CHECKLIST 158 SEKOLAH)          -->
+        <!-- ================================================== -->
+        <section id="tabContentSubrayon" class="hidden animate-view space-y-4">
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-extrabold text-sm text-slate-900">Data 6 Sub Rayon (158 SD/MI)</h3>
+                <p id="srCoordinatorLabel" class="text-[11px] font-semibold text-emerald-700">Ketua Sub Rayon: -</p>
+              </div>
+              <button id="btnMarkAllSr" onclick="markAllSubrayonSchools()" class="hidden text-[11px] font-extrabold bg-emerald-600 text-white px-3 py-1.5 rounded-xl shadow-xs">
+                <i class="fa-solid fa-check-double mr-1"></i> Ikut Semua
+              </button>
+            </div>
+
+            <!-- Pilihan 6 Sub Rayon & Pencarian -->
+            <div class="grid grid-cols-2 gap-2">
+              <select id="srSelectFilter" onchange="renderSubrayonTab()" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-extrabold text-blue-950">
+                <option value="Maulafa">Sub Rayon Maulafa (34)</option>
+                <option value="Alak">Sub Rayon Alak (31)</option>
+                <option value="Kota Raja">Sub Rayon Kota Raja (29)</option>
+                <option value="Oebobo">Sub Rayon Oebobo (27)</option>
+                <option value="Kelapa Lima">Sub Rayon Kelapa Lima (19)</option>
+                <option value="Kota Lama">Sub Rayon Kota Lama (18)</option>
+              </select>
+              <input id="srSearchInput" oninput="renderSubrayonTab()" type="text" placeholder="Cari Sekolah / NPSN..." class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-semibold" />
+            </div>
+
+            <!-- Progress Bar Sub Rayon Aktif -->
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <div class="flex justify-between items-center text-xs font-extrabold mb-1.5">
+                <span id="srProgressTitle" class="text-slate-700">Progres Sub Rayon</span>
+                <span id="srProgressNumbers" class="text-emerald-700">0 / 0 Ikut (0%)</span>
+              </div>
+              <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                <div id="srProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daftar Sekolah Sub Rayon -->
+          <div id="srSchoolCardsContainer" class="space-y-2.5"></div>
+        </section>
+
+        <!-- ================================================== -->
+        <!-- MENU 5: KINERJA PANITIA (MONITOR & CRUD 49 TUGAS)  -->
+        <!-- ================================================== -->
+        <section id="tabContentKinerja" class="hidden animate-view space-y-4">
+          
+          <!-- Kartu Persentase Total Kinerja Panitia -->
+          <div class="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-3xl p-5 shadow-md">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 bg-amber-400/10 px-2.5 py-1 rounded-full">
+                  Evaluasi Kinerja Real-Time
+                </span>
+                <h3 class="text-base font-extrabold mt-2">Total Progres Kepanitiaan</h3>
+                <p id="kinerjaSubtitleCount" class="text-[11px] text-blue-200">0 dari 49 Tugas Selesai</p>
+              </div>
+              <div id="kinerjaBigPercent" class="text-3xl font-extrabold text-amber-400">0%</div>
+            </div>
+            <div class="w-full bg-white/15 h-3 rounded-full mt-3 overflow-hidden">
+              <div id="kinerjaBigBar" class="bg-gradient-to-r from-amber-400 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <!-- 4 Tahapan Mini Cards -->
+            <div id="kinerjaPhaseGrid" class="grid grid-cols-4 gap-1.5 mt-4 pt-3 border-t border-white/10 text-center"></div>
+          </div>
+
+          <!-- Rapor Persentase Masing-Masing Divisi -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h4 class="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Rapor Kinerja 9 Divisi Panitia</h4>
+                <p class="text-[10px] text-slate-500">Klik salah satu divisi untuk memfilter daftar tugas di bawah</p>
+              </div>
+              <button id="btnAddTaskTop" onclick="openTaskModal()" class="bg-blue-900 hover:bg-blue-800 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1">
+                <i class="fa-solid fa-plus"></i> Tugas Baru
+              </button>
+            </div>
+            <div id="kinerjaDivisiBars" class="space-y-2.5"></div>
+          </div>
+
+          <!-- Filter & Daftar 49 Tugas (CRUD) -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Daftar Rincian Tugas Divisi</h4>
+              <button onclick="resetTaskFilters()" class="text-[11px] font-bold text-blue-700">Tampilkan Semua</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <select id="taskFilterPhase" onchange="renderTaskList()" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-bold">
+                <option value="ALL">Semua Tahapan (4)</option>
+                <option value="Perencanaan">1. Perencanaan</option>
+                <option value="Persiapan">2. Persiapan</option>
+                <option value="Pelaksanaan">3. Pelaksanaan</option>
+                <option value="Pasca-Acara">4. Pasca-Acara</option>
+              </select>
+              <select id="taskFilterDivisi" onchange="renderTaskList()" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-bold">
+                <option value="ALL">Semua Divisi</option>
+                <option value="Penanggung Jawab">Penanggung Jawab</option>
+                <option value="Ketua Panitia">Ketua Panitia</option>
+                <option value="Sekretaris">Sekretaris</option>
+                <option value="Bendahara">Bendahara</option>
+                <option value="Seksi Kesekretariatan">Seksi Kesekretariatan</option>
+                <option value="Seksi Acara dan Humas">Seksi Acara dan Humas</option>
+                <option value="Seksi Konsumsi">Seksi Konsumsi</option>
+                <option value="Seksi Perlengkapan, Dokumentasi, dan Publikasi">Seksi Perlengkapan & Dok.</option>
+                <option value="Seksi Keamanan dan Ketertiban">Seksi Keamanan</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Kontainer Kartu Tugas -->
+          <div id="taskCardsContainer" class="space-y-2.5"></div>
+
+        </section>
+
+      </main>
+
+      <!-- ========================================================== -->
+      <!-- 5 MENU FOOTER ANDROID (BOTTOM NAVIGATION BAR)              -->
+      <!-- ========================================================== -->
+      <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-slate-200 px-2 py-1.5 z-40 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
+        <div class="grid grid-cols-5 items-center">
+          
+          <!-- Menu 1: Beranda -->
+          <button id="footerBtnBeranda" onclick="switchTab('beranda')" class="flex flex-col items-center justify-center py-1 text-blue-900 font-extrabold">
+            <i class="fa-solid fa-house text-base"></i>
+            <span class="text-[10px] mt-1">Beranda</span>
+          </button>
+
+          <!-- Menu 2: Jadwal -->
+          <button id="footerBtnJadwal" onclick="switchTab('jadwal')" class="flex flex-col items-center justify-center py-1 text-slate-400 font-semibold">
+            <i class="fa-solid fa-calendar-check text-base"></i>
+            <span class="text-[10px] mt-1">Jadwal</span>
+          </button>
+
+          <!-- Menu 3 (Tengah Menonjol): ID & QR -->
+          <div class="flex justify-center">
+            <button id="footerBtnQr" onclick="switchTab('qr')" class="-mt-6 w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-900 to-indigo-700 text-amber-300 shadow-lg shadow-blue-900/40 border-4 border-white flex flex-col items-center justify-center active:scale-95 transition">
+              <i class="fa-solid fa-qrcode text-lg"></i>
+              <span class="text-[9px] font-extrabold text-white leading-none mt-0.5">ID & QR</span>
+            </button>
+          </div>
+
+          <!-- Menu 4: Sub Rayon -->
+          <button id="footerBtnSubrayon" onclick="switchTab('subrayon')" class="flex flex-col items-center justify-center py-1 text-slate-400 font-semibold">
+            <i class="fa-solid fa-school-flag text-base"></i>
+            <span class="text-[10px] mt-1">Sub Rayon</span>
+          </button>
+
+          <!-- Menu 5: Kinerja Panitia -->
+          <button id="footerBtnKinerja" onclick="switchTab('kinerja')" class="flex flex-col items-center justify-center py-1 text-slate-400 font-semibold">
+            <i class="fa-solid fa-chart-pie text-base"></i>
+            <span class="text-[10px] mt-1">Kinerja</span>
+          </button>
+
+        </div>
+      </nav>
+
+    </div>
+
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- MODAL TAMBAH / EDIT TUGAS KEPANITIAAN                      -->
+  <!-- ========================================================== -->
+  <div id="taskModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-3.5 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-        <h3 id="modalTaskTitle" class="font-extrabold text-sm text-slate-900">Tambah Tugas Kepanitiaan</h3>
-        <button onclick="closeTaskModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+        <h3 id="modalTaskHeader" class="font-extrabold text-sm text-slate-900">Tambah Tugas Kepanitiaan</h3>
+        <button onclick="closeTaskModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">&times;</button>
       </div>
-      <input type="hidden" id="formTaskId" />
+      <input type="hidden" id="modalTaskId" />
       <div>
         <label class="block text-[11px] font-bold text-slate-700 mb-1">Nama Pekerjaan / Tugas:</label>
-        <input id="formNamaPekerjaan" type="text" placeholder="Contoh: Koordinasi Rundown Acara..." class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold" />
+        <input id="modalTaskName" type="text" placeholder="Contoh: Penataan Parkir & Keamanan..." class="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-xs font-semibold" />
       </div>
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-2 gap-2.5">
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Divisi Kepanitiaan:</label>
-          <select id="formDivisi" class="w-full rounded-xl border border-slate-300 px-2.5 py-2 text-xs font-semibold">
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">Divisi / Seksi:</label>
+          <select id="modalTaskDivisi" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
             <option value="Penanggung Jawab">Penanggung Jawab</option>
             <option value="Ketua Panitia">Ketua Panitia</option>
             <option value="Sekretaris">Sekretaris</option>
@@ -419,8 +621,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Tahapan Kegiatan:</label>
-          <select id="formTahapan" class="w-full rounded-xl border border-slate-300 px-2.5 py-2 text-xs font-semibold">
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">Tahapan:</label>
+          <select id="modalTaskPhase" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
             <option value="Perencanaan">Perencanaan</option>
             <option value="Persiapan">Persiapan</option>
             <option value="Pelaksanaan">Pelaksanaan</option>
@@ -428,14 +630,14 @@
           </select>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-2 gap-2.5">
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Batas Waktu (Deadline):</label>
-          <input id="formDeadline" type="date" value="2026-09-23" class="w-full rounded-xl border border-slate-300 px-2.5 py-2 text-xs font-semibold" />
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">Tenggat Waktu:</label>
+          <input id="modalTaskDeadline" type="date" value="2026-09-23" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold" />
         </div>
         <div>
           <label class="block text-[11px] font-bold text-slate-700 mb-1">Status Tugas:</label>
-          <select id="formStatus" class="w-full rounded-xl border border-slate-300 px-2.5 py-2 text-xs font-semibold">
+          <select id="modalTaskStatus" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
             <option value="Belum Mulai">Belum Mulai</option>
             <option value="Sedang Berjalan">Sedang Berjalan</option>
             <option value="Selesai">Selesai</option>
@@ -443,57 +645,59 @@
         </div>
       </div>
       <div class="pt-2 flex gap-2">
-        <button onclick="closeTaskModal()" class="w-1/3 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">Batal</button>
-        <button onclick="saveTaskForm()" class="w-2/3 py-2.5 rounded-xl bg-blue-800 text-white font-bold text-xs shadow">Simpan Tugas</button>
+        <button onclick="closeTaskModal()" class="w-1/3 py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-xs">Batal</button>
+        <button onclick="saveTaskModal()" class="w-2/3 py-3 rounded-2xl bg-blue-900 text-white font-extrabold text-xs shadow-lg">Simpan Tugas</button>
       </div>
     </div>
   </div>
 
-  <!-- ===================================================== -->
-  <!-- MODAL KUNCI KONEKSI SUPABASE (AMAN DARI BLOKIR CHAT)  -->
-  <!-- ===================================================== -->
-  <div id="apiModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl p-5 space-y-3 shadow-2xl">
-      <div class="flex items-center justify-between border-b pb-2">
-        <h3 class="font-extrabold text-sm text-slate-900"><i class="fa-solid fa-key text-amber-500 mr-1"></i> Koneksi Database Supabase</h3>
-        <button onclick="closeApiModal()" class="text-slate-400 hover:text-slate-700 text-lg">&times;</button>
+  <!-- ========================================================== -->
+  <!-- MODAL KUNCI KONEKSI SUPABASE                               -->
+  <!-- ========================================================== -->
+  <div id="apiModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 space-y-3.5 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h3 class="font-extrabold text-sm text-slate-900">
+          <i class="fa-solid fa-database text-blue-700 mr-1.5"></i> Koneksi Database Supabase
+        </h3>
+        <button onclick="closeApiModal()" class="text-slate-400 hover:text-slate-700 text-lg font-bold">&times;</button>
       </div>
       <div>
-        <label class="block text-[11px] font-bold text-slate-600 mb-1">Supabase Project URL:</label>
-        <input id="inputSupabaseUrl" type="text" value="https://etjdsxqodvfozjkshzxp.supabase.co" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono" />
+        <label class="block text-[11px] font-bold text-slate-600 mb-1">Project URL Supabase:</label>
+        <input id="apiUrlInput" type="text" value="https://etjdsxqodvfozjkshzxp.supabase.co" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono" />
       </div>
       <div>
-        <label class="block text-[11px] font-bold text-slate-600 mb-1">Supabase Anon Public Key (diawali <code>eyJ...</code>):</label>
-        <textarea id="inputSupabaseKey" rows="3" placeholder="Tempelkan (Paste) kode anon public eyJ... milikmu di sini" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-mono"></textarea>
+        <label class="block text-[11px] font-bold text-slate-600 mb-1">Anon Public Key (diawali <code>eyJ...</code>):</label>
+        <textarea id="apiKeyInput" rows="3" placeholder="Tempelkan kode eyJ... dari menu API Keys Supabase di sini" class="w-full rounded-2xl border border-slate-300 px-3 py-2 text-xs font-mono"></textarea>
       </div>
-      <button onclick="saveApiConfig()" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-2.5 rounded-xl text-xs shadow">
-        Hubungkan & Muat Data Sekarang
+      <button onclick="saveApiKey()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-extrabold py-3 rounded-2xl text-xs shadow">
+        Simpan & Hubungkan Database
       </button>
     </div>
   </div>
 
-  <!-- TOAST NOTIFIKASI -->
-  <div id="toastBox" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg">
-    Notifikasi
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastBanner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white border border-white/15 text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toastText">Berhasil</span>
   </div>
 
   <script>
     // =========================================================================
     // KONFIGURASI SUPABASE
-    // Tips: Kamu bisa langsung menempelkan kode eyJ... di dalam tanda kutip
-    // DEFAULT_SUPABASE_KEY di bawah ini agar semua HP langsung terhubung otomatis!
+    // Tempelkan kode eyJ... milikmu di dalam tanda kutip DEFAULT_SB_KEY
+    // saat mengedit file ini di GitHub agar semua HP otomatis terhubung!
     // =========================================================================
-    const DEFAULT_SUPABASE_URL = "https://etjdsxqodvfozjkshzxp.supabase.co";
-    const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0amRzeHFvZHZmb3pqa3NoenhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzODcyMTUsImV4cCI6MjEwOTk2MzIxNX0.w2Jn2UnCtJhlvBg0cAkvjJ7qTjDhryDcEn5X0tqEjjA"; // <-- TEMPELKAN KODE eyJ... DI SINI NANTI
+    const DEFAULT_SB_URL = "https://etjdsxqodvfozjkshzxp.supabase.co";
+    const DEFAULT_SB_KEY = ""; // <-- TEMPELKAN KODE eyJ... DI SINI
 
-    let supabaseClient = null;
-    let panitiaData = [];
-    let tugasData = [];
-    let sekolahData = [];
-    let currentUser = null; // { mode: 'panitia'|'peserta', data: {...} }
+    let sb = null;
+    let panitiaList = [];
+    let tugasList = [];
+    let sekolahList = [];
+    let activeSession = null; // { role: 'peserta'|'panitia', profile: {...} }
 
-    // Daftar 8 Divisi Resmi SK Panitia
-    const ALL_DIVISI = [
+    const DIVISI_LIST = [
       "Penanggung Jawab",
       "Ketua Panitia",
       "Sekretaris",
@@ -505,402 +709,566 @@
       "Seksi Keamanan dan Ketertiban"
     ];
 
-    const ALL_SUBRAYON = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
+    const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
-    // Inisialisasi saat halaman dibuka
     window.addEventListener("DOMContentLoaded", () => {
-      initSupabaseConnection();
+      bootSupabase();
     });
 
-    function initSupabaseConnection() {
-      const savedUrl = localStorage.getItem("rakor_sb_url") || DEFAULT_SUPABASE_URL;
-      const savedKey = localStorage.getItem("rakor_sb_key") || DEFAULT_SUPABASE_KEY;
+    function bootSupabase() {
+      const url = localStorage.getItem("k3s_sb_url") || DEFAULT_SB_URL;
+      const key = localStorage.getItem("k3s_sb_key") || DEFAULT_SB_KEY;
 
-      document.getElementById("inputSupabaseUrl").value = savedUrl;
-      document.getElementById("inputSupabaseKey").value = savedKey;
+      document.getElementById("apiUrlInput").value = url;
+      document.getElementById("apiKeyInput").value = key;
 
-      if (!savedKey || !savedKey.startsWith("eyJ")) {
-        document.getElementById("apiWarningBanner").classList.remove("hidden");
-        openApiModal();
+      if (!key || !key.startsWith("eyJ")) {
+        document.getElementById("loginApiAlert").classList.remove("hidden");
         return;
       }
 
-      document.getElementById("apiWarningBanner").classList.add("hidden");
-      supabaseClient = window.supabase.createClient(savedUrl, savedKey);
-      refreshAllData();
-      subscribeRealtime();
+      document.getElementById("loginApiAlert").classList.add("hidden");
+      sb = window.supabase.createClient(url, key);
+      refreshAllData(false);
+      setupRealtimeChannel();
     }
 
-    function saveApiConfig() {
-      const url = document.getElementById("inputSupabaseUrl").value.trim();
-      const key = document.getElementById("inputSupabaseKey").value.trim();
+    function saveApiKey() {
+      const url = document.getElementById("apiUrlInput").value.trim();
+      const key = document.getElementById("apiKeyInput").value.trim();
       if (!key.startsWith("eyJ")) {
-        showToast("Kode Anon Key harus diawali huruf eyJ...");
+        toast("Kode Anon Public Key harus diawali huruf eyJ...");
         return;
       }
-      localStorage.setItem("rakor_sb_url", url);
-      localStorage.setItem("rakor_sb_key", key);
+      localStorage.setItem("k3s_sb_url", url);
+      localStorage.setItem("k3s_sb_key", key);
       closeApiModal();
-      initSupabaseConnection();
-      showToast("Berhasil terhubung ke Supabase!");
+      bootSupabase();
+      toast("Database Supabase Terhubung!");
     }
 
-    async function refreshAllData() {
-      if (!supabaseClient) return;
+    async function refreshAllData(showNotif = false) {
+      if (!sb) return;
       try {
-        const [resPanitia, resTugas, resSekolah] = await Promise.all([
-          supabaseClient.from("panitia_rakor").select("*").order("no", { ascending: true }),
-          supabaseClient.from("manajemen_tugas").select("*").order("deadline", { ascending: true }),
-          supabaseClient.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true })
+        const [rPan, rTgs, rSek] = await Promise.all([
+          sb.from("panitia_rakor").select("*").order("no", { ascending: true }),
+          sb.from("manajemen_tugas").select("*").order("deadline", { ascending: true }),
+          sb.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true })
         ]);
 
-        if (resPanitia.data) panitiaData = resPanitia.data;
-        if (resTugas.data) tugasData = resTugas.data;
-        if (resSekolah.data) sekolahData = resSekolah.data;
+        if (rPan.data) panitiaList = rPan.data;
+        if (rTgs.data) tugasList = rTgs.data;
+        if (rSek.data) sekolahList = rSek.data;
 
-        populateLoginDropdowns();
-        updatePublicStats();
-        renderAllViews();
-      } catch (err) {
-        console.error(err);
-        showToast("Gagal memuat data, periksa kunci API.");
+        populateLoginInputs();
+        renderAllTabs();
+        if (showNotif) toast("Data terbaru berhasil dimuat!");
+      } catch (e) {
+        console.error(e);
       }
     }
 
-    function subscribeRealtime() {
-      if (!supabaseClient) return;
-      supabaseClient
-        .channel("rakor-realtime")
-        .on("postgres_changes", { event: "*", schema: "public", table: "manajemen_tugas" }, () => refreshAllData())
-        .on("postgres_changes", { event: "*", schema: "public", table: "db_sekolah" }, () => refreshAllData())
+    function setupRealtimeChannel() {
+      if (!sb) return;
+      sb.channel("k3s-live-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "manajemen_tugas" }, () => refreshAllData(false))
+        .on("postgres_changes", { event: "*", schema: "public", table: "db_sekolah" }, () => refreshAllData(false))
         .subscribe();
     }
 
     // =========================================================================
-    // LOGIN & MULTI-ROLE SYSTEM
+    // SISTEM LOGIN LAYAR PENUH ANDROID
     // =========================================================================
-    function populateLoginDropdowns() {
-      const selPan = document.getElementById("selectPanitiaUser");
-      selPan.innerHTML = `<option value="">-- Pilih Nama Anda (${panitiaData.length} Panitia) --</option>`;
-      panitiaData.forEach(p => {
-        const srBadge = p.tugas_subrayon ? ` [Ketua Sub Rayon ${p.tugas_subrayon}]` : "";
-        selPan.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} — ${p.divisi}${srBadge}</option>`;
+    function setLoginRole(role) {
+      const isPeserta = role === "peserta";
+      document.getElementById("loginFormPeserta").classList.toggle("hidden", !isPeserta);
+      document.getElementById("loginFormPanitia").classList.toggle("hidden", isPeserta);
+
+      document.getElementById("btnRolePeserta").className = isPeserta
+        ? "py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition"
+        : "py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition";
+
+      document.getElementById("btnRolePanitia").className = !isPeserta
+        ? "py-2.5 rounded-xl text-xs font-extrabold bg-blue-500 text-white shadow transition"
+        : "py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition";
+    }
+
+    function populateLoginInputs() {
+      filterLoginSchools();
+      const selPan = document.getElementById("loginPanitiaSelect");
+      selPan.innerHTML = `<option value="">-- Pilih Nama Panitia (${panitiaList.length} Orang) --</option>`;
+      panitiaList.forEach(p => {
+        const rayonTag = p.tugas_subrayon ? ` ★ Ketua Rayon ${p.tugas_subrayon}` : "";
+        selPan.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${rayonTag})</option>`;
       });
-      populateLoginSekolah();
     }
 
-    function populateLoginSekolah() {
-      const sub = document.getElementById("filterLoginSubrayon").value;
-      const selSek = document.getElementById("selectPesertaSekolah");
-      const filtered = sub === "ALL" ? sekolahData : sekolahData.filter(s => s.subrayon === sub);
-      selSek.innerHTML = `<option value="">-- Pilih Sekolah (${filtered.length} SD/MI) --</option>`;
-      filtered.forEach(s => {
-        selSek.innerHTML += `<option value="${s.id_sekolah}">${s.nama_sekolah} (${s.subrayon})</option>`;
+    function filterLoginSchools() {
+      const sr = document.getElementById("loginSubrayonSelect").value;
+      const selSek = document.getElementById("loginSchoolSelect");
+      const list = sr === "ALL" ? sekolahList : sekolahList.filter(s => s.subrayon === sr);
+      selSek.innerHTML = `<option value="">-- Pilih Sekolah (${list.length} SD/MI) --</option>`;
+      list.forEach(s => {
+        selSek.innerHTML += `<option value="${s.id_sekolah}">${s.nama_sekolah} — ${s.npsn}</option>`;
       });
     }
 
-    function switchLoginTab(tab) {
-      const isPan = tab === "panitia";
-      document.getElementById("boxLoginPanitia").classList.toggle("hidden", !isPan);
-      document.getElementById("boxLoginPeserta").classList.toggle("hidden", isPan);
-      document.getElementById("tabLoginPanitia").className = isPan
-        ? "py-2 text-xs font-bold rounded-lg bg-white text-blue-900 shadow-sm transition"
-        : "py-2 text-xs font-bold rounded-lg text-slate-600 transition";
-      document.getElementById("tabLoginPeserta").className = !isPan
-        ? "py-2 text-xs font-bold rounded-lg bg-white text-emerald-800 shadow-sm transition"
-        : "py-2 text-xs font-bold rounded-lg text-slate-600 transition";
-    }
-
-    function loginAsPanitia() {
-      const idPan = document.getElementById("selectPanitiaUser").value;
-      if (!idPan) return showToast("Pilih nama panitia terlebih dahulu!");
-      const person = panitiaData.find(p => p.id_panitia === idPan);
-      if (!person) return;
-
-      currentUser = { mode: "panitia", data: person };
-      setupActiveUserUI();
-
-      // Jika punya rangkap jabatan Ketua Sub Rayon, set default filter Sub Rayon ke wilayahnya
-      if (person.tugas_subrayon) {
-        document.getElementById("selectActiveSubrayon").value = person.tugas_subrayon;
+    function handleLoginSubmit(role) {
+      if (!sb) {
+        openApiModal();
+        return toast("Hubungkan Kunci API Supabase terlebih dahulu!");
       }
-      document.getElementById("filterTugasDivisi").value = person.divisi;
-      switchMainView("monitor");
-    }
 
-    function loginAsPeserta() {
-      const idSek = document.getElementById("selectPesertaSekolah").value;
-      if (!idSek) return showToast("Pilih nama sekolah terlebih dahulu!");
-      const school = sekolahData.find(s => s.id_sekolah === idSek);
-      if (!school) return;
-
-      currentUser = { mode: "peserta", data: school };
-      setupActiveUserUI();
-      switchMainView("peserta");
-    }
-
-    function setupActiveUserUI() {
-      document.getElementById("viewLogin").classList.add("hidden");
-      document.getElementById("userActiveCard").classList.remove("hidden");
-      document.getElementById("bottomNav").classList.remove("hidden");
-      document.getElementById("btnLogout").classList.remove("hidden");
-
-      const badgesEl = document.getElementById("userRoleBadges");
-      badgesEl.innerHTML = "";
-
-      if (currentUser.mode === "panitia") {
-        const p = currentUser.data;
-        document.getElementById("userAvatar").textContent = p.nama_panitia.charAt(0);
-        document.getElementById("userNameDisplay").textContent = p.nama_panitia;
-        badgesEl.innerHTML += `<span class="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">${p.divisi} (${p.jabatan})</span>`;
-        if (p.tugas_subrayon) {
-          badgesEl.innerHTML += `<span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md"><i class="fa-solid fa-star mr-1"></i>Ketua Sub Rayon ${p.tugas_subrayon}</span>`;
-        }
+      if (role === "peserta") {
+        const idSek = document.getElementById("loginSchoolSelect").value;
+        if (!idSek) return toast("Pilih nama sekolah Anda terlebih dahulu!");
+        const school = sekolahList.find(s => s.id_sekolah === idSek);
+        if (!school) return;
+        activeSession = { role: "peserta", profile: school };
       } else {
-        const s = currentUser.data;
-        document.getElementById("userAvatar").textContent = "KS";
-        document.getElementById("userNameDisplay").textContent = s.nama_sekolah;
-        badgesEl.innerHTML += `<span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">Peserta Rakor • Sub Rayon ${s.subrayon}</span>`;
+        const idPan = document.getElementById("loginPanitiaSelect").value;
+        const pin = document.getElementById("loginPinInput").value.trim();
+        if (!idPan) return toast("Pilih nama panitia terlebih dahulu!");
+        if (pin !== "2026") return toast("PIN Panitia salah! Gunakan PIN: 2026");
+        const person = panitiaList.find(p => p.id_panitia === idPan);
+        if (!person) return;
+        activeSession = { role: "panitia", profile: person };
       }
-      renderAllViews();
+
+      enterMainApp();
     }
 
-    function logoutUser() {
-      currentUser = null;
-      document.getElementById("viewLogin").classList.remove("hidden");
-      document.getElementById("userActiveCard").classList.add("hidden");
-      document.getElementById("bottomNav").classList.add("hidden");
-      document.getElementById("btnLogout").classList.add("hidden");
-      ["viewMonitor", "viewTugas", "viewSubrayon", "viewPeserta"].forEach(id => {
-        document.getElementById(id).classList.add("hidden");
-      });
+    function enterMainApp() {
+      document.getElementById("loginScreen").classList.add("hidden");
+      document.getElementById("mainAppScreen").classList.remove("hidden");
+
+      const avatar = document.getElementById("topUserAvatar");
+      const nameEl = document.getElementById("topUserName");
+      const roleBadge = document.getElementById("topUserRoleBadge");
+      const srBadge = document.getElementById("topUserSubrayonBadge");
+
+      if (activeSession.role === "panitia") {
+        const p = activeSession.profile;
+        avatar.textContent = p.nama_panitia.charAt(0);
+        nameEl.textContent = p.nama_panitia;
+        roleBadge.textContent = p.divisi;
+        if (p.tugas_subrayon) {
+          srBadge.textContent = `Ketua Rayon ${p.tugas_subrayon}`;
+          srBadge.classList.remove("hidden");
+          document.getElementById("srSelectFilter").value = p.tugas_subrayon;
+        } else {
+          srBadge.classList.add("hidden");
+        }
+        document.getElementById("taskFilterDivisi").value = p.divisi;
+      } else {
+        const s = activeSession.profile;
+        avatar.textContent = "SD";
+        nameEl.textContent = s.nama_sekolah;
+        roleBadge.textContent = `NPSN: ${s.npsn}`;
+        srBadge.textContent = `Sub Rayon ${s.subrayon}`;
+        srBadge.classList.remove("hidden");
+        document.getElementById("srSelectFilter").value = s.subrayon;
+      }
+
+      switchTab("beranda");
+      renderAllTabs();
     }
 
-    function switchMainView(view) {
-      const views = {
-        monitor: "viewMonitor",
-        tugas: "viewTugas",
-        subrayon: "viewSubrayon",
-        peserta: "viewPeserta"
-      };
-      const navs = {
-        monitor: "navBtnMonitor",
-        tugas: "navBtnTugas",
-        subrayon: "navBtnSubrayon",
-        peserta: "navBtnPeserta"
-      };
-
-      Object.keys(views).forEach(k => {
-        document.getElementById(views[k]).classList.toggle("hidden", k !== view);
-        document.getElementById(navs[k]).className =
-          k === view
-            ? "flex flex-col items-center py-1.5 text-blue-800 font-extrabold"
-            : "flex flex-col items-center py-1.5 text-slate-400 font-semibold";
-      });
-      renderAllViews();
+    function logoutApp() {
+      activeSession = null;
+      document.getElementById("mainAppScreen").classList.add("hidden");
+      document.getElementById("loginScreen").classList.remove("hidden");
     }
 
     // =========================================================================
-    // RENDER DASHBOARD MONITOR, TUGAS DIVISI & 6 SUB RAYON
+    // NAVIGASI 5 MENU FOOTER ANDROID
     // =========================================================================
-    function updatePublicStats() {
-      const totalSek = sekolahData.length || 158;
-      const ikutSek = sekolahData.filter(s => s.status_ikut === "Ikut").length;
-      const totalTgs = tugasData.length || 1;
-      const selesaiTgs = tugasData.filter(t => t.status === "Selesai").length;
-      const pctTgs = Math.round((selesaiTgs / totalTgs) * 100);
+    function switchTab(tabName) {
+      const tabs = {
+        beranda: "tabContentBeranda",
+        jadwal: "tabContentJadwal",
+        qr: "tabContentQr",
+        subrayon: "tabContentSubrayon",
+        kinerja: "tabContentKinerja"
+      };
+      const btns = {
+        beranda: "footerBtnBeranda",
+        jadwal: "footerBtnJadwal",
+        subrayon: "footerBtnSubrayon",
+        kinerja: "footerBtnKinerja"
+      };
 
-      document.getElementById("statPublicTotalSekolah").textContent = totalSek;
-      document.getElementById("statPublicIkut").textContent = ikutSek;
-      document.getElementById("statPublicProgresTugas").textContent = pctTgs + "%";
-    }
-
-    function renderAllViews() {
-      renderMonitorDashboard();
-      renderTugasList();
-      renderSubrayonSchools();
-      renderPesertaPortal();
-    }
-
-    function renderMonitorDashboard() {
-      const totalTgs = tugasData.length;
-      const selesaiTgs = tugasData.filter(t => t.status === "Selesai").length;
-      const pctMain = totalTgs > 0 ? Math.round((selesaiTgs / totalTgs) * 100) : 0;
-
-      document.getElementById("mainKpiPercentage").textContent = pctMain + "%";
-      document.getElementById("mainKpiCount").textContent = `${selesaiTgs}/${totalTgs} Tugas Selesai`;
-      document.getElementById("mainKpiBar").style.width = pctMain + "%";
-
-      // 4 Tahapan Summary
-      const tahapanNames = ["Perencanaan", "Persiapan", "Pelaksanaan", "Pasca-Acara"];
-      const tahGrid = document.getElementById("tahapanGridSummary");
-      tahGrid.innerHTML = "";
-      tahapanNames.forEach(th => {
-        const list = tugasData.filter(t => t.tahapan === th);
-        const done = list.filter(t => t.status === "Selesai").length;
-        const pct = list.length > 0 ? Math.round((done / list.length) * 100) : 0;
-        tahGrid.innerHTML += `
-          <div class="bg-white/10 rounded-xl p-2">
-            <div class="text-xs font-extrabold text-amber-300">${pct}%</div>
-            <div class="text-[9px] text-blue-100 font-semibold truncate">${th}</div>
-            <div class="text-[9px] text-blue-300">${done}/${list.length}</div>
-          </div>
-        `;
+      Object.keys(tabs).forEach(k => {
+        document.getElementById(tabs[k]).classList.toggle("hidden", k !== tabName);
       });
 
-      // Kinerja per Divisi
-      const divContainer = document.getElementById("divisiProgressList");
-      divContainer.innerHTML = "";
-      ALL_DIVISI.forEach(div => {
-        const list = tugasData.filter(t => t.divisi === div);
-        const done = list.filter(t => t.status === "Selesai").length;
-        const pct = list.length > 0 ? Math.round((done / list.length) * 100) : 0;
-        const barColor = pct === 100 ? "bg-emerald-500" : pct > 0 ? "bg-blue-600" : "bg-slate-300";
+      Object.keys(btns).forEach(k => {
+        document.getElementById(btns[k]).className =
+          k === tabName
+            ? "flex flex-col items-center justify-center py-1 text-blue-900 font-extrabold"
+            : "flex flex-col items-center justify-center py-1 text-slate-400 font-semibold";
+      });
 
-        divContainer.innerHTML += `
-          <div onclick="jumpToDivisi('${div}')" class="p-3 rounded-xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 cursor-pointer transition">
-            <div class="flex justify-between items-center text-xs font-bold mb-1">
-              <span class="text-slate-800 truncate pr-2">${div}</span>
-              <span class="text-blue-900 shrink-0">${done}/${list.length} (${pct}%)</span>
+      renderAllTabs();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function filterScheduleDay(day) {
+      [1, 2, 3].forEach(d => {
+        document.getElementById(`scheduleDay${d}`).classList.toggle("hidden", d !== day);
+        document.getElementById(`btnDay${d}`).className =
+          d === day
+            ? "py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow"
+            : "py-2 rounded-xl text-xs font-bold text-slate-600";
+      });
+    }
+
+    // =========================================================================
+    // RENDER SELURUH DATA KE 5 TAB
+    // =========================================================================
+    function renderAllTabs() {
+      renderBerandaTab();
+      renderQrTab();
+      renderSubrayonTab();
+      renderKinerjaTab();
+    }
+
+    function renderBerandaTab() {
+      const totalSek = sekolahList.length || 158;
+      const ikutSek = sekolahList.filter(s => s.status_ikut === "Ikut").length;
+      const totalTgs = tugasList.length || 1;
+      const doneTgs = tugasList.filter(t => t.status === "Selesai").length;
+      const pctTgs = Math.round((doneTgs / totalTgs) * 100);
+
+      document.getElementById("homeMetricTotalSekolah").textContent = totalSek;
+      document.getElementById("homeMetricIkut").textContent = ikutSek;
+      document.getElementById("homeMetricKinerja").textContent = pctTgs + "%";
+
+      const srBox = document.getElementById("homeSubrayonBars");
+      srBox.innerHTML = "";
+      SUBRAYON_LIST.forEach(sr => {
+        const all = sekolahList.filter(s => s.subrayon === sr);
+        const ikut = all.filter(s => s.status_ikut === "Ikut").length;
+        const pct = all.length > 0 ? Math.round((ikut / all.length) * 100) : 0;
+        const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
+
+        srBox.innerHTML += `
+          <div onclick="openSubrayonFromHome('${sr}')" class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span class="text-slate-800">Sub Rayon ${sr} <span class="text-[10px] font-normal text-slate-500">(${ketua ? ketua.nama_panitia.split(',')[0] : ''})</span></span>
+              <span class="text-emerald-700 font-extrabold">${ikut}/${all.length} (${pct}%)</span>
             </div>
             <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-              <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${pct}%"></div>
-            </div>
-          </div>
-        `;
-      });
-
-      // Progres 6 Sub Rayon
-      const srContainer = document.getElementById("subrayonProgressList");
-      srContainer.innerHTML = "";
-      const totalIkutAll = sekolahData.filter(s => s.status_ikut === "Ikut").length;
-      document.getElementById("badgeTotalIkutHeader").textContent = `${totalIkutAll} / ${sekolahData.length} Ikut`;
-
-      ALL_SUBRAYON.forEach(sr => {
-        const schools = sekolahData.filter(s => s.subrayon === sr);
-        const ikut = schools.filter(s => s.status_ikut === "Ikut").length;
-        const tidak = schools.filter(s => s.status_ikut === "Tidak Ikut").length;
-        const pct = schools.length > 0 ? Math.round((ikut / schools.length) * 100) : 0;
-        const ketua = panitiaData.find(p => p.tugas_subrayon === sr);
-
-        srContainer.innerHTML += `
-          <div onclick="jumpToSubrayon('${sr}')" class="p-3 rounded-xl bg-slate-50 hover:bg-emerald-50/50 border border-slate-200 cursor-pointer transition">
-            <div class="flex justify-between items-center">
-              <div>
-                <div class="text-xs font-extrabold text-slate-900">Sub Rayon ${sr}</div>
-                <div class="text-[10px] text-slate-500">Ketua: ${ketua ? ketua.nama_panitia : "-"}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-xs font-extrabold text-emerald-700">${ikut}/${schools.length} Ikut (${pct}%)</div>
-                <div class="text-[10px] text-rose-500">${tidak} Tidak Ikut</div>
-              </div>
-            </div>
-            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-2">
-              <div class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+              <div class="bg-emerald-500 h-full rounded-full" style="width:${pct}%"></div>
             </div>
           </div>
         `;
       });
     }
 
-    function jumpToDivisi(div) {
-      document.getElementById("filterTugasDivisi").value = div;
-      document.getElementById("filterTugasTahapan").value = "ALL";
-      switchMainView("tugas");
+    function openSubrayonFromHome(sr) {
+      document.getElementById("srSelectFilter").value = sr;
+      switchTab("subrayon");
     }
 
-    function jumpToSubrayon(sr) {
-      document.getElementById("selectActiveSubrayon").value = sr;
-      switchMainView("subrayon");
+    function renderQrTab() {
+      if (!activeSession) return;
+      const qrBox = document.getElementById("qrCodeCanvas");
+      qrBox.innerHTML = "";
+
+      if (activeSession.role === "peserta") {
+        const s = sekolahList.find(x => x.id_sekolah === activeSession.profile.id_sekolah) || activeSession.profile;
+        document.getElementById("qrCardTitle").textContent = s.nama_sekolah;
+        document.getElementById("qrCardSubtitle").textContent = `NPSN: ${s.npsn} • Sub Rayon ${s.subrayon}`;
+        document.getElementById("qrKepsekFormBox").classList.remove("hidden");
+        document.getElementById("qrInputNamaKepsek").value = s.nama_kepsek || "";
+
+        const pill = document.getElementById("qrStatusPill");
+        if (s.status_ikut === "Ikut") {
+          pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800";
+          pill.textContent = "✓ Terkonfirmasi Mengikuti Rakor";
+        } else if (s.status_ikut === "Tidak Ikut") {
+          pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-rose-100 text-rose-800";
+          pill.textContent = "✕ Status: Tidak Ikut";
+        } else {
+          pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800";
+          pill.textContent = "Menunggu Checklist Ketua Sub Rayon";
+        }
+
+        new QRCode(qrBox, {
+          text: `PESERTA|${s.npsn}|${s.nama_sekolah}|${s.subrayon}`,
+          width: 165,
+          height: 165
+        });
+      } else {
+        const p = activeSession.profile;
+        document.getElementById("qrCardTitle").textContent = p.nama_panitia;
+        document.getElementById("qrCardSubtitle").textContent = `${p.divisi} (${p.jabatan})`;
+        document.getElementById("qrKepsekFormBox").classList.add("hidden");
+
+        const pill = document.getElementById("qrStatusPill");
+        pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-blue-100 text-blue-900";
+        pill.textContent = p.tugas_subrayon ? `Panitia & Ketua Sub Rayon ${p.tugas_subrayon}` : "Panitia Resmi Rakor K3S 2026";
+
+        new QRCode(qrBox, {
+          text: `PANITIA|${p.id_panitia}|${p.nama_panitia}|${p.divisi}`,
+          width: 165,
+          height: 165
+        });
+      }
+    }
+
+    async function saveKepsekName() {
+      if (!activeSession || activeSession.role !== "peserta") return;
+      const val = document.getElementById("qrInputNamaKepsek").value.trim();
+      await sb.from("db_sekolah").update({ nama_kepsek: val }).eq("id_sekolah", activeSession.profile.id_sekolah);
+      toast("Nama Kepala Sekolah tersimpan!");
+      refreshAllData(false);
     }
 
     // =========================================================================
-    // CRUD MANAJEMEN TUGAS (TAMBAH, EDIT, UBAH STATUS, HAPUS)
+    // TAB 4: SUB RAYON & CHECKLIST KEIKUTSERTAAN 158 SEKOLAH
     // =========================================================================
-    function renderTugasList() {
-      const tah = document.getElementById("filterTugasTahapan").value;
-      const div = document.getElementById("filterTugasDivisi").value;
-      const container = document.getElementById("tugasContainer");
+    function renderSubrayonTab() {
+      const sr = document.getElementById("srSelectFilter").value;
+      const kw = document.getElementById("srSearchInput").value.toLowerCase().trim();
+      const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
+      const isPanitia = activeSession && activeSession.role === "panitia";
 
-      let filtered = tugasData;
-      if (tah !== "ALL") filtered = filtered.filter(t => t.tahapan === tah);
-      if (div !== "ALL") filtered = filtered.filter(t => t.divisi === div);
+      document.getElementById("srCoordinatorLabel").textContent = ketua
+        ? `Ketua Sub Rayon ${sr}: ${ketua.nama_panitia}`
+        : `Wilayah Sub Rayon ${sr}`;
 
-      if (filtered.length === 0) {
-        container.innerHTML = `
-          <div class="bg-white rounded-2xl p-6 text-center border border-slate-200">
-            <p class="text-xs text-slate-500 font-semibold">Belum ada item tugas pada filter ini.</p>
-            <button onclick="openTaskModal()" class="mt-2 text-xs font-bold text-blue-700 underline">+ Tambah Tugas Baru</button>
+      document.getElementById("btnMarkAllSr").classList.toggle("hidden", !isPanitia);
+
+      const allSr = sekolahList.filter(s => s.subrayon === sr);
+      const ikutSr = allSr.filter(s => s.status_ikut === "Ikut").length;
+      const pct = allSr.length > 0 ? Math.round((ikutSr / allSr.length) * 100) : 0;
+
+      document.getElementById("srProgressTitle").textContent = `Sub Rayon ${sr}`;
+      document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Sekolah Ikut (${pct}%)`;
+      document.getElementById("srProgressBar").style.width = pct + "%";
+
+      const filtered = allSr.filter(
+        s => s.nama_sekolah.toLowerCase().includes(kw) || String(s.npsn).includes(kw)
+      );
+
+      const box = document.getElementById("srSchoolCardsContainer");
+      box.innerHTML = "";
+
+      filtered.forEach((s, i) => {
+        const isIkut = s.status_ikut === "Ikut";
+        const isTidak = s.status_ikut === "Tidak Ikut";
+
+        const actionButtons = isPanitia
+          ? `<div class="flex items-center gap-1.5 shrink-0">
+               <button onclick="updateSchoolParticipation('${s.id_sekolah}', 'Ikut')" class="px-3 py-2 rounded-xl text-xs font-extrabold transition ${isIkut ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600'}">
+                 Ikut
+               </button>
+               <button onclick="updateSchoolParticipation('${s.id_sekolah}', 'Tidak Ikut')" class="px-2.5 py-2 rounded-xl text-xs font-bold transition ${isTidak ? 'bg-rose-600 text-white shadow' : 'bg-slate-100 text-slate-500'}">
+                 Tidak
+               </button>
+             </div>`
+          : `<span class="text-[11px] font-extrabold px-2.5 py-1 rounded-xl shrink-0 ${isIkut ? 'bg-emerald-100 text-emerald-800' : isTidak ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500'}">
+               ${s.status_ikut}
+             </span>`;
+
+        box.innerHTML += `
+          <div class="bg-white rounded-2xl p-3.5 border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} shadow-xs flex items-center justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
+                <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
+                <span class="text-[10px] font-bold text-blue-700">${s.status_sekolah}</span>
+              </div>
+              <h4 class="font-extrabold text-xs text-slate-900 truncate mt-0.5">${s.nama_sekolah}</h4>
+              <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
+            </div>
+            ${actionButtons}
+          </div>
+        `;
+      });
+    }
+
+    async function updateSchoolParticipation(idSekolah, statusBaru) {
+      await sb.from("db_sekolah").update({
+        status_ikut: statusBaru,
+        waktu_registrasi: new Date().toLocaleString("id-ID")
+      }).eq("id_sekolah", idSekolah);
+      toast(`Status sekolah: ${statusBaru}`);
+      refreshAllData(false);
+    }
+
+    async function markAllSubrayonSchools() {
+      const sr = document.getElementById("srSelectFilter").value;
+      if (!confirm(`Tandai seluruh sekolah di Sub Rayon ${sr} sebagai IKUT?`)) return;
+      await sb.from("db_sekolah").update({
+        status_ikut: "Ikut",
+        waktu_registrasi: new Date().toLocaleString("id-ID")
+      }).eq("subrayon", sr);
+      toast(`Semua sekolah Sub Rayon ${sr} ditandai Ikut!`);
+      refreshAllData(false);
+    }
+
+    // =========================================================================
+    // TAB 5: KINERJA PANITIA & CRUD 49 TUGAS
+    // =========================================================================
+    function renderKinerjaTab() {
+      const total = tugasList.length;
+      const done = tugasList.filter(t => t.status === "Selesai").length;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+      document.getElementById("kinerjaBigPercent").textContent = pct + "%";
+      document.getElementById("kinerjaSubtitleCount").textContent = `${done} dari ${total} Tugas Selesai`;
+      document.getElementById("kinerjaBigBar").style.width = pct + "%";
+
+      const phases = ["Perencanaan", "Persiapan", "Pelaksanaan", "Pasca-Acara"];
+      const pGrid = document.getElementById("kinerjaPhaseGrid");
+      pGrid.innerHTML = "";
+      phases.forEach(ph => {
+        const allP = tugasList.filter(t => t.tahapan === ph);
+        const doneP = allP.filter(t => t.status === "Selesai").length;
+        const pctP = allP.length > 0 ? Math.round((doneP / allP.length) * 100) : 0;
+        pGrid.innerHTML += `
+          <div onclick="filterByPhaseClick('${ph}')" class="bg-white/10 hover:bg-white/20 rounded-2xl p-2 cursor-pointer">
+            <div class="text-xs font-extrabold text-amber-300">${pctP}%</div>
+            <div class="text-[9px] text-blue-100 font-bold truncate">${ph}</div>
+            <div class="text-[9px] text-blue-300">${doneP}/${allP.length}</div>
+          </div>
+        `;
+      });
+
+      const dBars = document.getElementById("kinerjaDivisiBars");
+      dBars.innerHTML = "";
+      DIVISI_LIST.forEach(div => {
+        const allD = tugasList.filter(t => t.divisi === div);
+        const doneD = allD.filter(t => t.status === "Selesai").length;
+        const pctD = allD.length > 0 ? Math.round((doneD / allD.length) * 100) : 0;
+        const color = pctD === 100 ? "bg-emerald-500" : pctD > 0 ? "bg-blue-600" : "bg-slate-300";
+
+        dBars.innerHTML += `
+          <div onclick="filterByDivisiClick('${div}')" class="p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 cursor-pointer transition">
+            <div class="flex justify-between items-center text-xs font-bold mb-1">
+              <span class="text-slate-800 truncate pr-2">${div}</span>
+              <span class="text-blue-900 font-extrabold shrink-0">${doneD}/${allD.length} (${pctD}%)</span>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div class="${color} h-full rounded-full transition-all duration-300" style="width:${pctD}%"></div>
+            </div>
+          </div>
+        `;
+      });
+
+      renderTaskList();
+    }
+
+    function filterByPhaseClick(ph) {
+      document.getElementById("taskFilterPhase").value = ph;
+      renderTaskList();
+    }
+
+    function filterByDivisiClick(div) {
+      document.getElementById("taskFilterDivisi").value = div;
+      renderTaskList();
+    }
+
+    function resetTaskFilters() {
+      document.getElementById("taskFilterPhase").value = "ALL";
+      document.getElementById("taskFilterDivisi").value = "ALL";
+      renderTaskList();
+    }
+
+    function renderTaskList() {
+      const ph = document.getElementById("taskFilterPhase").value;
+      const div = document.getElementById("taskFilterDivisi").value;
+      const isPanitia = activeSession && activeSession.role === "panitia";
+
+      document.getElementById("btnAddTaskTop").classList.toggle("hidden", !isPanitia);
+
+      let list = tugasList;
+      if (ph !== "ALL") list = list.filter(t => t.tahapan === ph);
+      if (div !== "ALL") list = list.filter(t => t.divisi === div);
+
+      const box = document.getElementById("taskCardsContainer");
+      if (list.length === 0) {
+        box.innerHTML = `
+          <div class="bg-white rounded-3xl p-6 text-center border border-slate-200">
+            <p class="text-xs text-slate-500 font-semibold">Belum ada rincian tugas untuk divisi/tahapan ini.</p>
+            ${isPanitia ? `<button onclick="openTaskModal()" class="mt-2 text-xs font-extrabold text-blue-800 underline">+ Tambah Tugas Sekarang</button>` : ''}
           </div>
         `;
         return;
       }
 
-      container.innerHTML = "";
-      filtered.forEach(t => {
+      box.innerHTML = "";
+      list.forEach(t => {
         const isDone = t.status === "Selesai";
-        const badgeColor = isDone
-          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+        const pillStyle = isDone
+          ? "bg-emerald-100 text-emerald-800"
           : t.status === "Sedang Berjalan"
-          ? "bg-amber-100 text-amber-800 border-amber-200"
-          : "bg-slate-100 text-slate-600 border-slate-200";
+          ? "bg-amber-100 text-amber-800"
+          : "bg-slate-100 text-slate-600";
 
-        container.innerHTML += `
-          <div class="bg-white rounded-2xl p-3.5 shadow-xs border ${isDone ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'} flex items-start gap-3">
-            <button onclick="toggleTaskQuickStatus('${t.id_tugas}', '${t.status}')" class="mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center border-2 ${isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent'} shrink-0">
+        box.innerHTML += `
+          <div class="bg-white rounded-2xl p-3.5 border ${isDone ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'} shadow-xs flex items-start gap-3">
+            <button onclick="toggleTaskDone('${t.id_tugas}', '${t.status}')" class="mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent'}">
               <i class="fa-solid fa-check text-xs"></i>
             </button>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md border ${badgeColor}">${t.status}</span>
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${pillStyle}">${t.status}</span>
                 <span class="text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md">${t.tahapan}</span>
               </div>
-              <h4 class="font-bold text-xs text-slate-900 mt-1 ${isDone ? 'line-through text-slate-400' : ''}">${t.nama_pekerjaan}</h4>
-              <p class="text-[10px] text-slate-500 mt-0.5">${t.divisi} • Tenggat: ${t.deadline || '-'}</p>
+              <h4 class="font-extrabold text-xs text-slate-900 mt-1 ${isDone ? 'line-through text-slate-400' : ''}">${t.nama_pekerjaan}</h4>
+              <p class="text-[10px] text-slate-500 mt-0.5">${t.divisi} • Deadline: ${t.deadline || '-'}</p>
             </div>
-            <div class="flex flex-col gap-1 shrink-0">
-              <button onclick="openTaskModal('${t.id_tugas}')" class="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-blue-800 text-xs" title="Edit">
-                <i class="fa-solid fa-pen"></i>
-              </button>
-              <button onclick="deleteTask('${t.id_tugas}')" class="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 text-xs" title="Hapus">
-                <i class="fa-solid fa-trash"></i>
-              </button>
-            </div>
+            ${isPanitia ? `
+              <div class="flex flex-col gap-1 shrink-0">
+                <button onclick="openTaskModal('${t.id_tugas}')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-600 text-xs flex items-center justify-center">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button onclick="deleteTaskItem('${t.id_tugas}')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 text-xs flex items-center justify-center">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            ` : ''}
           </div>
         `;
       });
     }
 
-    async function toggleTaskQuickStatus(idTugas, currentStatus) {
-      const nextStatus = currentStatus === "Selesai" ? "Belum Mulai" : "Selesai";
-      const nowStr = new Date().toLocaleString("id-ID");
-      await supabaseClient
-        .from("manajemen_tugas")
-        .update({ status: nextStatus, waktu_update: nowStr })
-        .eq("id_tugas", idTugas);
-      showToast(`Status tugas diubah ke: ${nextStatus}`);
-      refreshAllData();
+    async function toggleTaskDone(idTugas, currentStatus) {
+      if (!activeSession || activeSession.role !== "panitia") {
+        return toast("Hanya Panitia yang dapat mengubah status tugas!");
+      }
+      const next = currentStatus === "Selesai" ? "Belum Mulai" : "Selesai";
+      await sb.from("manajemen_tugas").update({
+        status: next,
+        waktu_update: new Date().toLocaleString("id-ID")
+      }).eq("id_tugas", idTugas);
+      toast(`Status tugas: ${next}`);
+      refreshAllData(false);
     }
 
     function openTaskModal(idTugas = null) {
       document.getElementById("taskModal").classList.remove("hidden");
       if (idTugas) {
-        const t = tugasData.find(x => x.id_tugas === idTugas);
+        const t = tugasList.find(x => x.id_tugas === idTugas);
         if (!t) return;
-        document.getElementById("modalTaskTitle").textContent = "Edit Tugas Kepanitiaan";
-        document.getElementById("formTaskId").value = t.id_tugas;
-        document.getElementById("formNamaPekerjaan").value = t.nama_pekerjaan;
-        document.getElementById("formDivisi").value = t.divisi;
-        document.getElementById("formTahapan").value = t.tahapan;
-        document.getElementById("formDeadline").value = t.deadline || "2026-09-23";
-        document.getElementById("formStatus").value = t.status;
+        document.getElementById("modalTaskHeader").textContent = "Edit Tugas Kepanitiaan";
+        document.getElementById("modalTaskId").value = t.id_tugas;
+        document.getElementById("modalTaskName").value = t.nama_pekerjaan;
+        document.getElementById("modalTaskDivisi").value = t.divisi;
+        document.getElementById("modalTaskPhase").value = t.tahapan;
+        document.getElementById("modalTaskDeadline").value = t.deadline || "2026-09-23";
+        document.getElementById("modalTaskStatus").value = t.status;
       } else {
-        document.getElementById("modalTaskTitle").textContent = "Tambah Tugas Kepanitiaan Baru";
-        document.getElementById("formTaskId").value = "";
-        document.getElementById("formNamaPekerjaan").value = "";
-        const currentFilterDiv = document.getElementById("filterTugasDivisi").value;
-        if (currentFilterDiv !== "ALL") document.getElementById("formDivisi").value = currentFilterDiv;
-        document.getElementById("formStatus").value = "Belum Mulai";
+        document.getElementById("modalTaskHeader").textContent = "Tambah Tugas Kepanitiaan Baru";
+        document.getElementById("modalTaskId").value = "";
+        document.getElementById("modalTaskName").value = "";
+        const curDiv = document.getElementById("taskFilterDivisi").value;
+        if (curDiv !== "ALL") document.getElementById("modalTaskDivisi").value = curDiv;
+        document.getElementById("modalTaskStatus").value = "Belum Mulai";
       }
     }
 
@@ -908,164 +1276,41 @@
       document.getElementById("taskModal").classList.add("hidden");
     }
 
-    async function saveTaskForm() {
-      const id = document.getElementById("formTaskId").value;
-      const nama = document.getElementById("formNamaPekerjaan").value.trim();
-      const divisi = document.getElementById("formDivisi").value;
-      const tahapan = document.getElementById("formTahapan").value;
-      const deadline = document.getElementById("formDeadline").value;
-      const status = document.getElementById("formStatus").value;
+    async function saveTaskModal() {
+      const id = document.getElementById("modalTaskId").value;
+      const nama_pekerjaan = document.getElementById("modalTaskName").value.trim();
+      const divisi = document.getElementById("modalTaskDivisi").value;
+      const tahapan = document.getElementById("modalTaskPhase").value;
+      const deadline = document.getElementById("modalTaskDeadline").value;
+      const status = document.getElementById("modalTaskStatus").value;
       const waktu_update = new Date().toLocaleString("id-ID");
 
-      if (!nama) return showToast("Nama pekerjaan tidak boleh kosong!");
+      if (!nama_pekerjaan) return toast("Nama pekerjaan wajib diisi!");
 
       if (id) {
-        await supabaseClient
-          .from("manajemen_tugas")
-          .update({ nama_pekerjaan: nama, divisi, tahapan, deadline, status, waktu_update })
+        await sb.from("manajemen_tugas")
+          .update({ nama_pekerjaan, divisi, tahapan, deadline, status, waktu_update })
           .eq("id_tugas", id);
-        showToast("Tugas berhasil diperbarui!");
+        toast("Tugas berhasil diperbarui!");
       } else {
         const newId = "TGS-" + Math.floor(100000 + Math.random() * 900000);
-        await supabaseClient
-          .from("manajemen_tugas")
-          .insert([{ id_tugas: newId, nama_pekerjaan: nama, divisi, tahapan, pic: "PAN-ADMIN", deadline, status, waktu_update }]);
-        showToast("Tugas baru berhasil ditambahkan!");
+        await sb.from("manajemen_tugas")
+          .insert([{ id_tugas: newId, nama_pekerjaan, divisi, tahapan, pic: "PAN-ADMIN", deadline, status, waktu_update }]);
+        toast("Tugas baru ditambahkan!");
       }
       closeTaskModal();
-      refreshAllData();
+      refreshAllData(false);
     }
 
-    async function deleteTask(idTugas) {
-      if (!confirm("Hapus tugas ini dari daftar kepanitiaan?")) return;
-      await supabaseClient.from("manajemen_tugas").delete().eq("id_tugas", idTugas);
-      showToast("Tugas dihapus.");
-      refreshAllData();
-    }
-
-    // =========================================================================
-    // CHECKLIST KEIKUTSERTAAN SEKOLAH OLEH 6 KETUA SUB RAYON
-    // =========================================================================
-    function renderSubrayonSchools() {
-      const activeSR = document.getElementById("selectActiveSubrayon").value;
-      const keyword = document.getElementById("searchSchoolInput").value.toLowerCase().trim();
-      const ketua = panitiaData.find(p => p.tugas_subrayon === activeSR);
-
-      document.getElementById("subrayonPICInfo").textContent = ketua
-        ? `Ketua Sub Rayon ${activeSR}: ${ketua.nama_panitia}`
-        : `Sub Rayon ${activeSR}`;
-
-      const srSchools = sekolahData.filter(s => s.subrayon === activeSR);
-      const ikutCount = srSchools.filter(s => s.status_ikut === "Ikut").length;
-      const pct = srSchools.length > 0 ? Math.round((ikutCount / srSchools.length) * 100) : 0;
-
-      document.getElementById("subrayonStatLabel").textContent = `Sub Rayon ${activeSR}`;
-      document.getElementById("subrayonStatNumbers").textContent = `${ikutCount} / ${srSchools.length} Sekolah Ikut (${pct}%)`;
-      document.getElementById("subrayonStatBar").style.width = pct + "%";
-
-      const filtered = srSchools.filter(
-        s => s.nama_sekolah.toLowerCase().includes(keyword) || String(s.npsn).includes(keyword)
-      );
-
-      const listEl = document.getElementById("subrayonSchoolList");
-      listEl.innerHTML = "";
-
-      filtered.forEach((s, idx) => {
-        const isIkut = s.status_ikut === "Ikut";
-        const isTidak = s.status_ikut === "Tidak Ikut";
-
-        listEl.innerHTML += `
-          <div class="bg-white rounded-2xl p-3.5 shadow-xs border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} flex items-center justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-1.5">
-                <span class="text-[10px] font-bold text-slate-400">#${idx + 1}</span>
-                <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
-                <span class="text-[10px] font-semibold text-slate-500">${s.status_sekolah}</span>
-              </div>
-              <h4 class="font-extrabold text-xs text-slate-900 truncate mt-0.5">${s.nama_sekolah}</h4>
-              <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <button onclick="setSchoolStatus('${s.id_sekolah}', 'Ikut')" class="px-3 py-2 rounded-xl text-xs font-extrabold transition ${isIkut ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50'}">
-                <i class="fa-solid fa-check mr-1"></i>Ikut
-              </button>
-              <button onclick="setSchoolStatus('${s.id_sekolah}', 'Tidak Ikut')" class="px-2.5 py-2 rounded-xl text-xs font-bold transition ${isTidak ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-rose-50'}">
-                Tidak
-              </button>
-            </div>
-          </div>
-        `;
-      });
-    }
-
-    async function setSchoolStatus(idSekolah, statusBaru) {
-      await supabaseClient
-        .from("db_sekolah")
-        .update({ status_ikut: statusBaru, waktu_registrasi: new Date().toLocaleString("id-ID") })
-        .eq("id_sekolah", idSekolah);
-      showToast(`Status sekolah disimpan: ${statusBaru}`);
-      refreshAllData();
-    }
-
-    async function markAllSubrayonIkut() {
-      const activeSR = document.getElementById("selectActiveSubrayon").value;
-      if (!confirm(`Tandai seluruh sekolah di Sub Rayon ${activeSR} sebagai IKUT?`)) return;
-      await supabaseClient
-        .from("db_sekolah")
-        .update({ status_ikut: "Ikut", waktu_registrasi: new Date().toLocaleString("id-ID") })
-        .eq("subrayon", activeSR);
-      showToast(`Seluruh sekolah Sub Rayon ${activeSR} ditandai Ikut!`);
-      refreshAllData();
+    async function deleteTaskItem(idTugas) {
+      if (!confirm("Hapus tugas ini dari daftar?")) return;
+      await sb.from("manajemen_tugas").delete().eq("id_tugas", idTugas);
+      toast("Tugas berhasil dihapus.");
+      refreshAllData(false);
     }
 
     // =========================================================================
-    // PORTAL PESERTA & QR CODE
-    // =========================================================================
-    function renderPesertaPortal() {
-      let school = null;
-      if (currentUser && currentUser.mode === "peserta") {
-        school = sekolahData.find(s => s.id_sekolah === currentUser.data.id_sekolah) || currentUser.data;
-      } else if (sekolahData.length > 0) {
-        school = sekolahData[0];
-      }
-      if (!school) return;
-
-      document.getElementById("pesertaNamaSekolah").textContent = school.nama_sekolah;
-      document.getElementById("pesertaDetailSekolah").textContent = `NPSN: ${school.npsn} • Sub Rayon ${school.subrayon} (${school.kelurahan})`;
-      document.getElementById("inputNamaKepsek").value = school.nama_kepsek || "";
-
-      const badge = document.getElementById("pesertaBadgeStatus");
-      if (school.status_ikut === "Ikut") {
-        badge.className = "inline-block text-[11px] font-extrabold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800";
-        badge.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>Terdaftar Mengikuti Rakor 2026`;
-      } else if (school.status_ikut === "Tidak Ikut") {
-        badge.className = "inline-block text-[11px] font-extrabold px-3 py-1 rounded-full bg-rose-100 text-rose-800";
-        badge.textContent = "Status: Tidak Mengikuti";
-      } else {
-        badge.className = "inline-block text-[11px] font-extrabold px-3 py-1 rounded-full bg-amber-100 text-amber-800";
-        badge.textContent = "Menunggu Checklist Ketua Sub Rayon";
-      }
-
-      const qrBox = document.getElementById("qrcodeContainer");
-      qrBox.innerHTML = "";
-      new QRCode(qrBox, {
-        text: `RAKOR2026|${school.npsn}|${school.nama_sekolah}|${school.subrayon}`,
-        width: 150,
-        height: 150
-      });
-    }
-
-    async function saveNamaKepsek() {
-      let school = currentUser && currentUser.mode === "peserta" ? currentUser.data : sekolahData[0];
-      if (!school) return;
-      const nama = document.getElementById("inputNamaKepsek").value.trim();
-      await supabaseClient.from("db_sekolah").update({ nama_kepsek: nama }).eq("id_sekolah", school.id_sekolah);
-      showToast("Nama Kepala Sekolah berhasil disimpan!");
-      refreshAllData();
-    }
-
-    // =========================================================================
-    // UTILITAS MODAL & NOTIFIKASI
+    // MODAL UTILITAS & TOAST
     // =========================================================================
     function openApiModal() {
       document.getElementById("apiModal").classList.remove("hidden");
@@ -1073,11 +1318,11 @@
     function closeApiModal() {
       document.getElementById("apiModal").classList.add("hidden");
     }
-    function showToast(msg) {
-      const box = document.getElementById("toastBox");
-      box.textContent = msg;
-      box.classList.remove("hidden");
-      setTimeout(() => box.classList.add("hidden"), 2600);
+    function toast(msg) {
+      const el = document.getElementById("toastBanner");
+      document.getElementById("toastText").textContent = msg;
+      el.classList.remove("hidden");
+      setTimeout(() => el.classList.add("hidden"), 2500);
     }
   </script>
 </body>
