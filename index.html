@@ -10,12 +10,13 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     body {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: #0f172a;
+      background-color: #090d16;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
@@ -25,7 +26,7 @@
       min-height: 100dvh;
       background-color: #f8fafc;
       position: relative;
-      box-shadow: 0 0 40px rgba(0,0,0,0.5);
+      box-shadow: 0 0 50px rgba(0,0,0,0.6);
       overflow-x: hidden;
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -35,6 +36,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-view { animation: fadeIn 0.22s ease-out forwards; }
+    #qrReader video { border-radius: 16px; object-fit: cover; }
   </style>
 </head>
 <body>
@@ -42,54 +44,57 @@
   <div class="app-shell flex flex-col justify-between">
 
     <!-- ========================================================== -->
-    <!-- LAYAR LOGIN ANDROID (FULL SCREEN SPLASH & LOGIN CARD)      -->
+    <!-- LAYAR LOGIN ANDROID BARU (3 STEP PESERTA + QR SCANNER)     -->
     <!-- ========================================================== -->
-    <div id="loginScreen" class="min-h-dvh bg-gradient-to-b from-slate-900 via-blue-950 to-slate-900 text-white flex flex-col justify-between p-6 relative overflow-hidden">
+    <div id="loginScreen" class="min-h-dvh bg-gradient-to-b from-slate-950 via-blue-950 to-slate-900 text-white flex flex-col justify-between p-5 relative overflow-hidden">
       
-      <!-- Dekorasi Cahaya Latar -->
-      <div class="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
-      <div class="absolute top-40 -left-20 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
+      <!-- Efek Cahaya Dekoratif -->
+      <div class="absolute -top-24 -right-24 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute top-1/3 -left-24 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <!-- Tombol Pengaturan Kunci API di Pojok Kanan Atas -->
+      <!-- Bar Atas Status Koneksi -->
       <div class="flex justify-between items-center z-10">
-        <span class="text-[11px] font-bold tracking-widest uppercase text-blue-300 bg-white/10 px-3 py-1 rounded-full">
-          <i class="fa-solid fa-mobile-screen-button mr-1"></i> Android App v2.6
-        </span>
-        <button onclick="openApiModal()" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-amber-300 shadow" title="Koneksi Database">
-          <i class="fa-solid fa-key text-sm"></i>
+        <div class="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase text-emerald-300 bg-emerald-500/10 border border-emerald-400/20 px-3 py-1 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span id="dbStatusBadge">Terhubung ke Server K3S</span>
+        </div>
+        <button onclick="refreshAllData(true)" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-blue-200 text-xs" title="Muat Ulang Data">
+          <i class="fa-solid fa-rotate"></i>
         </button>
       </div>
 
-      <!-- Identitas Aplikasi & Logo K3S -->
-      <div class="my-auto py-4 z-10">
-        <div class="text-center mb-6">
-          <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 mx-auto flex flex-col items-center justify-center shadow-2xl shadow-amber-500/30 border-4 border-white/20">
-            <i class="fa-solid fa-graduation-cap text-2xl"></i>
-            <span class="font-extrabold text-xs tracking-tighter mt-0.5">K3S KUPANG</span>
+      <!-- Konten Utama Login -->
+      <div class="my-auto py-3 z-10 space-y-4">
+        
+        <!-- Header Logo & Judul -->
+        <div class="text-center">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 mx-auto flex flex-col items-center justify-center shadow-xl shadow-amber-500/25 border-2 border-white/30">
+            <i class="fa-solid fa-graduation-cap text-xl"></i>
+            <span class="font-extrabold text-[10px] tracking-tighter mt-0.5">K3S KUPANG</span>
           </div>
-          <h1 class="text-2xl font-extrabold tracking-tight mt-4">SIM-RAKOR 2026</h1>
-          <p class="text-xs text-blue-200 mt-1">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang</p>
+          <h1 class="text-xl font-extrabold tracking-tight mt-2.5">SIM-RAKOR 2026</h1>
+          <p class="text-[11px] text-blue-200">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang</p>
         </div>
 
-        <!-- Peringatan Kunci API jika belum diisi -->
-        <div id="loginApiAlert" class="hidden mb-4 bg-amber-500/20 border border-amber-400/50 rounded-2xl p-3.5 text-left">
-          <div class="flex items-start gap-2.5">
-            <i class="fa-solid fa-triangle-exclamation text-amber-300 mt-0.5"></i>
-            <div class="flex-1">
-              <p class="text-xs font-bold text-amber-200">Kunci API Supabase Belum Aktif</p>
-              <p class="text-[11px] text-amber-100/90 mt-0.5">Klik tombol di bawah untuk menempelkan kode <code>eyJ...</code> milikmu.</p>
-              <button onclick="openApiModal()" class="mt-2 bg-amber-400 text-slate-950 font-extrabold text-[11px] px-3 py-1.5 rounded-lg">
-                Tempel Kunci API Sekarang
-              </button>
+        <!-- Tombol Utama Scan QR Code (Untuk Peserta & Panitia) -->
+        <button onclick="openQrScannerModal()" class="w-full bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/40 rounded-2xl p-3 flex items-center justify-between shadow-lg active:scale-[0.99] transition">
+          <div class="flex items-center gap-3 text-left">
+            <div class="w-10 h-10 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center text-lg shadow">
+              <i class="fa-solid fa-camera"></i>
+            </div>
+            <div>
+              <div class="text-xs font-extrabold text-white">Login Cepat via Scan QR Code</div>
+              <div class="text-[10px] text-emerald-200">Arahkan kamera ke Kartu ID Peserta / Panitia</div>
             </div>
           </div>
-        </div>
+          <i class="fa-solid fa-chevron-right text-emerald-300 text-xs mr-1"></i>
+        </button>
 
-        <!-- Kotak Kartu Login Utama -->
-        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-3xl p-5 shadow-2xl">
+        <!-- Kartu Form Login -->
+        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-3xl p-4 shadow-2xl">
           
-          <!-- Switch Peran Login -->
-          <div class="grid grid-cols-2 gap-1.5 bg-slate-950/60 p-1.5 rounded-2xl mb-4">
+          <!-- Tab Switcher: Peserta vs Panitia -->
+          <div class="grid grid-cols-2 gap-1.5 bg-slate-950/65 p-1.5 rounded-2xl mb-4">
             <button id="btnRolePeserta" onclick="setLoginRole('peserta')" class="py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition">
               <i class="fa-solid fa-school mr-1"></i> Peserta (Kepsek)
             </button>
@@ -98,12 +103,19 @@
             </button>
           </div>
 
-          <!-- FORM 1: MASUK SEBAGAI PESERTA (KEPALA SEKOLAH) -->
-          <div id="loginFormPeserta" class="space-y-3.5">
+          <!-- ==================================================== -->
+          <!-- FORM 1: LOGIN PESERTA (3 LANGKAH + PASSWORD NPSN)    -->
+          <!-- ==================================================== -->
+          <div id="loginFormPeserta" class="space-y-3">
+            
+            <!-- Langkah 1: Pilih Sub Rayon -->
             <div>
-              <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Wilayah Sub Rayon:</label>
-              <select id="loginSubrayonSelect" onchange="filterLoginSchools()" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
-                <option value="ALL">Semua Wilayah (158 SD/MI)</option>
+              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
+                <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">1</span> Pilih Sub Rayon</span>
+                <span class="text-[10px] text-slate-300">6 Wilayah</span>
+              </label>
+              <select id="loginSubrayonSelect" onchange="onSubrayonLoginChange()" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+                <option value="">-- Klik untuk Pilih Sub Rayon --</option>
                 <option value="Maulafa">Sub Rayon Maulafa (34 Sekolah)</option>
                 <option value="Alak">Sub Rayon Alak (31 Sekolah)</option>
                 <option value="Kota Raja">Sub Rayon Kota Raja (29 Sekolah)</option>
@@ -112,31 +124,55 @@
                 <option value="Kota Lama">Sub Rayon Kota Lama (18 Sekolah)</option>
               </select>
             </div>
+
+            <!-- Langkah 2: Pilih Nama Sekolah -->
             <div>
-              <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Sekolah Anda (atau Cari NPSN):</label>
-              <select id="loginSchoolSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
-                <option value="">-- Memuat 158 Sekolah... --</option>
+              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
+                <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">2</span> Pilih Nama Sekolah</span>
+                <span id="schoolCountHint" class="text-[10px] text-slate-300">Pilih rayon dulu</span>
+              </label>
+              <select id="loginSchoolSelect" disabled class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white disabled:opacity-40 focus:outline-none focus:border-amber-400">
+                <option value="">-- Pilih Sub Rayon Terlebih Dahulu --</option>
               </select>
             </div>
-            <button onclick="handleLoginSubmit('peserta')" class="w-full bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 active:scale-[0.99] text-slate-950 font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition">
+
+            <!-- Langkah 3: Password NPSN -->
+            <div>
+              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
+                <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">3</span> Password (Ketik NPSN Sekolah)</span>
+                <button type="button" onclick="togglePasswordVisibility('loginNpsnPassword', 'eyeIconNpsn')" class="text-[10px] text-amber-300 hover:underline">
+                  <i id="eyeIconNpsn" class="fa-solid fa-eye mr-0.5"></i> Lihat
+                </button>
+              </label>
+              <div class="relative">
+                <input id="loginNpsnPassword" type="password" inputmode="numeric" placeholder="Masukkan 8 Digit Nomor NPSN..." class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-amber-300 placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 focus:outline-none focus:border-amber-400" />
+              </div>
+            </div>
+
+            <button onclick="handleLoginSubmit('peserta')" class="w-full mt-1 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 active:scale-[0.99] text-slate-950 font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition">
               <span>MASUK PORTAL PESERTA</span>
               <i class="fa-solid fa-arrow-right-to-bracket"></i>
             </button>
           </div>
 
-          <!-- FORM 2: MASUK SEBAGAI PANITIA & KETUA SUB RAYON -->
-          <div id="loginFormPanitia" class="hidden space-y-3.5">
+          <!-- ==================================================== -->
+          <!-- FORM 2: LOGIN PANITIA & KETUA SUB RAYON              -->
+          <!-- ==================================================== -->
+          <div id="loginFormPanitia" class="hidden space-y-3">
             <div>
               <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Nama Anggota Panitia / Ketua Sub Rayon:</label>
-              <select id="loginPanitiaSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-400">
+              <select id="loginPanitiaSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-bold text-white focus:outline-none focus:border-blue-400">
                 <option value="">-- Memuat 19 Panitia... --</option>
               </select>
             </div>
             <div>
-              <label class="block text-[11px] font-bold text-blue-200 mb-1">PIN Akses Kepanitiaan (Default: 2026):</label>
-              <input id="loginPinInput" type="password" inputmode="numeric" value="2026" placeholder="Masukkan PIN 2026" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-bold tracking-widest text-center text-amber-300 focus:outline-none focus:border-amber-400" />
+              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
+                <span>PIN Akses Kepanitiaan:</span>
+                <span class="text-[10px] text-blue-300">Default: 2026</span>
+              </label>
+              <input id="loginPinInput" type="password" inputmode="numeric" value="2026" placeholder="Masukkan PIN Panitia" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-center text-amber-300 focus:outline-none focus:border-blue-400" />
             </div>
-            <button onclick="handleLoginSubmit('panitia')" class="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition">
+            <button onclick="handleLoginSubmit('panitia')" class="w-full mt-1 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition">
               <span>MASUK DASHBOARD PANITIA</span>
               <i class="fa-solid fa-shield-halved"></i>
             </button>
@@ -145,14 +181,14 @@
         </div>
       </div>
 
-      <!-- Footer Login -->
-      <div class="text-center text-[11px] text-slate-400 z-10">
-        Dikelola oleh K3S SD/MI Kota Kupang • Provinsi NTT
+      <!-- Footer Layar Login -->
+      <div class="text-center text-[10px] text-slate-400 z-10">
+        K3S SD/MI Kota Kupang • Dinas Pendidikan & Kebudayaan Kota Kupang
       </div>
     </div>
 
     <!-- ========================================================== -->
-    <!-- LAYAR UTAMA APLIKASI ANDROID (DENGAN 5 MENU FOOTER)        -->
+    <!-- LAYAR UTAMA APLIKASI ANDROID (5 MENU FOOTER)               -->
     <!-- ========================================================== -->
     <div id="mainAppScreen" class="hidden flex-1 flex flex-col pb-24">
 
@@ -173,9 +209,6 @@
         <div class="flex items-center gap-1.5 shrink-0">
           <button onclick="refreshAllData(true)" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-slate-200" title="Refresh Data">
             <i class="fa-solid fa-arrows-rotate"></i>
-          </button>
-          <button onclick="openApiModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-amber-300" title="Kunci API">
-            <i class="fa-solid fa-key"></i>
           </button>
           <button onclick="logoutApp()" class="w-8 h-8 rounded-xl bg-rose-500/20 hover:bg-rose-500/40 flex items-center justify-center text-xs text-rose-300" title="Keluar">
             <i class="fa-solid fa-power-off"></i>
@@ -198,8 +231,8 @@
               <span class="text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
                 24–26 September 2026
               </span>
-              <span id="homeLiveIndicator" class="text-[10px] font-bold text-emerald-300 flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Database
+              <span class="text-[10px] font-bold text-emerald-300 flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Realtime Sync
               </span>
             </div>
             <h3 class="text-base font-extrabold mt-2.5 leading-snug">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang Tahun 2026</h3>
@@ -217,7 +250,7 @@
               </div>
               <div class="bg-white/10 rounded-2xl p-2.5">
                 <div id="homeMetricKinerja" class="text-lg font-extrabold text-amber-300">0%</div>
-                <div class="text-[10px] text-blue-200">Kesiapan Panitia</div>
+                <div class="text-[10px] text-blue-200">Kinerja Panitia</div>
               </div>
             </div>
           </div>
@@ -230,7 +263,7 @@
               </div>
               <div>
                 <div class="text-xs font-extrabold text-slate-900">Buka ID & QR</div>
-                <div class="text-[10px] text-slate-500">Tiket Presensi Rapat</div>
+                <div class="text-[10px] text-slate-500">Kartu Akses & Presensi</div>
               </div>
             </button>
             <button onclick="switchTab('subrayon')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 text-left active:scale-95 transition">
@@ -248,17 +281,17 @@
           <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-2.5">
             <div class="flex items-center justify-between">
               <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <i class="fa-solid fa-bullhorn text-amber-500"></i> Pengumuman Kepanitiaan
+                <i class="fa-solid fa-bullhorn text-amber-500"></i> Informasi Kepanitiaan
               </h4>
-              <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">Terbaru</span>
+              <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">Penting</span>
             </div>
             <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs space-y-1">
-              <div class="font-extrabold text-amber-950">1. Pendataan Keikutsertaan Sekolah per Sub Rayon</div>
-              <p class="text-[11px] text-amber-900 leading-relaxed">Para Ketua Sub Rayon (Alak, Maulafa, Oebobo, Kelapa Lima, Kota Raja, Kota Lama) diharapkan melakukan checklist sekolah yang hadir melalui menu <b>Sub Rayon</b>.</p>
+              <div class="font-extrabold text-amber-950">1. Checklist Kehadiran Sekolah oleh Ketua Sub Rayon</div>
+              <p class="text-[11px] text-amber-900 leading-relaxed">Masing-masing Ketua Sub Rayon dapat memvalidasi sekolah yang mengikuti Rakor melalui menu <b>Sub Rayon</b> di bagian bawah layar.</p>
             </div>
             <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-xs space-y-1">
-              <div class="font-extrabold text-blue-950">2. Pemantauan Progres 49 Tugas Divisi</div>
-              <p class="text-[11px] text-blue-900 leading-relaxed">Koordinator dan anggota tiap seksi kepanitiaan dapat memperbarui status tugas pada menu <b>Kinerja</b>.</p>
+              <div class="font-extrabold text-blue-950">2. Tiket QR Code Dapat Digunakan untuk Login Cepat</div>
+              <p class="text-[11px] text-blue-900 leading-relaxed">Unduh atau tangkap layar (*screenshot*) Kartu QR pada menu <b>ID & QR</b> untuk login instan di perangkat mana pun.</p>
             </div>
           </div>
 
@@ -397,7 +430,7 @@
             <div class="absolute top-0 inset-x-0 h-3 bg-gradient-to-r from-blue-900 via-amber-400 to-emerald-500"></div>
             
             <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-900 border border-blue-200">
-              <i class="fa-solid fa-id-badge"></i> KARTU IDENTITAS DIGITAL RAKOR 2026
+              <i class="fa-solid fa-id-badge"></i> KARTU AKSES & LOGIN QR RAKOR 2026
             </div>
 
             <h3 id="qrCardTitle" class="text-base font-extrabold text-slate-900 mt-3 leading-snug">NAMA SEKOLAH / PANITIA</h3>
@@ -413,7 +446,7 @@
             <div class="flex justify-center my-3">
               <div id="qrCodeCanvas" class="p-4 bg-white rounded-3xl border-2 border-dashed border-slate-300 shadow-inner inline-block"></div>
             </div>
-            <p class="text-[11px] text-slate-400 font-medium">Tunjukkan QR Code ini kepada Seksi Perlengkapan / Registrasi</p>
+            <p class="text-[11px] text-slate-500 font-medium">QR Code ini dapat digunakan untuk <b>Presensi Kehadiran</b> sekaligus <b>Login Cepat</b> di halaman depan.</p>
 
             <!-- Form Simpan Nama Kepala Sekolah (Jika Login Peserta) -->
             <div id="qrKepsekFormBox" class="mt-5 pt-4 border-t border-slate-100 text-left">
@@ -592,6 +625,40 @@
   </div>
 
   <!-- ========================================================== -->
+  <!-- MODAL PEMINDAI QR CODE (LOGIN CEPAT PESERTA & PANITIA)     -->
+  <!-- ========================================================== -->
+  <div id="qrScannerModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/15 text-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-qrcode text-emerald-400 text-lg"></i>
+          <h3 class="font-extrabold text-sm">Scan QR Code Login</h3>
+        </div>
+        <button onclick="closeQrScannerModal()" class="w-8 h-8 rounded-full bg-white/10 text-white font-bold">&times;</button>
+      </div>
+
+      <p class="text-[11px] text-slate-300 leading-relaxed">
+        Arahkan kamera ke <b>Kartu QR Peserta (Kepala Sekolah)</b> atau <b>Kartu QR Panitia</b> untuk masuk otomatis tanpa mengetik password.
+      </p>
+
+      <!-- Area Kamera HTML5 QRCode -->
+      <div id="qrReader" class="w-full overflow-hidden rounded-2xl bg-black border border-white/20 min-h-[240px]"></div>
+
+      <!-- Alternatif Pilih Gambar QR dari Galeri HP -->
+      <div class="pt-1">
+        <label class="w-full py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-bold text-center block cursor-pointer">
+          <i class="fa-solid fa-image mr-1.5 text-amber-300"></i> Atau Pilih Gambar QR dari Galeri HP
+          <input id="qrFileInput" type="file" accept="image/*" onchange="scanQrFromFile(event)" class="hidden" />
+        </label>
+      </div>
+
+      <button onclick="closeQrScannerModal()" class="w-full py-2.5 rounded-2xl bg-rose-500/20 text-rose-300 font-bold text-xs">
+        Tutup Kamera
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
   <!-- MODAL TAMBAH / EDIT TUGAS KEPANITIAAN                      -->
   <!-- ========================================================== -->
   <div id="taskModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -651,31 +718,6 @@
     </div>
   </div>
 
-  <!-- ========================================================== -->
-  <!-- MODAL KUNCI KONEKSI SUPABASE                               -->
-  <!-- ========================================================== -->
-  <div id="apiModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-sm rounded-3xl p-5 space-y-3.5 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-        <h3 class="font-extrabold text-sm text-slate-900">
-          <i class="fa-solid fa-database text-blue-700 mr-1.5"></i> Koneksi Database Supabase
-        </h3>
-        <button onclick="closeApiModal()" class="text-slate-400 hover:text-slate-700 text-lg font-bold">&times;</button>
-      </div>
-      <div>
-        <label class="block text-[11px] font-bold text-slate-600 mb-1">Project URL Supabase:</label>
-        <input id="apiUrlInput" type="text" value="https://etjdsxqodvfozjkshzxp.supabase.co" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-mono" />
-      </div>
-      <div>
-        <label class="block text-[11px] font-bold text-slate-600 mb-1">Anon Public Key (diawali <code>eyJ...</code>):</label>
-        <textarea id="apiKeyInput" rows="3" placeholder="Tempelkan kode eyJ... dari menu API Keys Supabase di sini" class="w-full rounded-2xl border border-slate-300 px-3 py-2 text-xs font-mono"></textarea>
-      </div>
-      <button onclick="saveApiKey()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-extrabold py-3 rounded-2xl text-xs shadow">
-        Simpan & Hubungkan Database
-      </button>
-    </div>
-  </div>
-
   <!-- TOAST NOTIFICATION -->
   <div id="toastBanner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white border border-white/15 text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2">
     <i class="fa-solid fa-circle-check text-emerald-400"></i>
@@ -684,18 +726,17 @@
 
   <script>
     // =========================================================================
-    // KONFIGURASI SUPABASE
-    // Tempelkan kode eyJ... milikmu di dalam tanda kutip DEFAULT_SB_KEY
-    // saat mengedit file ini di GitHub agar semua HP otomatis terhubung!
+    // KONFIGURASI SUPABASE PERMANEN (OTOMATIS AKTIF DI SEMUA PERANGKAT)
     // =========================================================================
     const DEFAULT_SB_URL = "https://etjdsxqodvfozjkshzxp.supabase.co";
-    const DEFAULT_SB_KEY = ""; // <-- TEMPELKAN KODE eyJ... DI SINI
+    const DEFAULT_SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0amRzeHFvZHZmb3pqa3NoenhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzODcyMTUsImV4cCI6MjEwOTk2MzIxNX0.w2Jn2UnCtJhlvBg0cAkvjJ7qTjDhryDcEn5X0tqEjjA";
 
     let sb = null;
     let panitiaList = [];
     let tugasList = [];
     let sekolahList = [];
     let activeSession = null; // { role: 'peserta'|'panitia', profile: {...} }
+    let html5QrScanner = null;
 
     const DIVISI_LIST = [
       "Penanggung Jawab",
@@ -716,35 +757,9 @@
     });
 
     function bootSupabase() {
-      const url = localStorage.getItem("k3s_sb_url") || DEFAULT_SB_URL;
-      const key = localStorage.getItem("k3s_sb_key") || DEFAULT_SB_KEY;
-
-      document.getElementById("apiUrlInput").value = url;
-      document.getElementById("apiKeyInput").value = key;
-
-      if (!key || !key.startsWith("eyJ")) {
-        document.getElementById("loginApiAlert").classList.remove("hidden");
-        return;
-      }
-
-      document.getElementById("loginApiAlert").classList.add("hidden");
-      sb = window.supabase.createClient(url, key);
+      sb = window.supabase.createClient(DEFAULT_SB_URL, DEFAULT_SB_KEY);
       refreshAllData(false);
       setupRealtimeChannel();
-    }
-
-    function saveApiKey() {
-      const url = document.getElementById("apiUrlInput").value.trim();
-      const key = document.getElementById("apiKeyInput").value.trim();
-      if (!key.startsWith("eyJ")) {
-        toast("Kode Anon Public Key harus diawali huruf eyJ...");
-        return;
-      }
-      localStorage.setItem("k3s_sb_url", url);
-      localStorage.setItem("k3s_sb_key", key);
-      closeApiModal();
-      bootSupabase();
-      toast("Database Supabase Terhubung!");
     }
 
     async function refreshAllData(showNotif = false) {
@@ -760,11 +775,14 @@
         if (rTgs.data) tugasList = rTgs.data;
         if (rSek.data) sekolahList = rSek.data;
 
-        populateLoginInputs();
+        document.getElementById("dbStatusBadge").textContent = `Server Aktif • ${sekolahList.length} Sekolah`;
+        populatePanitiaLoginDropdown();
+        onSubrayonLoginChange();
         renderAllTabs();
         if (showNotif) toast("Data terbaru berhasil dimuat!");
       } catch (e) {
         console.error(e);
+        document.getElementById("dbStatusBadge").textContent = "Gangguan Jaringan";
       }
     }
 
@@ -777,7 +795,7 @@
     }
 
     // =========================================================================
-    // SISTEM LOGIN LAYAR PENUH ANDROID
+    // SISTEM LOGIN BERTINGKAT (SUB RAYON -> SEKOLAH -> PASSWORD NPSN) & PANITIA
     // =========================================================================
     function setLoginRole(role) {
       const isPeserta = role === "peserta";
@@ -793,49 +811,182 @@
         : "py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition";
     }
 
-    function populateLoginInputs() {
-      filterLoginSchools();
+    function onSubrayonLoginChange() {
+      const sr = document.getElementById("loginSubrayonSelect").value;
+      const selSek = document.getElementById("loginSchoolSelect");
+      const hint = document.getElementById("schoolCountHint");
+
+      if (!sr) {
+        selSek.disabled = true;
+        selSek.innerHTML = `<option value="">-- Pilih Sub Rayon Terlebih Dahulu --</option>`;
+        hint.textContent = "Pilih rayon dulu";
+        return;
+      }
+
+      const list = sekolahList.filter(s => s.subrayon === sr);
+      selSek.disabled = false;
+      hint.textContent = `${list.length} Sekolah tersedia`;
+      selSek.innerHTML = `<option value="">-- Pilih Nama Sekolah (${list.length} SD/MI) --</option>`;
+      list.forEach(s => {
+        selSek.innerHTML += `<option value="${s.id_sekolah}">${s.nama_sekolah}</option>`;
+      });
+    }
+
+    function populatePanitiaLoginDropdown() {
       const selPan = document.getElementById("loginPanitiaSelect");
+      const curVal = selPan.value;
       selPan.innerHTML = `<option value="">-- Pilih Nama Panitia (${panitiaList.length} Orang) --</option>`;
       panitiaList.forEach(p => {
         const rayonTag = p.tugas_subrayon ? ` ★ Ketua Rayon ${p.tugas_subrayon}` : "";
         selPan.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${rayonTag})</option>`;
       });
+      if (curVal) selPan.value = curVal;
     }
 
-    function filterLoginSchools() {
-      const sr = document.getElementById("loginSubrayonSelect").value;
-      const selSek = document.getElementById("loginSchoolSelect");
-      const list = sr === "ALL" ? sekolahList : sekolahList.filter(s => s.subrayon === sr);
-      selSek.innerHTML = `<option value="">-- Pilih Sekolah (${list.length} SD/MI) --</option>`;
-      list.forEach(s => {
-        selSek.innerHTML += `<option value="${s.id_sekolah}">${s.nama_sekolah} — ${s.npsn}</option>`;
-      });
+    function togglePasswordVisibility(inputId, iconId) {
+      const inp = document.getElementById(inputId);
+      const ic = document.getElementById(iconId);
+      if (inp.type === "password") {
+        inp.type = "text";
+        ic.className = "fa-solid fa-eye-slash mr-0.5";
+      } else {
+        inp.type = "password";
+        ic.className = "fa-solid fa-eye mr-0.5";
+      }
     }
 
     function handleLoginSubmit(role) {
-      if (!sb) {
-        openApiModal();
-        return toast("Hubungkan Kunci API Supabase terlebih dahulu!");
-      }
-
       if (role === "peserta") {
+        const sr = document.getElementById("loginSubrayonSelect").value;
         const idSek = document.getElementById("loginSchoolSelect").value;
-        if (!idSek) return toast("Pilih nama sekolah Anda terlebih dahulu!");
+        const inputNpsn = document.getElementById("loginNpsnPassword").value.trim();
+
+        if (!sr) return toast("Langkah 1: Pilih Sub Rayon terlebih dahulu!");
+        if (!idSek) return toast("Langkah 2: Pilih Nama Sekolah Anda!");
+        if (!inputNpsn) return toast("Langkah 3: Masukkan Password berupa NPSN sekolah!");
+
         const school = sekolahList.find(s => s.id_sekolah === idSek);
-        if (!school) return;
+        if (!school) return toast("Data sekolah tidak ditemukan.");
+
+        if (String(school.npsn).trim() !== inputNpsn) {
+          return toast("Password NPSN tidak cocok dengan sekolah yang dipilih!");
+        }
+
         activeSession = { role: "peserta", profile: school };
+        toast(`Selamat datang, Kepsek ${school.nama_sekolah}!`);
       } else {
         const idPan = document.getElementById("loginPanitiaSelect").value;
         const pin = document.getElementById("loginPinInput").value.trim();
-        if (!idPan) return toast("Pilih nama panitia terlebih dahulu!");
+        if (!idPan) return toast("Pilih nama anggota panitia terlebih dahulu!");
         if (pin !== "2026") return toast("PIN Panitia salah! Gunakan PIN: 2026");
+
         const person = panitiaList.find(p => p.id_panitia === idPan);
         if (!person) return;
         activeSession = { role: "panitia", profile: person };
+        toast(`Selamat bertugas, ${person.nama_panitia}!`);
       }
 
       enterMainApp();
+    }
+
+    // =========================================================================
+    // LOGIN CEPAT VIA SCAN QR CODE (KAMERA & UPLOAD FILE GALERI)
+    // =========================================================================
+    function openQrScannerModal() {
+      document.getElementById("qrScannerModal").classList.remove("hidden");
+      startCameraQrScanner();
+    }
+
+    async function closeQrScannerModal() {
+      document.getElementById("qrScannerModal").classList.add("hidden");
+      if (html5QrScanner) {
+        try {
+          await html5QrScanner.stop();
+          html5QrScanner.clear();
+        } catch (e) {}
+        html5QrScanner = null;
+      }
+    }
+
+    function startCameraQrScanner() {
+      if (html5QrScanner) return;
+      html5QrScanner = new Html5Qrcode("qrReader");
+      html5QrScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 210, height: 210 } },
+        (decodedText) => {
+          processScannedQrLogin(decodedText);
+        },
+        () => {}
+      ).catch(() => {
+        toast("Izinkan akses kamera atau pilih gambar QR dari galeri.");
+      });
+    }
+
+    function scanQrFromFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const fileScanner = new Html5Qrcode("qrReader");
+      fileScanner.scanFile(file, true)
+        .then(decodedText => {
+          processScannedQrLogin(decodedText);
+        })
+        .catch(() => {
+          toast("QR Code tidak terbaca pada gambar tersebut.");
+        });
+    }
+
+    async function processScannedQrLogin(rawText) {
+      const clean = String(rawText || "").trim();
+      if (!clean) return;
+
+      // Format 1: PESERTA|NPSN|NAMA_SEKOLAH|SUBRAYON atau RAKOR2026|NPSN|...
+      const parts = clean.split("|");
+      if (parts[0] === "PESERTA" || parts[0] === "RAKOR2026") {
+        const npsn = parts[1];
+        const school = sekolahList.find(s => String(s.npsn) === String(npsn));
+        if (school) {
+          await closeQrScannerModal();
+          activeSession = { role: "peserta", profile: school };
+          toast(`Login QR Berhasil: ${school.nama_sekolah}`);
+          enterMainApp();
+          return;
+        }
+      }
+
+      // Format 2: PANITIA|ID_PANITIA|NAMA|DIVISI
+      if (parts[0] === "PANITIA") {
+        const idPan = parts[1];
+        const person = panitiaList.find(p => p.id_panitia === idPan);
+        if (person) {
+          await closeQrScannerModal();
+          activeSession = { role: "panitia", profile: person };
+          toast(`Login QR Panitia: ${person.nama_panitia}`);
+          enterMainApp();
+          return;
+        }
+      }
+
+      // Format 3: Langsung kode NPSN (8 digit) atau ID_Sekolah (SCH-...) atau ID_Panitia (PAN-...)
+      const schoolByNpsn = sekolahList.find(s => String(s.npsn) === clean || s.id_sekolah === clean);
+      if (schoolByNpsn) {
+        await closeQrScannerModal();
+        activeSession = { role: "peserta", profile: schoolByNpsn };
+        toast(`Login QR Berhasil: ${schoolByNpsn.nama_sekolah}`);
+        enterMainApp();
+        return;
+      }
+
+      const panitiaById = panitiaList.find(p => p.id_panitia === clean);
+      if (panitiaById) {
+        await closeQrScannerModal();
+        activeSession = { role: "panitia", profile: panitiaById };
+        toast(`Login QR Panitia: ${panitiaById.nama_panitia}`);
+        enterMainApp();
+        return;
+      }
+
+      toast("QR Code tidak dikenali dalam database Rakor 2026.");
     }
 
     function enterMainApp() {
@@ -876,6 +1027,7 @@
 
     function logoutApp() {
       activeSession = null;
+      document.getElementById("loginNpsnPassword").value = "";
       document.getElementById("mainAppScreen").classList.add("hidden");
       document.getElementById("loginScreen").classList.remove("hidden");
     }
@@ -1309,20 +1461,11 @@
       refreshAllData(false);
     }
 
-    // =========================================================================
-    // MODAL UTILITAS & TOAST
-    // =========================================================================
-    function openApiModal() {
-      document.getElementById("apiModal").classList.remove("hidden");
-    }
-    function closeApiModal() {
-      document.getElementById("apiModal").classList.add("hidden");
-    }
     function toast(msg) {
       const el = document.getElementById("toastBanner");
       document.getElementById("toastText").textContent = msg;
       el.classList.remove("hidden");
-      setTimeout(() => el.classList.add("hidden"), 2500);
+      setTimeout(() => el.classList.add("hidden"), 2600);
     }
   </script>
 </body>
