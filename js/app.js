@@ -1016,10 +1016,27 @@ function renderKinerjaView() {
   renderTaskListView();
 }
 
+// Cek Otoritas Kelola Master Tugas: HANYA Ketua Panitia dan Sekretaris
+function canManageMasterTasks(user) {
+  return Boolean(
+    user &&
+    user.role === "panitia" &&
+    user.profile &&
+    ["Ketua Panitia", "Sekretaris"].includes(user.profile.divisi)
+  );
+}
+
 function renderTaskListView() {
   const ph = document.getElementById("taskFilterPhase")?.value || "ALL";
   const div = document.getElementById("taskFilterDivisi")?.value || "ALL";
   const isPanitia = activeUser && activeUser.role === "panitia";
+  const canEditMaster = canManageMasterTasks(activeUser);
+
+  // Sembunyikan tombol "+ Tambah Tugas" di bagian atas jika bukan Ketua Panitia / Sekretaris
+  const btnAddTop = document.getElementById("btnAddTaskTop");
+  if (btnAddTop) {
+    btnAddTop.classList.toggle("hidden", !canEditMaster);
+  }
 
   let list = tugasList;
   if (ph !== "ALL") list = list.filter(t => t.tahapan === ph);
@@ -1045,7 +1062,7 @@ function renderTaskListView() {
     const card = document.createElement("div");
     card.className = `bg-white rounded-2xl p-3.5 border ${isDone ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'} shadow-xs flex items-start gap-3`;
     card.innerHTML = `
-      <button class="btn-toggle-task mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent'}">
+      <button type="button" title="Centang Progres Kinerja" class="btn-toggle-task mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition active:scale-90 ${isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent hover:border-blue-600'}">
         <i class="fa-solid fa-check text-xs"></i>
       </button>
       <div class="flex-1 min-w-0">
@@ -1056,26 +1073,34 @@ function renderTaskListView() {
         <h4 class="font-extrabold text-xs text-slate-900 mt-1 ${isDone ? 'line-through text-slate-400' : ''}">${t.nama_pekerjaan}</h4>
         <p class="text-[10px] text-slate-500 mt-0.5">${t.divisi} • Deadline: ${t.deadline || '-'}</p>
       </div>
-      ${isPanitia ? `
+      ${canEditMaster ? `
         <div class="flex flex-col gap-1 shrink-0">
-          <button class="btn-edit-task w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-600 text-xs flex items-center justify-center"><i class="fa-solid fa-pen"></i></button>
-          <button class="btn-del-task w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 text-rose-600 text-xs flex items-center justify-center"><i class="fa-solid fa-trash"></i></button>
+          <button type="button" title="Edit Tugas" class="btn-edit-task w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-600 text-xs flex items-center justify-center transition"><i class="fa-solid fa-pen"></i></button>
+          <button type="button" title="Hapus Tugas" class="btn-del-task w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 text-rose-600 text-xs flex items-center justify-center transition"><i class="fa-solid fa-trash"></i></button>
         </div>
       ` : ''}
     `;
 
+    // Semua anggota panitia tetap bisa mencentang selesai/belum mulai
     card.querySelector(".btn-toggle-task")?.addEventListener("click", async () => {
       if (!isPanitia) return;
       const next = isDone ? "Belum Mulai" : "Selesai";
-      await sb.from("manajemen_tugas").update({ status: next, waktu_update: new Date().toLocaleString("id-ID") }).eq("id_tugas", t.id_tugas);
+      await sb.from("manajemen_tugas").update({
+        status: next,
+        waktu_update: new Date().toLocaleString("id-ID")
+      }).eq("id_tugas", t.id_tugas);
       toast(`Status tugas: ${next}`);
       await loadAllDatabase(false);
     });
 
-    if (isPanitia) {
+    // Hanya Ketua Panitia dan Sekretaris yang bisa Edit atau Hapus
+    if (canEditMaster) {
       card.querySelector(".btn-edit-task")?.addEventListener("click", () => openTaskModal(t.id_tugas));
       card.querySelector(".btn-del-task")?.addEventListener("click", async () => {
-        if (!confirm("Hapus tugas ini?")) return;
+        if (!canManageMasterTasks(activeUser)) {
+          return toast("Akses Ditolak: Hanya Ketua Panitia & Sekretaris yang dapat menghapus tugas!");
+        }
+        if (!confirm("Hapus tugas kepanitiaan ini?")) return;
         await sb.from("manajemen_tugas").delete().eq("id_tugas", t.id_tugas);
         toast("Tugas dihapus.");
         await loadAllDatabase(false);
@@ -1087,6 +1112,10 @@ function renderTaskListView() {
 }
 
 function openTaskModal(idTugas = null) {
+  if (!canManageMasterTasks(activeUser)) {
+    return toast("Akses Ditolak: Hanya Ketua Panitia & Sekretaris yang dapat menambah atau mengedit tugas!");
+  }
+
   document.getElementById("taskModal")?.classList.remove("hidden");
   if (idTugas) {
     const t = tugasList.find(x => x.id_tugas === idTugas);
@@ -1112,6 +1141,10 @@ function closeTaskModal() {
 }
 
 async function saveTaskModal() {
+  if (!canManageMasterTasks(activeUser)) {
+    return toast("Akses Ditolak: Hanya Ketua Panitia & Sekretaris yang berwenang!");
+  }
+
   const id = document.getElementById("modalTaskId").value;
   const nama_pekerjaan = document.getElementById("modalTaskName").value.trim();
   const divisi = document.getElementById("modalTaskDivisi").value;
