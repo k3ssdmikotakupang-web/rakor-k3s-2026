@@ -30,7 +30,7 @@ const POS_DEFINITIONS = [
     id: 'absen_h1',
     label: 'Pos 2: Absensi Masuk — Hari Ke-1',
     shortLabel: 'Pos 2: Absensi H1',
-    desc: 'Mencatat kehadiran peserta pada sesi Hari Ke-1 (Kamis, 24 Sept 2026).',
+    desc: 'Mencatat kehadiran peserta pada sesi Hari Ke-1 (Kamis, 19 Nov 2026).',
     lockAuthority: 'sekretariat',
     allowedDivisions: ['Seksi Perlengkapan, Dokumentasi, dan Publikasi', 'Seksi Kesekretariatan', 'Ketua Panitia', 'Sekretaris', 'Penanggung Jawab']
   },
@@ -38,7 +38,7 @@ const POS_DEFINITIONS = [
     id: 'absen_h2',
     label: 'Pos 3: Absensi Masuk — Hari Ke-2',
     shortLabel: 'Pos 3: Absensi H2',
-    desc: 'Mencatat kehadiran peserta pada sesi Hari Ke-2 (Jumat, 25 Sept 2026).',
+    desc: 'Mencatat kehadiran peserta pada sesi Hari Ke-2 (Jumat, 20 Nov 2026).',
     lockAuthority: 'sekretariat',
     allowedDivisions: ['Seksi Perlengkapan, Dokumentasi, dan Publikasi', 'Seksi Kesekretariatan', 'Ketua Panitia', 'Sekretaris', 'Penanggung Jawab']
   },
@@ -46,7 +46,7 @@ const POS_DEFINITIONS = [
     id: 'absen_h3',
     label: 'Pos 4: Absensi Masuk — Hari Ke-3',
     shortLabel: 'Pos 4: Absensi H3',
-    desc: 'Mencatat kehadiran peserta pada sesi Hari Ke-3 (Sabtu, 26 Sept 2026).',
+    desc: 'Mencatat kehadiran peserta pada sesi Hari Ke-3 (Sabtu, 21 Nov 2026).',
     lockAuthority: 'sekretariat',
     allowedDivisions: ['Seksi Perlengkapan, Dokumentasi, dan Publikasi', 'Seksi Kesekretariatan', 'Ketua Panitia', 'Sekretaris', 'Penanggung Jawab']
   },
