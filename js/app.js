@@ -19,6 +19,7 @@ import {
 import { renderStatistikSekolahWidget } from './statistik_sekolah.js';
 import { bindUserProfileTrigger } from './profil.js';
 import { initModernDropdowns } from './dropdown_ui.js';
+import { applyK3sLogoBranding, renderK3sMusicPlayerWidget } from './branding_audio.js';
 
 // Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
@@ -53,6 +54,7 @@ initApp();
 
 async function initApp() {
   initModernDropdowns();
+  applyK3sLogoBranding(null);
   updateStaticEventDatesToNov2026();
 
   initLogin(session => {
@@ -307,6 +309,7 @@ function renderAllViews() {
   renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, tarifKontribusiDefault, () => loadAllDatabase(false));
   renderCatatanPanitiaWidget(activeUser);
   renderStatistikSekolahWidget(activeUser, sekolahList, () => loadAllDatabase(false));
+  renderK3sMusicPlayerWidget(activeUser, layananList, () => loadAllDatabase(false));
   if (activeUser && activeUser.role === "panitia") {
     renderKinerjaView();
   }
