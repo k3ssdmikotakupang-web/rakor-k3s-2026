@@ -18,6 +18,7 @@ import {
 } from './keuangan.js';
 import { renderStatistikSekolahWidget } from './statistik_sekolah.js';
 import { bindUserProfileTrigger } from './profil.js';
+import { initModernDropdowns } from './dropdown_ui.js';
 
 // Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
@@ -293,6 +294,10 @@ function showTab(name) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+async function initApp() {
+  initModernDropdowns();
+  updateStaticEventDatesToNov2026();
+  
 function renderAllViews() {
   updateStaticEventDatesToNov2026();
   bindUserProfileTrigger(activeUser, () => loadAllDatabase(false));
