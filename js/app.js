@@ -55,6 +55,18 @@ async function initApp() {
   initModernDropdowns();
   updateStaticEventDatesToNov2026();
 
+  initLogin(session => {
+    activeUser = session;
+    onLoginSuccess();
+  });
+
+  initJadwal();
+  bindNavigationAndActions();
+  await loadAllDatabase(false);
+  checkCertificateVerificationUrl(sekolahList, panitiaList);
+  setupRealtimeListeners();
+}
+
 function updateStaticEventDatesToNov2026() {
   document.querySelectorAll("span, p, div").forEach(el => {
     if (el.children.length === 0 && el.textContent) {
@@ -282,7 +294,7 @@ function showTab(name) {
   renderAllViews();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-  
+
 function renderAllViews() {
   updateStaticEventDatesToNov2026();
   bindUserProfileTrigger(activeUser, () => loadAllDatabase(false));
@@ -395,7 +407,6 @@ function renderAbsensiPesertaView() {
   const subEl = document.getElementById("absensiSchoolSubtitle");
   if (subEl) subEl.textContent = `${s.nama_sekolah} (NPSN: ${s.npsn}) • Sub Rayon ${s.subrayon}`;
 
-  // Hitung total & persentase kehadiran 3 hari
   const h1 = Boolean(s.hadir_h1);
   const h2 = Boolean(s.hadir_h2);
   const h3 = Boolean(s.hadir_h3);
@@ -408,7 +419,6 @@ function renderAbsensiPesertaView() {
     { key: "hadir_h3", isHadir: h3, dayNum: 3, label: "Hari Ke-3 • Sabtu, 21 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
   ];
 
-  // Sembunyikan teks petunjuk lama di bawah container dan ganti dengan Kartu Kontrol Lengkap
   const subViewHadir = document.getElementById("subViewHadirBox");
   if (subViewHadir && subViewHadir.children.length > 1) {
     const oldInfoBox = subViewHadir.children[1];
@@ -427,7 +437,6 @@ function renderAbsensiPesertaView() {
       : "bg-rose-50 text-rose-700 border-rose-200";
 
     box.innerHTML = `
-      <!-- 1. RINGKASAN PROGRES PRESENSI SCANNER & TOMBOL BUKA QR -->
       <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white space-y-3 shadow-md">
         <div class="flex items-center justify-between">
           <div>
@@ -456,7 +465,6 @@ function renderAbsensiPesertaView() {
         </div>
       </div>
 
-      <!-- 2. DAFTAR REKAP HARIAN (H1 - H3) MURNI HASIL SCAN PANITIA (READ-ONLY) -->
       <div class="space-y-2 pt-1">
         <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 px-1">
           Status Verifikasi Kehadiran Harian (H1–H3)
@@ -466,7 +474,7 @@ function renderAbsensiPesertaView() {
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5">
                 <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-md ${d.isHadir ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">
-                  ${d.isHadir ? '✓ TERVERIFIKASI HADIR' : '⏳ BELUM TERCATAT SCAN'}
+                  ${d.isHadir ? 'TERVERIFIKASI HADIR' : 'BELUM TERCATAT SCAN'}
                 </span>
               </div>
               <h4 class="font-extrabold text-xs text-slate-900 mt-1">${d.label}</h4>
@@ -488,7 +496,6 @@ function renderAbsensiPesertaView() {
         `).join('')}
       </div>
 
-      <!-- 3. KARTU KONTROL DATA TERKAIT (REGISTRASI, KAMAR, KONTRIBUSI, RAKOR KIT & TRANSPOR) -->
       <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
         <div class="font-extrabold text-xs text-slate-800 uppercase flex items-center gap-1.5">
           <i class="fa-solid fa-clipboard-check text-blue-800"></i>
@@ -496,16 +503,14 @@ function renderAbsensiPesertaView() {
         </div>
 
         <div class="grid grid-cols-2 gap-2">
-          <!-- Status Registrasi -->
           <div class="p-2.5 rounded-xl bg-white border border-slate-200">
             <div class="text-[10px] text-slate-500 font-semibold">Status Registrasi</div>
             <div class="text-xs font-extrabold mt-0.5 ${s.status_ikut === 'Ikut' ? 'text-emerald-700' : 'text-amber-700'}">
-              ${s.status_ikut === 'Ikut' ? '✓ Terdaftar Ikut' : (s.status_ikut || 'Belum Konfirmasi')}
+              ${s.status_ikut === 'Ikut' ? 'Terdaftar Ikut' : (s.status_ikut || 'Belum Konfirmasi')}
             </div>
             <div class="text-[9px] text-slate-400 mt-0.5 truncate">${s.waktu_registrasi || 'Via Sub Rayon / Pos 1'}</div>
           </div>
 
-          <!-- Nomor Kamar Hotel -->
           <div class="p-2.5 rounded-xl bg-white border border-slate-200">
             <div class="text-[10px] text-slate-500 font-semibold">Kamar Penginapan</div>
             <div class="text-xs font-extrabold text-indigo-900 mt-0.5">
@@ -514,7 +519,6 @@ function renderAbsensiPesertaView() {
             <div class="text-[9px] text-slate-400 mt-0.5">Sesuai kuota kamar</div>
           </div>
 
-          <!-- Status Kontribusi Kegiatan -->
           <div class="p-2.5 rounded-xl bg-white border border-slate-200">
             <div class="text-[10px] text-slate-500 font-semibold">Kontribusi (Rp 2 Jt)</div>
             <div class="mt-1">
@@ -525,7 +529,6 @@ function renderAbsensiPesertaView() {
             <div class="text-[9px] text-slate-400 mt-1 truncate">${s.waktu_bayar ? 'Update: ' + s.waktu_bayar.split(',')[0] : 'Bendahara / Rayon'}</div>
           </div>
 
-          <!-- Status Perijinan -->
           <div class="p-2.5 rounded-xl bg-white border border-slate-200">
             <div class="text-[10px] text-slate-500 font-semibold">Catatan Perijinan</div>
             <div class="text-xs font-extrabold mt-0.5 ${s.status_izin && s.status_izin !== 'Hadir Penuh (Tanpa Izin)' ? 'text-amber-700' : 'text-slate-700'} truncate">
@@ -535,7 +538,6 @@ function renderAbsensiPesertaView() {
           </div>
         </div>
 
-        <!-- Bukti Serah Terima Rakor Kit & Uang Transpor (Hasil Scan Pos 5 & Pos 6) -->
         <div class="grid grid-cols-2 gap-2 pt-1">
           <div class="p-3 rounded-xl border ${s.ambil_kit ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'}">
             <div class="flex items-center justify-between">
@@ -543,7 +545,7 @@ function renderAbsensiPesertaView() {
               <i class="fa-solid fa-briefcase text-xs ${s.ambil_kit ? 'text-emerald-600' : 'text-slate-400'}"></i>
             </div>
             <div class="text-xs font-extrabold mt-1 ${s.ambil_kit ? 'text-emerald-800' : 'text-slate-500'}">
-              ${s.ambil_kit ? '✓ SUDAH DITERIMA' : 'Belum Diambil'}
+              ${s.ambil_kit ? 'SUDAH DITERIMA' : 'Belum Diambil'}
             </div>
             <div class="text-[9px] text-slate-400 mt-0.5 truncate">
               ${s.ambil_kit ? `${s.waktu_ambil_kit || ''} (${s.petugas_kit || 'Panitia'})` : 'Scan QR di Meja Kit'}
@@ -556,7 +558,7 @@ function renderAbsensiPesertaView() {
               <i class="fa-solid fa-wallet text-xs ${s.terima_transport ? 'text-blue-700' : 'text-slate-400'}"></i>
             </div>
             <div class="text-xs font-extrabold mt-1 ${s.terima_transport ? 'text-blue-900' : 'text-slate-500'}">
-              ${s.terima_transport ? '✓ SUDAH DITERIMA' : 'Belum Diterima'}
+              ${s.terima_transport ? 'SUDAH DITERIMA' : 'Belum Diterima'}
             </div>
             <div class="text-[9px] text-slate-400 mt-0.5 truncate">
               ${s.terima_transport ? `${s.waktu_terima_transport || ''} (${s.petugas_transport || 'Bendahara'})` : 'Scan QR di Bendahara'}
