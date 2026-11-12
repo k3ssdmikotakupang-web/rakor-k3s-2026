@@ -20,6 +20,7 @@ import { renderStatistikSekolahWidget } from './statistik_sekolah.js';
 import { bindUserProfileTrigger } from './profil.js';
 import { initModernDropdowns } from './dropdown_ui.js';
 import { applyK3sLogoBranding, renderK3sMusicPlayerWidget } from './branding_audio.js';
+import { renderSpjBospWidgets } from './spj_bosp.js';
 
 // Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
