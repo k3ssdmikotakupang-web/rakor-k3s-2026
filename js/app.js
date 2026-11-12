@@ -4,6 +4,7 @@ import { initLogin } from './login.js';
 import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from './jadwal.js';
 import { openRoomManagerModal } from './kamar.js';
 import { openLayananDocumentModal, DEFAULT_LAYANAN } from './layanan.js';
+import { openDokumentasiModal } from './dokumentasi.js';
 
 // Hilangkan error favicon.ico 404 di Console secara otomatis
 if (!document.querySelector("link[rel*='icon']")) {
