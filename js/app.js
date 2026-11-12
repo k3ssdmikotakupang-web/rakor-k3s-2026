@@ -18,6 +18,7 @@ import {
 } from './keuangan.js';
 import { renderStatistikSekolahWidget } from './statistik_sekolah.js';
 
+// Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
   link.rel = "icon";
@@ -30,7 +31,7 @@ let panitiaList = [];
 let sekolahList = [];
 let tugasList = [];
 let layananList = [];
-let tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT; // Rp 2.000.000 per sekolah
+let tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT;
 
 const DIVISI_LIST = [
   "Penanggung Jawab",
@@ -66,8 +67,10 @@ async function initApp() {
 function updateStaticEventDatesToNov2026() {
   document.querySelectorAll("span, p, div").forEach(el => {
     if (el.children.length === 0 && el.textContent) {
-      if (el.textContent.includes("24–26 Sept")) {
-        el.textContent = el.textContent.replace("24–26 September 2026", "19–21 November 2026").replace("24–26 Sept", "19–21 Nov");
+      if (el.textContent.includes("24–26 Sept") || el.textContent.includes("24-26 Sept")) {
+        el.textContent = el.textContent
+          .replace("24–26 September 2026", "19–21 November 2026")
+          .replace("24–26 Sept", "19–21 Nov");
       }
     }
   });
@@ -86,14 +89,14 @@ async function loadAllDatabase(showNotif = false) {
     if (rSek.data) sekolahList = rSek.data;
     if (rTgs.data) tugasList = rTgs.data;
     layananList = (rLay.data && rLay.data.length > 0) ? rLay.data : DEFAULT_LAYANAN;
-    tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT; // Dikunci Rp 2.000.000 / sekolah
+    tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT;
 
     const pSelect = document.getElementById("loginPanitiaSelect");
     if (pSelect) {
       const prev = pSelect.value;
       pSelect.innerHTML = `<option value="">Pilih Nama Panitia (${panitiaList.length} Orang)</option>`;
       panitiaList.forEach(p => {
-        const srTag = p.tugas_subrayon ? ` ★ Ketua Rayon ${p.tugas_subrayon}` : "";
+        const srTag = p.tugas_subrayon ? ` [Ketua Rayon ${p.tugas_subrayon}]` : "";
         pSelect.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${srTag})</option>`;
       });
       if (prev) pSelect.value = prev;
@@ -106,6 +109,9 @@ async function loadAllDatabase(showNotif = false) {
       if (activeUser.role === "peserta") {
         const updatedSchool = sekolahList.find(s => s.id_sekolah === activeUser.profile.id_sekolah);
         if (updatedSchool) activeUser.profile = updatedSchool;
+      } else {
+        const updatedPanitia = panitiaList.find(p => p.id_panitia === activeUser.profile.id_panitia);
+        if (updatedPanitia) activeUser.profile = updatedPanitia;
       }
       renderAllViews();
     } else {
@@ -288,6 +294,16 @@ function showTab(name) {
 
 function renderAllViews() {
   updateStaticEventDatesToNov2026();
+
+  // Panggil modul profil secara aman jika file profil.js sudah dibuat
+  import('./profil.js')
+    .then(mod => {
+      if (mod && typeof mod.bindUserProfileTrigger === "function") {
+        mod.bindUserProfileTrigger(activeUser, () => loadAllDatabase(false));
+      }
+    })
+    .catch(() => {});
+
   renderBerandaView();
   renderLiveJadwal();
   renderQrView();
@@ -414,7 +430,7 @@ function renderAbsensiPesertaView() {
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5">
             <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${isHadir ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
-              ${isHadir ? '✓ HADIR TERCATAT' : 'BELUM PRESENSI'}
+              ${isHadir ? 'HADIR TERCATAT' : 'BELUM PRESENSI'}
             </span>
           </div>
           <h4 class="font-extrabold text-xs text-slate-900 mt-1">${d.label}</h4>
@@ -500,10 +516,10 @@ function renderQrView() {
     if (pill) {
       if (s.status_ikut === "Ikut") {
         pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800";
-        pill.textContent = "✓ Terdaftar Ikut Rakor";
+        pill.textContent = "Terdaftar Ikut Rakor";
       } else if (s.status_ikut === "Tidak Ikut") {
         pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-rose-100 text-rose-800";
-        pill.textContent = "✕ Tidak Ikut";
+        pill.textContent = "Tidak Ikut";
       } else {
         pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800";
         pill.textContent = "Menunggu Validasi Ketua Rayon / Bendahara";
@@ -553,9 +569,6 @@ async function saveNamaKepsek() {
   await loadAllDatabase(false);
 }
 
-// =========================================================================
-// 4. TAB SUB RAYON (INPUT IKUT & KONTRIBUSI KHUSUS KETUA SUB RAYON & BENDAHARA)
-// =========================================================================
 function renderSubrayonView() {
   const srSelect = document.getElementById("srSelectFilter");
   const sr = srSelect?.value || "Maulafa";
@@ -582,7 +595,6 @@ function renderSubrayonView() {
   document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
   document.getElementById("srProgressBar").style.width = pct + "%";
 
-  // Jika pengguna termasuk 5 peran berwenang (PJ, Ketua Panitia, Sekretaris, Bendahara, Ketua Sub Rayon), tampilkan tombol pintas ke Info Keuangan
   let shortcutBar = document.getElementById("srFinanceShortcutBar");
   const cardsContainer = document.getElementById("srSchoolCardsContainer");
   if (!shortcutBar && cardsContainer && cardsContainer.parentElement) {
@@ -661,7 +673,7 @@ function renderSubrayonView() {
           <i class="fa-solid fa-money-bill-wave text-xs ${statusBayar === 'Lunas' ? 'text-emerald-600' : statusBayar === 'Dalam Proses' ? 'text-amber-500' : 'text-slate-400'}"></i>
           <span class="text-[10px] font-bold text-slate-600">Kontribusi (Rp 2 Jt):</span>
           <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${bayarBadgeStyle}">
-            ${statusBayar === 'Lunas' ? '✓ LUNAS' : statusBayar === 'Dalam Proses' ? '⏳ PROSES' : '✕ BELUM BAYAR'}
+            ${statusBayar === 'Lunas' ? 'LUNAS' : statusBayar === 'Dalam Proses' ? 'PROSES' : 'BELUM BAYAR'}
           </span>
         </div>
 
@@ -669,7 +681,7 @@ function renderSubrayonView() {
           <select class="select-status-bayar rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-extrabold text-slate-800 shrink-0 focus:border-blue-900">
             <option value="Belum Bayar" ${statusBayar === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
             <option value="Dalam Proses" ${statusBayar === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
-            <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>✓ Lunas</option>
+            <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>Lunas</option>
           </select>
         ` : `
           <span class="text-[10px] font-bold text-slate-400">${s.waktu_bayar ? s.waktu_bayar.split(',')[0] : ''}</span>
