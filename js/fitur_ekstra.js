@@ -1,5 +1,5 @@
 // js/fitur_ekstra.js
-// Mencakup: (1) Cetak PDF ID Card Kalung Elegan, (3) Running Text Live dengan Pengatur Kecepatan, (5) PWA Install
+// Mencakup: (1) Cetak PDF ID Card Kalung Elegan, (3) Running Text Live, (5) Menu Tentang Aplikasi, Paten K3S & Install HP
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
@@ -59,13 +59,20 @@ function ensureJsPdfLoaded() {
 
 export function renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, reloadCallback) {
   initPwaInstallSupport();
-  injectHeaderInstallButton();
+  removeHeaderInstallButtonIfExist();
   renderLiveRunningTextBanner(activeUser, layananList, reloadCallback);
   renderBulkIdCardGeneratorWidget(activeUser, sekolahList, panitiaList);
+  renderTentangAplikasiMenuWidget();
+}
+
+// Pastikan ikon install di header dihapus bersih agar header tidak berdesakan
+function removeHeaderInstallButtonIfExist() {
+  const oldHeaderBtn = document.getElementById("btnHeaderPwaInstall");
+  if (oldHeaderBtn) oldHeaderBtn.remove();
 }
 
 // =========================================================================
-// FITUR 5: PWA INSTALL KE LAYAR UTAMA HP ANDROID / IOS
+// FITUR 5: MENU "TENTANG APLIKASI, PATEN K3S & PASANG DI HP" (DI MENU LAYANAN)
 // =========================================================================
 export function initPwaInstallSupport() {
   if (pwaInitialized) return;
@@ -91,7 +98,7 @@ export function initPwaInstallSupport() {
   const manifestObj = {
     name: "SIM-RAKOR K3S SD/MI Kota Kupang 2026",
     short_name: "SIM-RAKOR K3S",
-    description: "Aplikasi Resmi Rapat Koordinasi Kepala SD/MI Kota Kupang 2026",
+    description: "Sistem Informasi Manajemen Rapat Koordinasi Kepala SD/MI Kota Kupang",
     start_url: window.location.origin + window.location.pathname,
     display: "standalone",
     background_color: "#0f172a",
@@ -122,7 +129,6 @@ export function initPwaInstallSupport() {
     e.preventDefault();
     deferredPwaPrompt = e;
     injectInstallAppButtons();
-    injectHeaderInstallButton();
   });
 
   injectInstallAppButtons();
@@ -145,39 +151,51 @@ function injectInstallAppButtons() {
       btn.className = "mt-3 w-full py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-amber-400/40 text-amber-300 font-extrabold text-xs flex items-center justify-center gap-2 shadow transition active:scale-95";
       btn.innerHTML = `
         <i class="fa-brands fa-android text-emerald-400 text-sm"></i>
-        <span>Pasang Aplikasi SIM-RAKOR di Layar HP</span>
+        <span>Tentang Aplikasi & Pasang di Layar HP</span>
       `;
-      btn.addEventListener("click", triggerInstallAppFlow);
+      btn.addEventListener("click", openTentangAplikasiModal);
       targetCard.appendChild(btn);
     }
   }
 }
 
-// Tambahkan juga ikon Install Aplikasi di Header Kanan Atas (Jika belum diinstal)
-function injectHeaderInstallButton() {
-  const existing = document.getElementById("btnHeaderPwaInstall");
-  if (isRunningStandalone()) {
-    if (existing) existing.remove();
-    return;
-  }
+// Menyuntikkan Tombol Menu "Tentang Aplikasi & Install HP" di dalam Grid Menu Layanan Peserta & Panitia
+function renderTentangAplikasiMenuWidget() {
+  const firstServiceBtn = document.querySelector(".service-menu-btn");
+  const gridContainer = firstServiceBtn ? firstServiceBtn.parentElement : null;
+  if (!gridContainer) return;
 
-  const musicBtn = document.getElementById("btnHeaderK3sMusic") || document.getElementById("btnHeaderNotifBell") || document.getElementById("btnRefreshApp");
-  if (!musicBtn || !musicBtn.parentElement) return;
-
-  if (!existing) {
-    const btn = document.createElement("button");
-    btn.id = "btnHeaderPwaInstall";
+  let btn = document.getElementById("btnServiceTentangAplikasi");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "btnServiceTentangAplikasi";
     btn.type = "button";
-    btn.title = "Pasang Aplikasi ke Layar Utama HP";
-    btn.className = "w-9 h-9 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 flex items-center justify-center text-xs text-emerald-300 active:scale-95 transition";
-    btn.innerHTML = `<i class="fa-solid fa-mobile-screen-button"></i>`;
-    btn.onclick = () => triggerInstallAppFlow();
-    musicBtn.parentElement.insertBefore(btn, musicBtn);
+    btn.className = "col-span-3 p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white border border-amber-400/40 flex items-center justify-between px-4 active:scale-[0.99] transition shadow-md";
+    gridContainer.appendChild(btn);
   }
+
+  btn.innerHTML = `
+    <div class="flex items-center gap-3 text-left">
+      <div class="w-11 h-11 rounded-2xl bg-white p-1.5 flex items-center justify-center shadow shrink-0 border border-amber-300">
+        <img src="./logo-k3s.png" alt="K3S" class="w-full h-full object-contain" onerror="this.outerHTML='<i class=\\'fa-solid fa-shield-halved text-blue-900 text-lg\\'></i>'" />
+      </div>
+      <div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-xs font-extrabold text-white">Tentang Aplikasi & Pasang di HP</span>
+          <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">Hak Cipta K3S</span>
+        </div>
+        <div class="text-[10px] text-blue-200 mt-0.5">
+          Instalasi ke layar utama HP, informasi sistem & lisensi resmi K3S Kota Kupang
+        </div>
+      </div>
+    </div>
+    <i class="fa-solid fa-chevron-right text-amber-300 text-xs shrink-0"></i>
+  `;
+
+  btn.onclick = () => openTentangAplikasiModal();
 }
 
 export async function triggerInstallAppFlow() {
-  // Jika Chrome Android sudah siap melakukan 1-Click Install
   if (deferredPwaPrompt) {
     deferredPwaPrompt.prompt();
     const { outcome } = await deferredPwaPrompt.userChoice;
@@ -187,49 +205,132 @@ export async function triggerInstallAppFlow() {
     }
     return;
   }
+  openTentangAplikasiModal();
+}
 
-  // Jika dibuka dari browser internal WhatsApp / iOS / atau sudah terinstal, tampilkan modal panduan interaktif
+export function openTentangAplikasiModal() {
   const modal = document.getElementById("serviceModal");
   const titleEl = document.getElementById("serviceModalTitle");
   const bodyEl = document.getElementById("serviceModalBody");
-  if (!modal || !titleEl || !bodyEl) {
-    alert("CARA PASANG DI LAYAR HP:\n\n1. Ketuk ikon Titik Tiga (⋮) di pojok kanan atas browser Chrome Anda.\n2. Pilih 'Instal Aplikasi' atau 'Tambahkan ke Layar Utama' (Add to Home Screen).\n3. Ikon berlogo K3S akan langsung muncul di layar depan HP Anda!");
-    return;
-  }
+  if (!modal || !titleEl || !bodyEl) return;
 
   modal.classList.remove("hidden");
-  titleEl.innerHTML = `<i class="fa-solid fa-mobile-screen-button text-emerald-600 mr-1.5"></i> Pasang Aplikasi di Layar HP`;
+  titleEl.innerHTML = `<i class="fa-solid fa-circle-info text-blue-700 mr-1.5"></i> Tentang Aplikasi & Lisensi K3S`;
+
+  const isInstalled = isRunningStandalone();
+
   bodyEl.innerHTML = `
-    <div class="p-4 rounded-3xl bg-slate-900 text-white text-center space-y-2.5">
-      <div class="w-16 h-16 rounded-2xl bg-white p-2 mx-auto shadow border-2 border-amber-400 flex items-center justify-center">
-        <img src="./logo-k3s.png" alt="K3S" class="w-full h-full object-contain" onerror="this.outerHTML='<i class=\\'fa-solid fa-mobile-screen text-2xl text-blue-900\\'></i>'" />
+    <!-- 1. KARTU BRANDING & HAK PATEN K3S KOTA KUPANG -->
+    <div class="p-5 rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white text-center space-y-3 shadow-xl border-2 border-amber-400/50 relative overflow-hidden">
+      <div class="w-24 h-24 rounded-3xl bg-white p-2.5 mx-auto shadow-lg border-2 border-amber-400 flex items-center justify-center">
+        <img src="./logo-k3s.png" alt="Logo K3S Kota Kupang" class="w-full h-full object-contain" onerror="this.outerHTML='<i class=\\'fa-solid fa-award text-3xl text-blue-900\\'></i>'" />
       </div>
-      <h4 class="font-extrabold text-sm text-amber-300">SIM-RAKOR K3S Kota Kupang</h4>
-      <p class="text-[11px] text-slate-300 leading-relaxed">
-        Pasang ikon aplikasi ini di layar depan HP Anda agar tampil layar penuh seperti aplikasi Play Store dan tidak perlu mengetik alamat link lagi.
+
+      <div>
+        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-amber-400 text-slate-950 px-3 py-0.5 rounded-full shadow">
+          Official Super-App Version 2.6
+        </span>
+        <h3 class="text-base font-extrabold text-white mt-2 tracking-tight">SIM-RAKOR K3S KOTA KUPANG 2026</h3>
+        <p class="text-[11px] text-blue-200 font-semibold mt-0.5">
+          Sistem Informasi Manajemen Rapat Koordinasi Kepala SD/MI Se-Kota Kupang
+        </p>
+      </div>
+
+      <!-- Kotak Lisensi & Paten Resmi K3S -->
+      <div class="p-3 rounded-2xl bg-white/10 border border-white/15 text-left space-y-1.5">
+        <div class="flex items-center gap-1.5 text-[10px] font-extrabold text-amber-300 uppercase">
+          <i class="fa-solid fa-certificate"></i>
+          <span>Hak Cipta & Kepemilikan Sistem (Paten Digital)</span>
+        </div>
+        <p class="text-[10px] text-slate-200 leading-relaxed">
+          Seluruh desain antarmuka, arsitektur sistem, basis data 158 sekolah, dan modul otomasi dokumen pada aplikasi ini merupakan milik eksklusif dan dilindungi di bawah lisensi resmi:
+        </p>
+        <div class="pt-1 border-t border-white/10 text-[10px] font-bold text-white">
+          <div>🏛️ KELOMPOK KERJA KEPALA SEKOLAH (K3S) SD/MI KOTA KUPANG</div>
+          <div class="text-blue-200 font-normal mt-0.5">Sekretariat: SD NCIPS - Jl. Kenanga, No. 01 Naikolan - Kupang</div>
+          <div class="text-amber-300 font-normal">Email: k3s.sdmikotakupang@gmail.com</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. BAGIAN PEMASANGAN APLIKASI KE LAYAR UTAMA HP (PWA) -->
+    <div class="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="font-extrabold text-xs text-emerald-950 uppercase flex items-center gap-1.5">
+          <i class="fa-brands fa-android text-emerald-600 text-base"></i>
+          <span>Pasang Aplikasi di Layar Utama HP</span>
+        </div>
+        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${isInstalled ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-900'}">
+          ${isInstalled ? '✓ Sudah Terpasang' : 'Mode Web-App'}
+        </span>
+      </div>
+
+      <p class="text-[11px] text-slate-700 leading-relaxed">
+        Agar Anda tidak perlu mengetik alamat link berulang kali, pasang ikon <b>SIM-RAKOR K3S</b> langsung di layar utama HP Anda (sejajar dengan aplikasi WhatsApp/YouTube):
       </p>
+
+      ${deferredPwaPrompt ? `
+        <button type="button" id="btnTriggerNativePwaPrompt" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2 active:scale-95 transition">
+          <i class="fa-solid fa-download"></i>
+          <span>Klik di Sini untuk Instal Langsung ke HP</span>
+        </button>
+      ` : ''}
+
+      <div class="p-3 rounded-xl bg-white border border-emerald-200 space-y-1.5 text-[11px] text-slate-800">
+        <div class="font-extrabold text-emerald-900">📱 Panduan Pasang di HP Android (Chrome):</div>
+        <ol class="list-decimal list-inside space-y-1 font-semibold text-slate-700">
+          <li>Ketuk ikon <b>Titik Tiga (⋮)</b> di pojok kanan atas browser Chrome Anda.</li>
+          <li>Pilih menu <b>"Instal aplikasi"</b> atau <b>"Tambahkan ke layar utama"</b> (<i>Add to Home screen</i>).</li>
+          <li>Ketuk <b>Instal / Tambah</b> — ikon berlogo K3S langsung tampil di layar depan HP Anda!</li>
+        </ol>
+      </div>
+
+      <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-1 text-[11px] text-slate-700">
+        <div class="font-extrabold text-slate-900"><i class="fa-brands fa-apple mr-1"></i> Panduan Pengguna iPhone (Safari):</div>
+        <p>Ketuk ikon <b>Bagikan (Share)</b> di bagian bawah Safari, lalu pilih <b>"Tambah ke Layar Utama" (Add to Home Screen)</b>.</p>
+      </div>
     </div>
 
-    <div class="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-2.5 text-xs text-slate-800">
-      <div class="font-extrabold text-emerald-950 uppercase text-[11px] flex items-center gap-1.5">
-        <i class="fa-brands fa-android text-emerald-600 text-sm"></i>
-        <span>Langkah Cepat di HP Android (Chrome):</span>
+    <!-- 3. INFORMASI FITUR & SPESIFIKASI SISTEM -->
+    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+      <div class="font-extrabold text-xs text-slate-900 uppercase flex items-center gap-1.5">
+        <i class="fa-solid fa-microchip text-blue-800"></i>
+        <span>Spesifikasi & Modul Terintegrasi</span>
       </div>
-      <ol class="list-decimal list-inside space-y-2 text-[11px] font-semibold leading-relaxed">
-        <li>Pastikan link ini dibuka di browser <b>Google Chrome</b> (jika Anda membukanya dari dalam chat WhatsApp, ketuk pojok kanan atas lalu pilih <i>"Buka di Chrome"</i>).</li>
-        <li>Ketuk ikon <b>Titik Tiga (⋮)</b> di pojok kanan atas browser Chrome Anda.</li>
-        <li>Pilih menu <b>"Instal aplikasi"</b> atau <b>"Tambahkan ke layar utama"</b> (<i>Add to Home screen</i>).</li>
-        <li>Ketuk <b>Instal / Tambah</b> — ikon berlogo K3S langsung muncul di layar utama HP Anda!</li>
-      </ol>
-    </div>
-
-    <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs text-slate-700">
-      <div class="font-extrabold text-slate-900 uppercase text-[10px]">
-        <i class="fa-brands fa-apple mr-1"></i> Pengguna iPhone (Safari):
+      <div class="grid grid-cols-2 gap-2 text-[10px]">
+        <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+          <div class="font-extrabold text-blue-900">🔐 Multi-Pos QR Scanner</div>
+          <div class="text-slate-500 mt-0.5">6 Pos Layanan Terkunci Otoritas Sekretariat & Bendahara</div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+          <div class="font-extrabold text-emerald-800">📄 Generator SPJ BOSP</div>
+          <div class="text-slate-500 mt-0.5">Daftar Hadir Individu, Kolektif Rayon & E-Kwitansi Resmi</div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+          <div class="font-extrabold text-amber-800">🎓 E-Sertifikat 32 JP</div>
+          <div class="text-slate-500 mt-0.5">Validasi Kode QR Anti-Pemalsuan Terintegrasi</div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+          <div class="font-extrabold text-indigo-900">📊 Real-Time Cloud DB</div>
+          <div class="text-slate-500 mt-0.5">Sinkronisasi Langsung 158 SD/MI di 6 Sub Rayon</div>
+        </div>
       </div>
-      <p class="text-[11px]">Ketuk ikon <b>Bagikan (Share)</b> di bagian bawah Safari, lalu pilih <b>"Tambah ke Layar Utama" (Add to Home Screen)</b>.</p>
+      <div class="pt-2 border-t border-slate-200 text-center text-[10px] font-bold text-slate-400">
+        &copy; 2026 K3S SD/MI Kota Kupang • Hak Cipta Dilindungi Undang-Undang
+      </div>
     </div>
   `;
+
+  document.getElementById("btnTriggerNativePwaPrompt")?.addEventListener("click", async () => {
+    if (!deferredPwaPrompt) return;
+    deferredPwaPrompt.prompt();
+    const { outcome } = await deferredPwaPrompt.userChoice;
+    if (outcome === 'accepted') {
+      toast("Aplikasi SIM-RAKOR berhasil dipasang ke layar utama HP Anda!");
+      deferredPwaPrompt = null;
+      modal.classList.add("hidden");
+    }
+  });
 }
 
 // =========================================================================
@@ -266,11 +367,10 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
     kode_menu: 'pengumuman_live',
     judul: 'Info Penting Panitia',
     deskripsi: 'Selamat datang Peserta Rakor Kepala SD/MI Kota Kupang (19–21 November 2026). Pastikan menunjukkan QR Code saat registrasi & pengambilan Rakor Kit.',
-    url_link: '45', // Menyimpan durasi kecepatan dalam detik (Default: 45 detik agar santai & mudah dibaca)
+    url_link: '45',
     status_tersedia: 'AKTIF'
   };
 
-  // Ambil durasi kecepatan dari kolom url_link (default 45 detik jika belum diatur)
   const rawSpeedSec = parseInt(broadcastItem.url_link, 10);
   const speedSeconds = (!isNaN(rawSpeedSec) && rawSpeedSec >= 15 && rawSpeedSec <= 90) ? rawSpeedSec : 45;
 
