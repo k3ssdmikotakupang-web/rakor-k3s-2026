@@ -616,16 +616,23 @@ function renderQrView() {
   if (!qrBox) return;
   qrBox.innerHTML = "";
 
+  // 1. Sembunyikan permanen form input Nama Kepala Sekolah lama di halaman QR
+  const oldKepsekForm = document.getElementById("qrKepsekFormBox");
+  if (oldKepsekForm) oldKepsekForm.classList.add("hidden");
+
   let qrPayloadText = "";
   const roomPill = document.getElementById("qrRoomPill");
+  let missingFields = [];
 
   if (activeUser.role === "peserta") {
     const s = sekolahList.find(x => x.id_sekolah === activeUser.profile.id_sekolah) || activeUser.profile;
     document.getElementById("qrCardTitle").textContent = s.nama_sekolah;
-    document.getElementById("qrCardSubtitle").textContent = `NPSN: ${s.npsn} • Sub Rayon ${s.subrayon}`;
-    document.getElementById("qrKepsekFormBox")?.classList.remove("hidden");
-    const inpKepsek = document.getElementById("qrInputNamaKepsek");
-    if (inpKepsek) inpKepsek.value = s.nama_kepsek || "";
+    document.getElementById("qrCardSubtitle").textContent = `${s.nama_kepsek ? s.nama_kepsek + ' • ' : ''}NPSN: ${s.npsn} • Sub Rayon ${s.subrayon}`;
+
+    // Cek kelengkapan data profil Peserta
+    if (!s.nama_kepsek || String(s.nama_kepsek).trim() === "") missingFields.push("Nama & Gelar Kepala Sekolah");
+    if (!s.nip_kepsek || String(s.nip_kepsek).trim() === "") missingFields.push("NIP");
+    if (!s.no_hp || String(s.no_hp).trim() === "") missingFields.push("No. WhatsApp");
 
     if (roomPill) {
       roomPill.classList.remove("hidden");
@@ -648,11 +655,13 @@ function renderQrView() {
 
     qrPayloadText = `PESERTA|${s.npsn}|${s.nama_sekolah}|${s.subrayon}`;
   } else {
-    const p = activeUser.profile;
+    const p = panitiaList.find(x => x.id_panitia === activeUser.profile.id_panitia) || activeUser.profile;
     document.getElementById("qrCardTitle").textContent = p.nama_panitia;
     document.getElementById("qrCardSubtitle").textContent = `${p.divisi} (${p.jabatan})`;
-    document.getElementById("qrKepsekFormBox")?.classList.add("hidden");
     roomPill?.classList.add("hidden");
+
+    // Cek kelengkapan data profil Panitia
+    if (!p.no_hp || String(p.no_hp).trim() === "") missingFields.push("No. WhatsApp Aktif");
 
     const pill = document.getElementById("qrStatusPill");
     if (pill) {
@@ -663,6 +672,55 @@ function renderQrView() {
     qrPayloadText = `PANITIA|${p.id_panitia}|${p.nama_panitia}|${p.divisi}`;
   }
 
+  // 2. Tampilkan Peringatan jika Data Profil belum lengkap (atau info terverifikasi jika sudah lengkap)
+  let alertBox = document.getElementById("qrProfileWarningBanner");
+  if (!alertBox && oldKepsekForm && oldKepsekForm.parentElement) {
+    alertBox = document.createElement("div");
+    alertBox.id = "qrProfileWarningBanner";
+    oldKepsekForm.insertAdjacentElement("afterend", alertBox);
+  }
+
+  if (alertBox) {
+    if (missingFields.length > 0) {
+      alertBox.className = "mt-3 p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-left space-y-2.5 shadow-2xs";
+      alertBox.innerHTML = `
+        <div class="flex items-start gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 text-sm font-extrabold">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 class="text-xs font-extrabold text-amber-950">Data Profil Belum Lengkap!</h4>
+            <p class="text-[10px] text-amber-900 leading-relaxed mt-0.5">
+              Mohon lengkapi <b>${missingFields.join(", ")}</b> pada menu Profil untuk keperluan pencetakan E-Sertifikat dan kartu peserta.
+            </p>
+          </div>
+        </div>
+        <button type="button" id="btnOpenProfileFromQrAlert" class="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow transition">
+          <i class="fa-solid fa-user-pen"></i>
+          <span>Lengkapi Data di Menu Profil Sekarang</span>
+        </button>
+      `;
+      document.getElementById("btnOpenProfileFromQrAlert")?.addEventListener("click", () => {
+        document.getElementById("topUserAvatar")?.click();
+      });
+    } else {
+      alertBox.className = "mt-3 p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between px-3.5";
+      alertBox.innerHTML = `
+        <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-900">
+          <i class="fa-solid fa-circle-check text-emerald-600"></i>
+          <span>Biodata Profil & Sertifikat Lengkap</span>
+        </div>
+        <button type="button" id="btnEditProfileFromQr" class="text-[10px] font-extrabold text-blue-800 hover:underline">
+          Ubah Profil
+        </button>
+      `;
+      document.getElementById("btnEditProfileFromQr")?.addEventListener("click", () => {
+        document.getElementById("topUserAvatar")?.click();
+      });
+    }
+  }
+
+  // 3. Render Gambar QR Code
   try {
     if (typeof window.QRCode === "function") {
       new window.QRCode(qrBox, {
