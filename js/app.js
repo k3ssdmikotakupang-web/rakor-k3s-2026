@@ -2,6 +2,7 @@
 import { sb, toast } from './supabase.js';
 import { initLogin } from './login.js';
 import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from './jadwal.js';
+import { openRoomManagerModal } from './kamar.js';
 
 let activeUser = null;
 let panitiaList = [];
