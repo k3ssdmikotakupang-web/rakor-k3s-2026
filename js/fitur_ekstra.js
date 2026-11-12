@@ -334,29 +334,31 @@ export function openTentangAplikasiModal() {
 }
 
 // =========================================================================
-// FITUR 3: RUNNING TEXT PENGUMUMAN LIVE + PENGATUR KECEPATAN
+// FITUR 3: RUNNING TEXT PENGUMUMAN LIVE (LANGSUNG JALAN DETIK PERTAMA MASUK DASHBOARD)
 // =========================================================================
 function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (!tabBeranda) return;
 
+  // Gunakan animasi Seamless Loop (0% ke -50%) agar teks langsung terlihat & bergerak instan tanpa jeda kosong
   if (!document.getElementById("runningTextStyleTag")) {
     const st = document.createElement("style");
     st.id = "runningTextStyleTag";
     st.textContent = `
-      @keyframes k3sMarquee {
-        0% { transform: translateX(100%); }
-        100% { transform: translateX(-100%); }
+      @keyframes k3sSeamlessMarquee {
+        0% { transform: translate3d(0%, 0, 0); }
+        100% { transform: translate3d(-50%, 0, 0); }
       }
-      .animate-k3s-marquee {
-        display: inline-block;
-        white-space: nowrap;
-        animation-name: k3sMarquee;
+      .k3s-marquee-track {
+        display: flex;
+        width: max-content;
+        will-change: transform;
+        animation-name: k3sSeamlessMarquee;
         animation-timing-function: linear;
         animation-iteration-count: infinite;
       }
-      .animate-k3s-marquee:hover,
-      .animate-k3s-marquee:active {
+      .k3s-marquee-track:hover,
+      .k3s-marquee-track:active {
         animation-play-state: paused;
       }
     `;
@@ -367,12 +369,12 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
     kode_menu: 'pengumuman_live',
     judul: 'Info Penting Panitia',
     deskripsi: 'Selamat datang Peserta Rakor Kepala SD/MI Kota Kupang (19–21 November 2026). Pastikan menunjukkan QR Code saat registrasi & pengambilan Rakor Kit.',
-    url_link: '45',
+    url_link: '35',
     status_tersedia: 'AKTIF'
   };
 
   const rawSpeedSec = parseInt(broadcastItem.url_link, 10);
-  const speedSeconds = (!isNaN(rawSpeedSec) && rawSpeedSec >= 15 && rawSpeedSec <= 90) ? rawSpeedSec : 45;
+  const speedSeconds = (!isNaN(rawSpeedSec) && rawSpeedSec >= 12 && rawSpeedSec <= 90) ? rawSpeedSec : 35;
 
   const isActive = broadcastItem.status_tersedia !== 'NONAKTIF';
   const canEdit = canManageBroadcast(activeUser);
@@ -387,14 +389,34 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
   if (!isActive && !canEdit) {
     bar.className = "hidden";
     bar.innerHTML = "";
+    bar.dataset.signature = "";
     return;
   }
+
+  // Cegah animasi ter-reset dari awal jika teks, status, dan hak akses tidak berubah
+  const currentSignature = `${isActive}|${canEdit}|${speedSeconds}|${broadcastItem.judul}|${broadcastItem.deskripsi}`;
+  if (bar.dataset.signature === currentSignature) {
+    bar.onclick = () => openBroadcastEditorModal(activeUser, broadcastItem, speedSeconds, reloadCallback);
+    return;
+  }
+  bar.dataset.signature = currentSignature;
 
   bar.className = `rounded-2xl p-2.5 border shadow-sm flex items-center justify-between gap-2 cursor-pointer ${
     isActive
       ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border-amber-300 text-slate-900'
       : 'bg-slate-100 border-slate-300 text-slate-500'
   }`;
+
+  const singleSegmentHtml = `
+    <span class="inline-flex items-center pr-12">
+      <b class="text-red-700 mr-1.5">[${broadcastItem.judul}]:</b>
+      <span>${broadcastItem.deskripsi}</span>
+      <span class="mx-6 text-amber-500">•</span>
+      <b class="text-red-700 mr-1.5">[${broadcastItem.judul}]:</b>
+      <span>${broadcastItem.deskripsi}</span>
+      <span class="mx-6 text-amber-500">•</span>
+    </span>
+  `;
 
   bar.innerHTML = `
     <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
@@ -403,9 +425,16 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
         <span>${isActive ? 'INFO LIVE' : 'OFF'}</span>
       </span>
       <div class="overflow-hidden flex-1 relative">
-        <div style="animation-duration: ${speedSeconds}s;" class="text-xs font-extrabold ${isActive ? 'text-slate-900 animate-k3s-marquee' : 'text-slate-500 truncate'}">
-          <b>[${broadcastItem.judul}]</b>: ${broadcastItem.deskripsi} &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; <b>[${broadcastItem.judul}]</b>: ${broadcastItem.deskripsi}
-        </div>
+        ${isActive ? `
+          <div class="k3s-marquee-track text-xs font-extrabold text-slate-900" style="animation-duration: ${speedSeconds}s;">
+            ${singleSegmentHtml}
+            ${singleSegmentHtml}
+          </div>
+        ` : `
+          <div class="text-xs font-bold text-slate-500 truncate">
+            [Siaran Nonaktif] ${broadcastItem.deskripsi}
+          </div>
+        `}
       </div>
     </div>
     ${canEdit ? `
