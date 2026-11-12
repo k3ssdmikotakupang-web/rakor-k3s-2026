@@ -5,6 +5,7 @@ import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from
 import { openRoomManagerModal } from './kamar.js';
 import { openLayananDocumentModal, DEFAULT_LAYANAN } from './layanan.js';
 import { openDokumentasiModal } from './dokumentasi.js';
+import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifikat.js';
 
 // Hilangkan error favicon.ico 404 di Console secara otomatis
 if (!document.querySelector("link[rel*='icon']")) {
@@ -45,6 +46,7 @@ async function initApp() {
   initJadwal();
   bindNavigationAndActions();
   await loadAllDatabase(false);
+  checkCertificateVerificationUrl(sekolahList, panitiaList);
   setupRealtimeListeners();
 }
 
@@ -336,6 +338,10 @@ function openServiceModal(serviceCode) {
   }
   if (serviceCode === "dokumentasi") {
     openDokumentasiModal(activeUser, () => loadAllDatabase(false));
+    return;
+  }
+  if (serviceCode === "sertifikat") {
+    openSertifikatModal(activeUser, sekolahList, () => loadAllDatabase(false));
     return;
   }
   openLayananDocumentModal(serviceCode, activeUser, layananList, () => loadAllDatabase(false));
