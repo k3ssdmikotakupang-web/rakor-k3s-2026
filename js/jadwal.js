@@ -3,149 +3,265 @@ import { sb, toast } from './supabase.js';
 
 export let isSekretaris = false;
 let currentDay = 1;
+let scheduleCache = [];
 
 export async function checkSecretaryPrivilege(userSession) {
-  isSekretaris = userSession && userSession.role === 'panitia' && userSession.profile.divisi === 'Sekretaris';
+  isSekretaris = Boolean(
+    userSession &&
+    userSession.role === 'panitia' &&
+    userSession.profile &&
+    userSession.profile.divisi === 'Sekretaris'
+  );
+}
+
+// Fungsi Pintar: Mengubah teks jam ("07.30 - 09.00", "08:00", "8.30") menjadi angka menit sejak 00:00
+function parseTimeToMinutes(waktuStr, urutanWaktuStr) {
+  const source = String(waktuStr || urutanWaktuStr || '').trim();
+  const match = source.match(/(\d{1,2})[:.](\d{2})/);
+  if (!match) return 9999; // Jika tidak ada format jam, taruh di paling bawah
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  return hours * 60 + minutes;
+}
+
+// Mengubah teks jam menjadi format TIME SQL ("HH:MM:00") agar tabel Supabase juga ikut rapi
+function extractSqlTime(waktuStr) {
+  const match = String(waktuStr || '').trim().match(/(\d{1,2})[:.](\d{2})/);
+  if (!match) return '23:59:00';
+  const hh = String(match[1]).padStart(2, '0');
+  const mm = String(match[2]).padStart(2, '0');
+  return `${hh}:${mm}:00`;
 }
 
 export function initJadwal() {
-  document.getElementById("btnDay1").addEventListener("click", () => filterDay(1));
-  document.getElementById("btnDay2").addEventListener("click", () => filterDay(2));
-  document.getElementById("btnDay3").addEventListener("click", () => filterDay(3));
+  document.getElementById("btnDay1")?.addEventListener("click", () => filterDay(1));
+  document.getElementById("btnDay2")?.addEventListener("click", () => filterDay(2));
+  document.getElementById("btnDay3")?.addEventListener("click", () => filterDay(3));
 
-  document.getElementById("btnAddSchedule").addEventListener("click", () => openModal());
-  document.getElementById("btnSaveSchedule").addEventListener("click", saveSesi);
-  document.getElementById("btnCancelSchedule").addEventListener("click", closeModal);
-  document.getElementById("btnDismissSchedule").addEventListener("click", closeModal);
+  document.getElementById("btnAddSchedule")?.addEventListener("click", () => openModal(null));
+  document.getElementById("btnSaveSchedule")?.addEventListener("click", saveSesi);
+  document.getElementById("btnCancelSchedule")?.addEventListener("click", closeModal);
+  document.getElementById("btnDismissSchedule")?.addEventListener("click", closeModal);
 }
 
-function filterDay(day) {
-  currentDay = day;
+export function filterDay(day) {
+  currentDay = Number(day);
   [1, 2, 3].forEach(d => {
     const btn = document.getElementById(`btnDay${d}`);
-    if (d === day) {
-      btn.className = "py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow";
-    } else {
-      btn.className = "py-2 rounded-xl text-xs font-bold text-slate-600";
-    }
+    if (!btn) return;
+    btn.className =
+      d === currentDay
+        ? "py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow"
+        : "py-2 rounded-xl text-xs font-bold text-slate-600";
   });
   renderLiveJadwal();
 }
 
 export async function renderLiveJadwal() {
-  // Urutkan berdasarkan "hari" lalu "urutan_waktu" ASC agar terurut rapi
-  const { data: Sched } = await sb.from("jadwal_rakor")
-                                 .select("*")
-                                 .order("hari")
-                                 .order("urutan_waktu", { ascending: true });
+  const { data, error } = await sb.from("jadwal_rakor").select("*");
+  if (error || !data) return;
 
-  if (!Sched) return;
+  // URUTKAN OTOMATIS BERDASARKAN: 1. Hari, 2. Jam Mulai (Pagi -> Malam), 3. ID Jadwal
+  scheduleCache = [...data].sort((a, b) => {
+    const dayDiff = Number(a.hari || 1) - Number(b.hari || 1);
+    if (dayDiff !== 0) return dayDiff;
 
-  // 1. CARI SESI YANG AKTIF
-  const liveActive = Sched.find(j => j.status_aktif === true);
+    const timeA = parseTimeToMinutes(a.waktu, a.urutan_waktu);
+    const timeB = parseTimeToMinutes(b.waktu, b.urutan_waktu);
+    if (timeA !== timeB) return timeA - timeB;
+
+    return Number(a.id_jadwal || 0) - Number(b.id_jadwal || 0);
+  });
+
+  // 1. TAMPILKAN SESI YANG SEDANG BERLANGSUNG (LIVE) DI BERANDA PESERTA & PANITIA
+  const liveActive = scheduleCache.find(j => j.status_aktif === true);
   const dashboardCard = document.getElementById("liveActiveSessionContainer");
 
-  if (liveActive) {
-    dashboardCard.classList.remove("hidden");
-    document.getElementById("liveActiveTitle").textContent = liveActive.judul_sesi;
-    document.getElementById("liveActiveDesc").textContent = liveActive.deskripsi || "Tidak ada deskripsi.";
-    document.getElementById("liveActiveTime").textContent = `Hari ke-${liveActive.hari} (${liveActive.waktu})`;
-    document.getElementById("liveActivePic").innerHTML = liveActive.pemateri_pic ? `<i class="fa-solid fa-user-tag mr-1"></i> ${liveActive.pemateri_pic}` : "PIC: -";
-  } else {
-    dashboardCard.classList.add("hidden");
+  if (dashboardCard) {
+    if (liveActive) {
+      dashboardCard.classList.remove("hidden");
+      document.getElementById("liveActiveTitle").textContent = liveActive.judul_sesi;
+      document.getElementById("liveActiveDesc").textContent = liveActive.deskripsi || "Sesi sedang berlangsung.";
+      document.getElementById("liveActiveTime").textContent = `Hari Ke-${liveActive.hari} • ${liveActive.waktu}`;
+      document.getElementById("liveActivePic").innerHTML = liveActive.pemateri_pic
+        ? `<i class="fa-solid fa-user-tag mr-1"></i> ${liveActive.pemateri_pic}`
+        : "PIC: Panitia Rakor";
+    } else {
+      dashboardCard.classList.add("hidden");
+    }
   }
 
-  // 2. TAMPILKAN TAB RUNDOWN HARIAN (Sesuai Hari yang dipilih)
+  // 2. RENDER DAFTAR JADWAL SESUAI HARI YANG DIPILIH (SUDAH TERURUT WAKTU)
   const rundownContainer = document.getElementById("scheduleListContainer");
-  const filtered = Sched.filter(j => Number(j.hari) === Number(currentDay));
+  if (!rundownContainer) return;
+
+  document.getElementById("btnAddSchedule")?.classList.toggle("hidden", !isSekretaris);
+  document.getElementById("secretaryScheduleBanner")?.classList.toggle("hidden", !isSekretaris);
+
+  const filtered = scheduleCache.filter(j => Number(j.hari) === Number(currentDay));
 
   if (filtered.length === 0) {
-    rundownContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Belum ada jadwal.</div>`;
+    rundownContainer.innerHTML = `
+      <div class="p-6 text-center rounded-2xl bg-slate-50 border border-slate-200">
+        <p class="text-xs text-slate-500 font-semibold">Belum ada jadwal untuk Hari Ke-${currentDay}.</p>
+      </div>
+    `;
     return;
   }
 
-  // Tampilkan Mode Editor bagi Sekretaris
-  document.getElementById("btnAddSchedule").classList.toggle("hidden", !isSekretaris);
-  document.getElementById("secretaryScheduleBanner").classList.toggle("hidden", !isSekretaris);
-
   rundownContainer.innerHTML = "";
   filtered.forEach(session => {
-    const borderStyle = session.status_aktif ? "border-emerald-500 bg-emerald-500/5" : "border-slate-200 bg-slate-50";
-    const labelStyle = session.warna_label === "emas" ? "bg-amber-500 text-slate-950" : session.warna_label === "hijau" ? "bg-emerald-600 text-white" : "bg-blue-900 text-white";
+    const isLive = session.status_aktif === true;
+    const borderStyle = isLive
+      ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400/30"
+      : "border-slate-200 bg-slate-50";
 
-    // Tombol Saklar Sesi Aktif
-    const saklarAktif = isSekretaris ? `
-      <button class="toggle-active-session w-7 h-7 rounded-lg bg-white border flex items-center justify-center shadow-sm ${session.status_aktif ? 'text-emerald-500 border-emerald-500 bg-emerald-50' : 'text-slate-400'}" data-id="${session.id_jadwal}" data-active="${session.status_aktif}" title="Aktifkan Live">
-        <i class="fa-solid fa-signal text-xs ${session.status_aktif ? 'animate-pulse' : ''}"></i>
-      </button>
-    ` : "";
+    const labelStyle =
+      session.warna_label === "emas"
+        ? "bg-amber-500 text-slate-950"
+        : session.warna_label === "hijau"
+        ? "bg-emerald-600 text-white"
+        : "bg-blue-900 text-white";
 
-    const editHapusButtons = isSekretaris ? `
-      <div class="flex gap-1">
-        <button class="edit-schedule w-7 h-7 rounded-lg bg-white border flex items-center justify-center" data-id="${session.id_jadwal}"><i class="fa-solid fa-pen text-blue-700 text-xs"></i></button>
-        <button class="del-schedule w-7 h-7 rounded-lg bg-white border flex items-center justify-center" data-id="${session.id_jadwal}"><i class="fa-solid fa-trash text-rose-500 text-xs"></i></button>
-      </div>
-    ` : "";
+    // Tombol khusus Sekretaris: Aktifkan Live, Edit, Hapus
+    const secretaryControls = isSekretaris
+      ? `<div class="flex flex-col gap-1.5 shrink-0 items-end">
+           <button class="toggle-active-session px-2 py-1 rounded-lg border text-[10px] font-extrabold flex items-center gap-1 shadow-2xs transition ${
+             isLive
+               ? 'bg-red-600 text-white border-red-600 animate-pulse'
+               : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-500'
+           }" data-id="${session.id_jadwal}" data-active="${isLive}" title="Tampilkan sebagai Sesi Sedang Berlangsung di Beranda">
+             <i class="fa-solid fa-tower-broadcast"></i> ${isLive ? 'LIVE' : 'Set Live'}
+           </button>
+           <div class="flex gap-1">
+             <button class="edit-schedule w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 flex items-center justify-center" data-id="${session.id_jadwal}" title="Edit Sesi">
+               <i class="fa-solid fa-pen text-blue-800 text-[11px]"></i>
+             </button>
+             <button class="del-schedule w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 flex items-center justify-center" data-id="${session.id_jadwal}" title="Hapus Sesi">
+               <i class="fa-solid fa-trash text-rose-600 text-[11px]"></i>
+             </button>
+           </div>
+         </div>`
+      : "";
 
     rundownContainer.innerHTML += `
-      <div class="flex gap-3 items-start p-3.5 rounded-2xl border ${borderStyle}">
-        <div class="px-2.5 py-1.5 rounded-xl ${labelStyle} font-extrabold text-[9px] shrink-0 text-center">
+      <div class="flex gap-3 items-start p-3.5 rounded-2xl border ${borderStyle} transition">
+        <div class="px-2.5 py-1.5 rounded-xl ${labelStyle} font-extrabold text-[10px] shrink-0 text-center min-w-[78px]">
           ${session.waktu}
         </div>
         <div class="flex-1 min-w-0">
-          <div class="font-extrabold text-xs text-slate-900 leading-snug flex items-center gap-1.5">
-            ${session.judul_sesi}
-            ${session.status_aktif ? '<span class="inline-block text-[8px] font-extrabold bg-red-500 text-white px-1.5 py-0.2 rounded-full uppercase tracking-wider animate-pulse">Live</span>' : ''}
+          <div class="font-extrabold text-xs text-slate-900 leading-snug flex items-center gap-1.5 flex-wrap">
+            <span>${session.judul_sesi}</span>
+            ${isLive ? '<span class="inline-flex items-center gap-1 text-[9px] font-extrabold bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse"><span class="w-1.5 h-1.5 bg-white rounded-full"></span>Sedang Berlangsung</span>' : ''}
           </div>
-          <p class="text-[11px] text-slate-500 mt-0.5">${session.deskripsi || ""}</p>
-          ${session.pemateri_pic ? `<div class="text-[9px] font-extrabold text-blue-900 mt-1"><i class="fa-solid fa-user-tag mr-1"></i>${session.pemateri_pic}</div>` : ""}
+          <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed">${session.deskripsi || ""}</p>
+          ${session.pemateri_pic ? `<div class="text-[10px] font-bold text-blue-900 mt-1"><i class="fa-solid fa-user-tag mr-1"></i>${session.pemateri_pic}</div>` : ""}
         </div>
-        <div class="flex flex-col gap-1.5 shrink-0 items-end">
-          ${saklarAktif}
-          ${editHapusButtons}
-        </div>
+        ${secretaryControls}
       </div>
     `;
   });
 
-  // Berikan event listener pada tombol-tombol milik Sekretaris
   if (isSekretaris) {
-    document.querySelectorAll(".toggle-active-session").forEach(btn => btn.addEventListener("click", async (e) => {
-      const id = btn.dataset.id;
-      const isCurrentlyActive = btn.dataset.active === "true";
-      
-      // Matikan semua sesi lain yang aktif terlebih dahulu, lalu nyalakan sesi ini saja
-      await sb.from("jadwal_rakor").update({ status_aktif: false }).neq("id_jadwal", id);
-      await sb.from("jadwal_rakor").update({ status_aktif: !isCurrentlyActive }).eq("id_jadwal", id);
+    document.querySelectorAll(".toggle-active-session").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.id);
+        const currentlyActive = btn.dataset.active === "true";
 
-      toast(!isCurrentlyActive ? "Sesi Live diaktifkan ke Beranda Peserta!" : "Sesi Live diakhiri.");
-      renderLiveJadwal();
-    }));
+        // Matikan status_aktif sesi lain terlebih dahulu
+        await sb.from("jadwal_rakor").update({ status_aktif: false }).neq("id_jadwal", id);
+        // Ubah status_aktif sesi yang diklik
+        await sb.from("jadwal_rakor").update({ status_aktif: !currentlyActive }).eq("id_jadwal", id);
 
-    document.querySelectorAll(".edit-schedule").forEach(btn => btn.addEventListener("click", () => openModal(btn.dataset.id)));
-    document.querySelectorAll(".del-schedule").forEach(btn => btn.addEventListener("click", (e) => deleteSesi(btn.dataset.id)));
+        toast(!currentlyActive ? "Sesi diaktifkan sebagai LIVE di Beranda seluruh Peserta!" : "Status Live sesi dimatikan.");
+        renderLiveJadwal();
+      });
+    });
+
+    document.querySelectorAll(".edit-schedule").forEach(btn => {
+      btn.addEventListener("click", () => openModal(Number(btn.dataset.id)));
+    });
+
+    document.querySelectorAll(".del-schedule").forEach(btn => {
+      btn.addEventListener("click", () => deleteSesi(Number(btn.dataset.id)));
+    });
   }
 }
 
 function openModal(id = null) {
-  document.getElementById("scheduleModal").classList.remove("hidden");
+  if (!isSekretaris) return toast("Hanya Sekretaris Panitia yang dapat mengubah jadwal!");
+  document.getElementById("scheduleModal")?.classList.remove("hidden");
+
   if (id) {
-    const j = SchedDataCache.find(x => x.id_jadwal == id); // cache as global / query local
-    // Set default value...
+    const item = scheduleCache.find(x => Number(x.id_jadwal) === Number(id));
+    if (!item) return;
+    document.getElementById("modalScheduleHeader").textContent = "Edit Sesi Jadwal Kegiatan";
+    document.getElementById("modalScheduleId").value = item.id_jadwal;
+    document.getElementById("modalScheduleDay").value = item.hari;
+    document.getElementById("modalScheduleTime").value = item.waktu;
+    document.getElementById("modalScheduleTitle").value = item.judul_sesi;
+    document.getElementById("modalScheduleDesc").value = item.deskripsi || "";
+    document.getElementById("modalSchedulePic").value = item.pemateri_pic || "";
+    document.getElementById("modalScheduleColor").value = item.warna_label || "biru";
+  } else {
+    document.getElementById("modalScheduleHeader").textContent = "Tambah Sesi Jadwal Baru";
+    document.getElementById("modalScheduleId").value = "";
+    document.getElementById("modalScheduleDay").value = currentDay;
+    document.getElementById("modalScheduleTime").value = "";
+    document.getElementById("modalScheduleTitle").value = "";
+    document.getElementById("modalScheduleDesc").value = "";
+    document.getElementById("modalSchedulePic").value = "";
+    document.getElementById("modalScheduleColor").value = "biru";
   }
 }
 
 function closeModal() {
-  document.getElementById("scheduleModal").classList.add("hidden");
+  document.getElementById("scheduleModal")?.classList.add("hidden");
 }
 
 async function saveSesi() {
-  // logic insert/update...
+  if (!isSekretaris) return;
+
+  const id = document.getElementById("modalScheduleId").value;
+  const hari = Number(document.getElementById("modalScheduleDay").value);
+  const waktu = document.getElementById("modalScheduleTime").value.trim();
+  const judul_sesi = document.getElementById("modalScheduleTitle").value.trim();
+  const deskripsi = document.getElementById("modalScheduleDesc").value.trim();
+  const pemateri_pic = document.getElementById("modalSchedulePic").value.trim();
+  const warna_label = document.getElementById("modalScheduleColor").value;
+  const urutan_waktu = extractSqlTime(waktu);
+
+  if (!waktu || !judul_sesi) {
+    return toast("Jam Sesi dan Judul Acara wajib diisi!");
+  }
+
+  const payload = { hari, waktu, judul_sesi, deskripsi, pemateri_pic, warna_label, urutan_waktu };
+
+  if (id) {
+    const { error } = await sb.from("jadwal_rakor").update(payload).eq("id_jadwal", Number(id));
+    if (error) {
+      // Fallback jika kolom urutan_waktu belum ada di Supabase
+      delete payload.urutan_waktu;
+      await sb.from("jadwal_rakor").update(payload).eq("id_jadwal", Number(id));
+    }
+    toast("Jadwal berhasil diperbarui & diurutkan!");
+  } else {
+    const { error } = await sb.from("jadwal_rakor").insert([payload]);
+    if (error) {
+      delete payload.urutan_waktu;
+      await sb.from("jadwal_rakor").insert([payload]);
+    }
+    toast("Sesi baru ditambahkan sesuai urutan jam!");
+  }
+
+  closeModal();
+  filterDay(hari);
 }
 
 async function deleteSesi(id) {
-  if (confirm("Hapus sesi ini?")) {
-    await sb.from("jadwal_rakor").delete().eq("id_jadwal", id);
-    renderLiveJadwal();
-  }
+  if (!isSekretaris) return;
+  if (!confirm("Hapus sesi kegiatan ini dari jadwal Rakor?")) return;
+  await sb.from("jadwal_rakor").delete().eq("id_jadwal", Number(id));
+  toast("Sesi jadwal dihapus.");
+  renderLiveJadwal();
 }
