@@ -52,19 +52,8 @@ const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", 
 initApp();
 
 async function initApp() {
+  initModernDropdowns();
   updateStaticEventDatesToNov2026();
-
-  initLogin(session => {
-    activeUser = session;
-    onLoginSuccess();
-  });
-
-  initJadwal();
-  bindNavigationAndActions();
-  await loadAllDatabase(false);
-  checkCertificateVerificationUrl(sekolahList, panitiaList);
-  setupRealtimeListeners();
-}
 
 function updateStaticEventDatesToNov2026() {
   document.querySelectorAll("span, p, div").forEach(el => {
@@ -293,10 +282,6 @@ function showTab(name) {
   renderAllViews();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-
-async function initApp() {
-  initModernDropdowns();
-  updateStaticEventDatesToNov2026();
   
 function renderAllViews() {
   updateStaticEventDatesToNov2026();
