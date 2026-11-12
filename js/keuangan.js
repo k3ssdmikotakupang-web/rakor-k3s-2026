@@ -1,7 +1,7 @@
 // js/keuangan.js
 import { sb, toast } from './supabase.js';
 
-export const TARIF_KONTRIBUSI_DEFAULT = 2000000; // Rp 2.000.000 per sekolah
+export const TARIF_KONTRIBUSI_DEFAULT = 2000000;
 const SUBRAYON_ORDER = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
 let selectedDetailRayon = "ALL";
@@ -11,19 +11,15 @@ export function formatRupiah(angka) {
   return "Rp " + Number(angka || 0).toLocaleString("id-ID");
 }
 
-// Hak Akses Melihat Menu Info Keuangan:
-// HANYA Penanggung Jawab, Ketua Panitia, Sekretaris, Bendahara, dan 6 Ketua Sub Rayon
 export function canAccessInfoKeuangan(activeUser) {
   if (!activeUser || activeUser.role !== "panitia" || !activeUser.profile) return false;
   const p = activeUser.profile;
   const allowedCoreRoles = ["Penanggung Jawab", "Ketua Panitia", "Sekretaris", "Bendahara"];
   if (allowedCoreRoles.includes(p.divisi)) return true;
-  if (p.tugas_subrayon && p.tugas_subrayon.trim() !== "") return true; // 6 Ketua Sub Rayon
+  if (p.tugas_subrayon && p.tugas_subrayon.trim() !== "") return true;
   return false;
 }
 
-// Hak Akses Mengubah Status Ikut & Kontribusi:
-// HANYA Bendahara (Semua Rayon) dan Ketua Sub Rayon (Khusus Wilayahnya Sendiri)
 export function canEditPaymentAndParticipation(activeUser, targetSubrayon) {
   if (!activeUser || activeUser.role !== "panitia" || !activeUser.profile) return false;
   const p = activeUser.profile;
@@ -32,11 +28,9 @@ export function canEditPaymentAndParticipation(activeUser, targetSubrayon) {
   return false;
 }
 
-// Menyuntikkan Tombol Menu "Info Keuangan" di Beranda Khusus Pejabat yang Berwenang
 export function renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, tarifAktif, reloadCallback) {
   const existingBtn = document.getElementById("btnServiceInfoKeuangan");
 
-  // Sembunyikan tombol jika yang login adalah Peserta atau Anggota Seksi Biasa (bukan Ketua Sub Rayon)
   if (!canAccessInfoKeuangan(activeUser)) {
     if (existingBtn) existingBtn.remove();
     return;
@@ -76,7 +70,7 @@ export function renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, t
         </div>
       </div>
       <div class="text-[10px] font-extrabold bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-xl shrink-0">
-        Detail &rarr;
+        Detail
       </div>
     `;
     targetBtn.onclick = () => openInfoKeuanganModal(activeUser, sekolahList, panitiaList, nominalPerSekolah, reloadCallback);
@@ -96,7 +90,6 @@ export function openInfoKeuanganModal(activeUser, sekolahList, panitiaList, nomi
   modal.classList.remove("hidden");
   titleEl.innerHTML = `<i class="fa-solid fa-sack-dollar text-emerald-600 mr-1.5"></i> Info Keuangan & Kontribusi Rakor`;
 
-  // Jika yang login adalah Ketua Sub Rayon, arahkan filter default ke wilayahnya
   if (activeUser.profile?.tugas_subrayon && selectedDetailRayon === "ALL") {
     selectedDetailRayon = activeUser.profile.tugas_subrayon;
   }
@@ -113,12 +106,11 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
 
   const kasTerkumpul = totalLunas * tarif;
   const potensiProses = totalProses * tarif;
-  const targetPenuh = totalSekolah * tarif; // 158 x 2.000.000 = Rp 316.000.000
+  const targetPenuh = totalSekolah * tarif;
   const targetPesertaIkut = totalIkut * tarif;
   const pctTerkumpul = totalSekolah > 0 ? Math.round((totalLunas / totalSekolah) * 100) : 0;
 
   bodyEl.innerHTML = `
-    <!-- KARTU UTAMA KAS BENDAHARA SE-KOTA KUPANG -->
     <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white shadow-lg space-y-3 border border-emerald-500/30">
       <div class="flex items-center justify-between">
         <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
@@ -131,7 +123,7 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
         <div class="text-[10px] uppercase tracking-wider text-slate-300 font-bold">Total Dana Terkumpul di Bendahara (Lunas)</div>
         <div class="text-2xl font-extrabold text-amber-300 mt-0.5">${formatRupiah(kasTerkumpul)}</div>
         <div class="text-[10px] text-emerald-200 mt-0.5">
-          Dari Target 158 Sekolah: <b>${formatRupiah(targetPenuh)}</b> • Target Sekolah Ikut (${totalIkut}): <b>${formatRupiah(targetPesertaIkut)}</b>
+          Target 158 Sekolah: <b>${formatRupiah(targetPenuh)}</b> | Target Ikut (${totalIkut}): <b>${formatRupiah(targetPesertaIkut)}</b>
         </div>
       </div>
 
@@ -158,7 +150,6 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
       </div>
     </div>
 
-    <!-- RINCIAN KEUANGAN PER SUB RAYON (6 KECAMATAN) -->
     <div class="space-y-2">
       <div class="flex items-center justify-between">
         <h4 class="font-extrabold text-xs text-slate-900 uppercase">
@@ -192,7 +183,7 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
                     <span class="text-[10px] font-bold bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">${srSchools.length} SD/MI</span>
                   </div>
                   <div class="text-[10px] text-slate-500 mt-0.5">
-                    Ketua: <b>${ketua ? ketua.nama_panitia : '-'}</b> • Ikut: <b>${srIkut}</b>
+                    Ketua: <b>${ketua ? ketua.nama_panitia : '-'}</b> | Ikut: <b>${srIkut}</b>
                   </div>
                 </div>
                 <div class="text-right shrink-0">
@@ -206,9 +197,9 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
               </div>
 
               <div class="flex items-center justify-between text-[10px] font-bold">
-                <span class="text-emerald-700">✓ Lunas: ${srLunas}</span>
-                <span class="text-amber-700">⏳ Proses: ${srProses}</span>
-                <span class="text-rose-600">✕ Belum: ${srBelum}</span>
+                <span class="text-emerald-700">Lunas: ${srLunas}</span>
+                <span class="text-amber-700">Proses: ${srProses}</span>
+                <span class="text-rose-600">Belum: ${srBelum}</span>
                 <span class="text-blue-800 font-extrabold">${srPct}%</span>
               </div>
             </div>
@@ -217,7 +208,6 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
       </div>
     </div>
 
-    <!-- DAFTAR SEKOLAH & UPDATE STATUS BAYAR (KHUSUS BENDAHARA & KETUA SUB RAYON TERKAIT) -->
     <div class="pt-2 border-t border-slate-200 space-y-2.5">
       <div class="flex items-center justify-between">
         <span class="font-extrabold text-xs text-slate-900 uppercase">Rincian Status Kontribusi Sekolah</span>
@@ -231,19 +221,17 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
 
         <select id="keuFilterStatus" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-800">
           <option value="ALL" ${selectedStatusFilter === 'ALL' ? 'selected' : ''}>Semua Status Bayar</option>
-          <option value="Lunas" ${selectedStatusFilter === 'Lunas' ? 'selected' : ''}>✓ Sudah Lunas</option>
-          <option value="Dalam Proses" ${selectedStatusFilter === 'Dalam Proses' ? 'selected' : ''}>⏳ Dalam Proses</option>
-          <option value="Belum Bayar" ${selectedStatusFilter === 'Belum Bayar' ? 'selected' : ''}>✕ Belum Bayar</option>
+          <option value="Lunas" ${selectedStatusFilter === 'Lunas' ? 'selected' : ''}>Sudah Lunas</option>
+          <option value="Dalam Proses" ${selectedStatusFilter === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
+          <option value="Belum Bayar" ${selectedStatusFilter === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
         </select>
       </div>
 
       <input id="keuSearchSchool" type="text" placeholder="Cari nama sekolah atau NPSN..." class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold" />
-
       <div id="keuSchoolListBox" class="space-y-1.5 max-h-64 overflow-y-auto pr-0.5"></div>
     </div>
   `;
 
-  // Klik kartu Sub Rayon untuk langsung memfilter daftar sekolah di bawahnya
   document.querySelectorAll(".sr-finance-card").forEach(card => {
     card.addEventListener("click", () => {
       const clickedSr = card.dataset.sr;
@@ -308,15 +296,15 @@ function renderFilteredSchoolFinanceRows(activeUser, sekolahList, tarif, bodyEl,
       <div class="min-w-0 flex-1">
         <div class="font-extrabold text-xs text-slate-900 truncate">${idx + 1}. ${s.nama_sekolah}</div>
         <div class="text-[10px] text-slate-500">
-          Rayon ${s.subrayon} • Status: <b>${s.status_ikut}</b>
-          ${statusBayar === 'Lunas' ? `• <span class="text-emerald-700 font-bold">${formatRupiah(tarif)}</span>` : ''}
+          Rayon ${s.subrayon} | Status: <b>${s.status_ikut}</b>
+          ${statusBayar === 'Lunas' ? ' | <span class="text-emerald-700 font-bold">' + formatRupiah(tarif) + '</span>' : ''}
         </div>
       </div>
       ${canEdit ? `
         <select class="keu-row-select rounded-xl border border-slate-300 bg-slate-50 px-2 py-1.5 text-[11px] font-extrabold text-slate-800 shrink-0">
           <option value="Belum Bayar" ${statusBayar === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
           <option value="Dalam Proses" ${statusBayar === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
-          <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>✓ Lunas (2 Jt)</option>
+          <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>Lunas (2 Jt)</option>
         </select>
       ` : `
         <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-lg border shrink-0 ${badgeClass}">
