@@ -9,7 +9,6 @@ import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifik
 import { renderPosScannerWidgets } from './scanner_pos.js';
 import { renderCatatanPanitiaWidget } from './catatan.js';
 
-// Hilangkan error favicon.ico 404 di Console secara otomatis
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
   link.rel = "icon";
@@ -22,6 +21,7 @@ let panitiaList = [];
 let sekolahList = [];
 let tugasList = [];
 let layananList = [];
+let tarifKontribusiDefault = 1000000; // Default Rp 1.000.000 per sekolah (Bisa diubah oleh Bendahara)
 
 const DIVISI_LIST = [
   "Penanggung Jawab",
@@ -37,9 +37,28 @@ const DIVISI_LIST = [
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
+function formatRupiah(angka) {
+  return "Rp " + Number(angka || 0).toLocaleString("id-ID");
+}
+
+// Cek Wewenang Mengubah Status Ikut & Kontribusi Sekolah: HANYA Bendahara atau Ketua Sub Rayon di Wilayahnya
+function canManageSchoolAndContribution(user, targetSubrayon) {
+  if (!user || user.role !== "panitia" || !user.profile) return false;
+  const p = user.profile;
+  if (p.divisi === "Bendahara") return true; // Bendahara berwenang di seluruh 6 Sub Rayon
+  if (p.tugas_subrayon && p.tugas_subrayon === targetSubrayon) return true; // Ketua Sub Rayon hanya di wilayahnya sendiri
+  return false;
+}
+
+function isUserBendahara(user) {
+  return Boolean(user && user.role === "panitia" && user.profile?.divisi === "Bendahara");
+}
+
 initApp();
 
 async function initApp() {
+  updateStaticEventDatesToNov2026();
+
   initLogin(session => {
     activeUser = session;
     onLoginSuccess();
@@ -52,19 +71,34 @@ async function initApp() {
   setupRealtimeListeners();
 }
 
+// Otomatis ubah label tanggal statis di HTML ke 19–21 November 2026
+function updateStaticEventDatesToNov2026() {
+  document.querySelectorAll("span, p, div").forEach(el => {
+    if (el.children.length === 0 && el.textContent) {
+      if (el.textContent.includes("24–26 Sept")) {
+        el.textContent = el.textContent.replace("24–26 September 2026", "19–21 November 2026").replace("24–26 Sept", "19–21 Nov");
+      }
+    }
+  });
+}
+
 async function loadAllDatabase(showNotif = false) {
   try {
-    const [rPan, rSek, rTgs, rLay] = await Promise.all([
+    const [rPan, rSek, rTgs, rLay, rKeu] = await Promise.all([
       sb.from("panitia_rakor").select("*").order("no", { ascending: true }),
       sb.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true }),
       sb.from("manajemen_tugas").select("*").order("deadline", { ascending: true }),
-      sb.from("info_layanan").select("*")
+      sb.from("info_layanan").select("*"),
+      sb.from("pengaturan_keuangan").select("*").eq("id", 1).maybeSingle()
     ]);
 
     if (rPan.data) panitiaList = rPan.data;
     if (rSek.data) sekolahList = rSek.data;
     if (rTgs.data) tugasList = rTgs.data;
     layananList = (rLay.data && rLay.data.length > 0) ? rLay.data : DEFAULT_LAYANAN;
+    if (rKeu.data && rKeu.data.tarif_per_sekolah !== undefined) {
+      tarifKontribusiDefault = Number(rKeu.data.tarif_per_sekolah);
+    }
 
     const pSelect = document.getElementById("loginPanitiaSelect");
     if (pSelect) {
@@ -150,6 +184,7 @@ function setupRealtimeListeners() {
     .on("postgres_changes", { event: "*", schema: "public", table: "db_sekolah" }, () => loadAllDatabase(false))
     .on("postgres_changes", { event: "*", schema: "public", table: "manajemen_tugas" }, () => loadAllDatabase(false))
     .on("postgres_changes", { event: "*", schema: "public", table: "info_layanan" }, () => loadAllDatabase(false))
+    .on("postgres_changes", { event: "*", schema: "public", table: "pengaturan_keuangan" }, () => loadAllDatabase(false))
     .subscribe();
 }
 
@@ -265,6 +300,7 @@ function showTab(name) {
 }
 
 function renderAllViews() {
+  updateStaticEventDatesToNov2026();
   renderBerandaView();
   renderLiveJadwal();
   renderQrView();
@@ -291,17 +327,15 @@ function renderBerandaView() {
   const kamarBadge = document.getElementById("badgeHomeKamar");
 
   if (activeUser && activeUser.role === "panitia") {
-    const totalTgs = tugasList.length || 49;
-    const doneTgs = tugasList.filter(t => t.status === "Selesai").length;
-    const pctTgs = totalTgs > 0 ? Math.round((doneTgs / totalTgs) * 100) : 0;
-    if (thirdVal) thirdVal.textContent = pctTgs + "%";
-    if (thirdLbl) thirdLbl.textContent = "Kinerja Panitia";
+    const lunasCount = sekolahList.filter(s => s.status_bayar === "Lunas").length;
+    if (thirdVal) thirdVal.textContent = `${lunasCount} Lunas`;
+    if (thirdLbl) thirdLbl.textContent = "Kontribusi";
     if (kamarBadge) kamarBadge.textContent = "Atur Kamar";
   } else if (activeUser && activeUser.role === "peserta") {
     const s = activeUser.profile;
-    const hadirCount = [s.hadir_h1, s.hadir_h2, s.hadir_h3].filter(Boolean).length;
-    if (thirdVal) thirdVal.textContent = `${hadirCount}/3 Hari`;
-    if (thirdLbl) thirdLbl.textContent = "Kehadiran Anda";
+    const statusByr = s.status_bayar || "Belum Bayar";
+    if (thirdVal) thirdVal.textContent = statusByr === "Lunas" ? "LUNAS" : statusByr === "Dalam Proses" ? "PROSES" : "BELUM";
+    if (thirdLbl) thirdLbl.textContent = "Kontribusi";
     if (kamarBadge) kamarBadge.textContent = s.nomor_kamar || "Cek Kamar";
   }
 
@@ -312,6 +346,7 @@ function renderBerandaView() {
   SUBRAYON_LIST.forEach(sr => {
     const all = sekolahList.filter(s => s.subrayon === sr);
     const ikut = all.filter(s => s.status_ikut === "Ikut").length;
+    const lunas = all.filter(s => s.status_bayar === "Lunas").length;
     const pct = all.length > 0 ? Math.round((ikut / all.length) * 100) : 0;
     const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
 
@@ -320,7 +355,7 @@ function renderBerandaView() {
     div.innerHTML = `
       <div class="flex justify-between text-xs font-bold mb-1">
         <span class="text-slate-800">Sub Rayon ${sr} <span class="text-[10px] font-normal text-slate-500">(${ketua ? ketua.nama_panitia.split(',')[0] : ''})</span></span>
-        <span class="text-emerald-700 font-extrabold">${ikut}/${all.length} (${pct}%)</span>
+        <span class="text-emerald-700 font-extrabold">${ikut}/${all.length} Ikut • <span class="text-blue-700">${lunas} Lunas</span></span>
       </div>
       <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
         <div class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width:${pct}%"></div>
@@ -373,9 +408,9 @@ function renderAbsensiPesertaView() {
   if (subEl) subEl.textContent = `${s.nama_sekolah} • Sub Rayon ${s.subrayon}`;
 
   const days = [
-    { key: "hadir_h1", label: "Hari Ke-1 • Kamis, 24 Sept 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
-    { key: "hadir_h2", label: "Hari Ke-2 • Jumat, 25 Sept 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
-    { key: "hadir_h3", label: "Hari Ke-3 • Sabtu, 26 Sept 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
+    { key: "hadir_h1", label: "Hari Ke-1 • Kamis, 19 Nov 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
+    { key: "hadir_h2", label: "Hari Ke-2 • Jumat, 20 Nov 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
+    { key: "hadir_h3", label: "Hari Ke-3 • Sabtu, 21 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
   ];
 
   const box = document.getElementById("absensiDaysContainer");
@@ -389,7 +424,7 @@ function renderAbsensiPesertaView() {
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5">
             <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${isHadir ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
-              ${isHadir ? '✓ HADIR' : 'BELUM PRESENSI'}
+              ${isHadir ? '✓ HADIR TERCATAT' : 'BELUM PRESENSI'}
             </span>
           </div>
           <h4 class="font-extrabold text-xs text-slate-900 mt-1">${d.label}</h4>
@@ -406,9 +441,7 @@ function renderAbsensiPesertaView() {
 
       card.querySelector(".btn-checkin").addEventListener("click", async () => {
         const nextVal = !isHadir;
-        const updateObj = { [d.key]: nextVal };
-        if (nextVal) updateObj.status_ikut = "Ikut";
-        await sb.from("db_sekolah").update(updateObj).eq("id_sekolah", s.id_sekolah);
+        await sb.from("db_sekolah").update({ [d.key]: nextVal }).eq("id_sekolah", s.id_sekolah);
         toast(nextVal ? `Presensi Hari Ke-${idx + 1} berhasil dicatat!` : `Presensi Hari Ke-${idx + 1} dibatalkan.`);
         await loadAllDatabase(false);
       });
@@ -470,7 +503,7 @@ function renderQrView() {
 
     if (roomPill) {
       roomPill.classList.remove("hidden");
-      roomPill.innerHTML = `<i class="fa-solid fa-bed mr-1"></i>Kamar: ${s.nomor_kamar || 'Belum Ditentukan'}`;
+      roomPill.innerHTML = `<i class="fa-solid fa-bed mr-1"></i>Kamar: ${s.nomor_kamar || 'Belum Ditentukan'} • <i class="fa-solid fa-coins ml-1 mr-0.5"></i>${s.status_bayar || 'Belum Bayar'}`;
     }
 
     const pill = document.getElementById("qrStatusPill");
@@ -483,7 +516,7 @@ function renderQrView() {
         pill.textContent = "✕ Tidak Ikut";
       } else {
         pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800";
-        pill.textContent = "Menunggu Checklist Rayon";
+        pill.textContent = "Menunggu Validasi Ketua Rayon / Bendahara";
       }
     }
 
@@ -530,12 +563,18 @@ async function saveNamaKepsek() {
   await loadAllDatabase(false);
 }
 
+// =========================================================================
+// 4. TAB SUB RAYON & KONTRIBUSI DANA KEGIATAN (KHUSUS KETUA SUB RAYON & BENDAHARA)
+// =========================================================================
 function renderSubrayonView() {
   const srSelect = document.getElementById("srSelectFilter");
   const sr = srSelect?.value || "Maulafa";
   const kw = (document.getElementById("srSearchInput")?.value || "").toLowerCase().trim();
   const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
-  const isPanitia = activeUser && activeUser.role === "panitia";
+
+  // Hak Akses: HANYA Ketua Sub Rayon (di wilayahnya sendiri) & Bendahara (semua wilayah)
+  const canEditThisRayon = canManageSchoolAndContribution(activeUser, sr);
+  const isBendahara = isUserBendahara(activeUser);
 
   const coordLabel = document.getElementById("srCoordinatorLabel");
   if (coordLabel) {
@@ -544,7 +583,7 @@ function renderSubrayonView() {
       : `Wilayah Sub Rayon ${sr}`;
   }
 
-  document.getElementById("btnMarkAllSr")?.classList.toggle("hidden", !isPanitia);
+  document.getElementById("btnMarkAllSr")?.classList.toggle("hidden", !canEditThisRayon);
 
   const allSr = sekolahList.filter(s => s.subrayon === sr);
   const ikutSr = allSr.filter(s => s.status_ikut === "Ikut").length;
@@ -553,6 +592,9 @@ function renderSubrayonView() {
   document.getElementById("srProgressTitle").textContent = `Sub Rayon ${sr}`;
   document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
   document.getElementById("srProgressBar").style.width = pct + "%";
+
+  // Suntikkan Kartu Rekapitulasi Kontribusi & Dana Terkumpul di atas daftar sekolah
+  injectFinanceSummaryWidget(sr, allSr, canEditThisRayon, isBendahara);
 
   const filtered = allSr.filter(
     s => s.nama_sekolah.toLowerCase().includes(kw) || String(s.npsn).includes(kw)
@@ -565,48 +607,213 @@ function renderSubrayonView() {
   filtered.forEach((s, i) => {
     const isIkut = s.status_ikut === "Ikut";
     const isTidak = s.status_ikut === "Tidak Ikut";
+    const statusBayar = s.status_bayar || "Belum Bayar";
+
+    const bayarBadgeStyle = statusBayar === "Lunas"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+      : statusBayar === "Dalam Proses"
+      ? "bg-amber-100 text-amber-800 border-amber-300"
+      : "bg-rose-50 text-rose-700 border-rose-200";
 
     const card = document.createElement("div");
-    card.className = `bg-white rounded-2xl p-3.5 border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} shadow-xs flex items-center justify-between gap-2`;
+    card.className = `bg-white rounded-2xl p-3.5 border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} shadow-xs space-y-2.5`;
     card.innerHTML = `
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
-          <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
-          ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded"><i class="fa-solid fa-bed mr-0.5"></i>${s.nomor_kamar}</span>` : ''}
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
+            <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
+            ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded"><i class="fa-solid fa-bed mr-0.5"></i>${s.nomor_kamar}</span>` : ''}
+          </div>
+          <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
+          <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
         </div>
-        <h4 class="font-extrabold text-xs text-slate-900 truncate mt-0.5">${s.nama_sekolah}</h4>
-        <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
+
+        <!-- Kontrol Ikut / Tidak (Khusus Ketua Sub Rayon Wilayah Ini & Bendahara) -->
+        ${canEditThisRayon ? `
+          <div class="flex items-center gap-1 shrink-0">
+            <button class="btn-ikut px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition ${isIkut ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600'}">Ikut</button>
+            <button class="btn-tidak px-2 py-1.5 rounded-xl text-[11px] font-bold transition ${isTidak ? 'bg-rose-600 text-white shadow' : 'bg-slate-100 text-slate-500'}">Tidak</button>
+          </div>
+        ` : `
+          <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-xl shrink-0 ${isIkut ? 'bg-emerald-100 text-emerald-800' : isTidak ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500'}">
+            ${s.status_ikut}
+          </span>
+        `}
       </div>
-      ${isPanitia ? `
-        <div class="flex items-center gap-1.5 shrink-0">
-          <button class="btn-ikut px-3 py-2 rounded-xl text-xs font-extrabold ${isIkut ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600'}">Ikut</button>
-          <button class="btn-tidak px-2.5 py-2 rounded-xl text-xs font-bold ${isTidak ? 'bg-rose-600 text-white shadow' : 'bg-slate-100 text-slate-500'}">Tidak</button>
+
+      <!-- Baris Status Kontribusi Uang Kegiatan -->
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <i class="fa-solid fa-money-bill-wave text-xs ${statusBayar === 'Lunas' ? 'text-emerald-600' : statusBayar === 'Dalam Proses' ? 'text-amber-500' : 'text-slate-400'}"></i>
+          <span class="text-[10px] font-bold text-slate-600">Kontribusi:</span>
+          <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${bayarBadgeStyle}">
+            ${statusBayar === 'Lunas' ? '✓ LUNAS' : statusBayar === 'Dalam Proses' ? '⏳ DALAM PROSES' : '✕ BELUM BAYAR'}
+          </span>
         </div>
-      ` : `
-        <span class="text-[11px] font-extrabold px-2.5 py-1 rounded-xl shrink-0 ${isIkut ? 'bg-emerald-100 text-emerald-800' : isTidak ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500'}">${s.status_ikut}</span>
-      `}
+
+        ${canEditThisRayon ? `
+          <select class="select-status-bayar rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-extrabold text-slate-800 shrink-0 focus:border-blue-900">
+            <option value="Belum Bayar" ${statusBayar === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
+            <option value="Dalam Proses" ${statusBayar === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
+            <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>✓ Lunas</option>
+          </select>
+        ` : `
+          <span class="text-[10px] font-bold text-slate-400">${s.waktu_bayar ? s.waktu_bayar.split(',')[0] : ''}</span>
+        `}
+      </div>
     `;
 
-    if (isPanitia) {
-      card.querySelector(".btn-ikut")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, "Ikut"));
-      card.querySelector(".btn-tidak")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, "Tidak Ikut"));
+    if (canEditThisRayon) {
+      card.querySelector(".btn-ikut")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Ikut"));
+      card.querySelector(".btn-tidak")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Tidak Ikut"));
+      card.querySelector(".select-status-bayar")?.addEventListener("change", (e) => {
+        setSchoolPaymentStatus(s.id_sekolah, sr, e.target.value);
+      });
     }
     box.appendChild(card);
   });
 }
 
-async function setSchoolStatus(idSekolah, statusBaru) {
+function injectFinanceSummaryWidget(sr, allSr, canEditThisRayon, isBendahara) {
+  const tabSubrayon = document.getElementById("tabContentSubrayon");
+  const cardsContainer = document.getElementById("srSchoolCardsContainer");
+  if (!tabSubrayon || !cardsContainer) return;
+
+  let finWidget = document.getElementById("srFinanceSummaryBox");
+  if (!finWidget) {
+    finWidget = document.createElement("div");
+    finWidget.id = "srFinanceSummaryBox";
+    tabSubrayon.insertBefore(finWidget, cardsContainer);
+  }
+
+  // Hitung rekap Sub Rayon aktif
+  const srLunas = allSr.filter(s => s.status_bayar === "Lunas").length;
+  const srProses = allSr.filter(s => s.status_bayar === "Dalam Proses").length;
+  const srBelum = allSr.length - srLunas - srProses;
+  const srDanaTerkumpul = srLunas * tarifKontribusiDefault;
+
+  // Hitung rekap Total Kota Kupang (158 Sekolah)
+  const totalLunasAll = sekolahList.filter(s => s.status_bayar === "Lunas").length;
+  const totalProsesAll = sekolahList.filter(s => s.status_bayar === "Dalam Proses").length;
+  const totalDanaAll = totalLunasAll * tarifKontribusiDefault;
+
+  finWidget.className = "bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl p-4 shadow-md space-y-3";
+  finWidget.innerHTML = `
+    <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
+      <div>
+        <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
+          Rekap Kontribusi Kegiatan
+        </span>
+        <h4 class="text-xs font-extrabold mt-1">Status Pembayaran Sub Rayon ${sr}</h4>
+      </div>
+      <div class="text-right">
+        <div class="text-[10px] text-blue-200">Dana Terkumpul (Rayon ${sr})</div>
+        <div class="text-sm font-extrabold text-emerald-300">${formatRupiah(srDanaTerkumpul)}</div>
+      </div>
+    </div>
+
+    <!-- 3 Kotak Status Bayar Sub Rayon Aktif -->
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="bg-emerald-500/15 border border-emerald-400/30 rounded-2xl p-2">
+        <div class="text-sm font-extrabold text-emerald-300">${srLunas}</div>
+        <div class="text-[9px] text-emerald-100 font-semibold">Lunas</div>
+      </div>
+      <div class="bg-amber-500/15 border border-amber-400/30 rounded-2xl p-2">
+        <div class="text-sm font-extrabold text-amber-300">${srProses}</div>
+        <div class="text-[9px] text-amber-100 font-semibold">Dalam Proses</div>
+      </div>
+      <div class="bg-rose-500/15 border border-rose-400/30 rounded-2xl p-2">
+        <div class="text-sm font-extrabold text-rose-300">${srBelum}</div>
+        <div class="text-[9px] text-rose-100 font-semibold">Belum Bayar</div>
+      </div>
+    </div>
+
+    <!-- Total Keseluruhan 6 Sub Rayon untuk Bendahara & Panitia -->
+    <div class="p-2.5 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-between text-xs">
+      <div>
+        <div class="font-extrabold text-amber-300">Total Kas Masuk (Se-Kota Kupang):</div>
+        <div class="text-[10px] text-blue-200">${totalLunasAll} Lunas • ${totalProsesAll} Dalam Proses (dari ${sekolahList.length} Sekolah)</div>
+      </div>
+      <div class="text-sm font-extrabold text-white">${formatRupiah(totalDanaAll)}</div>
+    </div>
+
+    <!-- Pengaturan Tarif Kontribusi per Sekolah (Khusus Bendahara) -->
+    ${isBendahara ? `
+      <div class="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
+        <span class="text-[10px] font-bold text-amber-200"><i class="fa-solid fa-sliders mr-1"></i>Nominal Kontribusi / Sekolah (Rp):</span>
+        <div class="flex items-center gap-1.5">
+          <input id="inputTarifKontribusi" type="number" step="50000" value="${tarifKontribusiDefault}" class="w-28 rounded-xl bg-slate-900 border border-white/20 px-2.5 py-1 text-xs font-extrabold text-amber-300 text-right" />
+          <button id="btnSaveTarifKontribusi" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold px-2.5 py-1 rounded-xl text-[11px]">
+            Set
+          </button>
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Info Hak Akses -->
+    <div class="text-[10px] text-center ${canEditThisRayon ? 'text-emerald-300 font-bold' : 'text-slate-400'}">
+      ${canEditThisRayon
+        ? `<i class="fa-solid fa-unlockKeyhole mr-1"></i>Mode Edit Aktif (${isBendahara ? 'Bendahara Panitia' : 'Ketua Sub Rayon ' + sr})`
+        : `<i class="fa-solid fa-lock mr-1"></i>Penginputan Ikut/Tidak & Status Kontribusi hanya oleh Ketua Sub Rayon ${sr} dan Bendahara.`}
+    </div>
+  `;
+
+  if (isBendahara) {
+    document.getElementById("btnSaveTarifKontribusi")?.addEventListener("click", async () => {
+      const val = Number(document.getElementById("inputTarifKontribusi")?.value || 0);
+      tarifKontribusiDefault = val;
+      await sb.from("pengaturan_keuangan").upsert([{
+        id: 1,
+        tarif_per_sekolah: val,
+        waktu_update: new Date().toLocaleString("id-ID")
+      }]);
+      toast(`Nominal kontribusi diatur ke ${formatRupiah(val)} / sekolah`);
+      renderSubrayonView();
+    });
+  }
+}
+
+async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
+  if (!canManageSchoolAndContribution(activeUser, targetSubrayon)) {
+    return toast("Akses Ditolak: Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
+  }
   await sb.from("db_sekolah").update({
     status_ikut: statusBaru,
     waktu_registrasi: new Date().toLocaleString("id-ID")
   }).eq("id_sekolah", idSekolah);
-  toast(`Status sekolah: ${statusBaru}`);
+  toast(`Status keikutsertaan: ${statusBaru}`);
+  await loadAllDatabase(false);
+}
+
+async function setSchoolPaymentStatus(idSekolah, targetSubrayon, statusBayarBaru) {
+  if (!canManageSchoolAndContribution(activeUser, targetSubrayon)) {
+    return toast("Akses Ditolak: Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
+  }
+  const petugas = activeUser?.profile?.nama_panitia || "Bendahara/Rayon";
+  const waktu = new Date().toLocaleString("id-ID");
+
+  // Jika sekolah sudah Lunas atau Dalam Proses, otomatis tandai status_ikut menjadi "Ikut"
+  const updatePayload = {
+    status_bayar: statusBayarBaru,
+    nominal_kontribusi: statusBayarBaru === "Lunas" ? tarifKontribusiDefault : 0,
+    waktu_bayar: waktu,
+    petugas_bayar: petugas
+  };
+  if (statusBayarBaru === "Lunas" || statusBayarBaru === "Dalam Proses") {
+    updatePayload.status_ikut = "Ikut";
+  }
+
+  await sb.from("db_sekolah").update(updatePayload).eq("id_sekolah", idSekolah);
+  toast(`Status kontribusi: ${statusBayarBaru}`);
   await loadAllDatabase(false);
 }
 
 async function markAllSubrayonIkut() {
   const sr = document.getElementById("srSelectFilter")?.value || "Maulafa";
+  if (!canManageSchoolAndContribution(activeUser, sr)) {
+    return toast("Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
+  }
   if (!confirm(`Tandai seluruh sekolah di Sub Rayon ${sr} sebagai IKUT?`)) return;
   await sb.from("db_sekolah").update({
     status_ikut: "Ikut",
@@ -781,13 +988,13 @@ function openTaskModal(idTugas = null) {
     document.getElementById("modalTaskName").value = t.nama_pekerjaan;
     document.getElementById("modalTaskDivisi").value = t.divisi;
     document.getElementById("modalTaskPhase").value = t.tahapan;
-    document.getElementById("modalTaskDeadline").value = t.deadline || "2026-09-23";
+    document.getElementById("modalTaskDeadline").value = t.deadline || "2026-11-18";
     document.getElementById("modalTaskStatus").value = t.status;
   } else {
     document.getElementById("modalTaskHeader").textContent = "Tambah Tugas Baru";
     document.getElementById("modalTaskId").value = "";
     document.getElementById("modalTaskName").value = "";
-    document.getElementById("modalTaskDeadline").value = "2026-09-23";
+    document.getElementById("modalTaskDeadline").value = "2026-11-18";
     document.getElementById("modalTaskStatus").value = "Belum Mulai";
   }
 }
