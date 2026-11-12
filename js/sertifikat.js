@@ -105,7 +105,7 @@ export async function checkCertificateVerificationUrl(sekolahList, panitiaList) 
       </div>
       <div class="flex justify-between">
         <span class="text-slate-500">Waktu & Pola:</span>
-        <span class="font-bold text-emerald-700">24–26 Sept 2026 (32 JP)</span>
+        <span class="font-bold text-emerald-700">19–21 Nov 2026 (32 JP)</span>
       </div>
     </div>
   ` : `
@@ -535,7 +535,7 @@ async function drawCertificateCanvas(side, ident) {
       ctx.fillText("Diberikan kepada:", W / 2, 290);
       ctx.font = "500 20px 'Plus Jakarta Sans', sans-serif";
       ctx.fillText("Telah berpartisipasi aktif dalam kegiatan Rapat Koordinasi Kepala SD/MI Se-Kota Kupang Tahun 2026", W / 2, 540);
-      ctx.fillText("yang diselenggarakan pada tanggal 24 s.d. 26 September 2026 di Kota Kupang (Pola 32 JP).", W / 2, 572);
+      ctx.fillText("yang diselenggarakan pada tanggal 19 s.d. 21 November 2026 di Kota Kupang (Pola 32 JP).", W / 2, 572);
 
       ctx.font = "bold 18px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "#0f172a";
@@ -635,7 +635,7 @@ async function drawCertificateCanvas(side, ident) {
       ctx.textAlign = "right";
       ctx.fillStyle = "#0f172a";
       ctx.font = "bold 18px 'Plus Jakarta Sans', sans-serif";
-      ctx.fillText("Kupang, 26 September 2026", W - 95, 625);
+      ctx.fillText("Kupang, 21 November 2026", W - 95, 625);
       ctx.fillText("Sekretaris Panitia,", W - 95, 650);
       ctx.fillText("Emanuel Nata Huler, S.Pd., Gr.", W - 95, 725);
     }
