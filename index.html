@@ -27,12 +27,9 @@
     <!-- LAYAR LOGIN MINIMALIS & ELEGAN                             -->
     <!-- ========================================================== -->
     <div id="loginScreen" class="min-h-dvh bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 text-white flex flex-col justify-between p-6 relative overflow-hidden">
-      
-      <!-- Glow Latar Halus -->
       <div class="absolute -top-28 left-1/2 -translate-x-1/2 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
       <div class="absolute -bottom-24 right-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <!-- Bar Atas Minimalis -->
       <div class="flex justify-between items-center z-10">
         <div class="inline-flex items-center gap-2 text-[10px] font-semibold tracking-wider text-slate-400">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
@@ -43,10 +40,7 @@
         </button>
       </div>
 
-      <!-- Konten Tengah Login -->
       <div class="my-auto z-10 space-y-6">
-        
-        <!-- Brand & Judul Singkat -->
         <div class="text-center space-y-1.5">
           <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 mx-auto flex items-center justify-center shadow-lg shadow-amber-500/20 mb-3">
             <i class="fa-solid fa-graduation-cap text-2xl"></i>
@@ -55,10 +49,7 @@
           <p class="text-[11px] font-medium tracking-widest uppercase text-slate-400">K3S SD/MI Kota Kupang • 2026</p>
         </div>
 
-        <!-- Glass Card Minimalis -->
         <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-2xl space-y-4">
-          
-          <!-- Switch Peran -->
           <div class="grid grid-cols-2 gap-1 bg-slate-950/60 p-1 rounded-2xl">
             <button id="btnRolePeserta" class="py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition">
               Peserta
@@ -68,7 +59,7 @@
             </button>
           </div>
 
-          <!-- FORM PESERTA (TANPA LABEL BERLEBIH) -->
+          <!-- FORM PESERTA -->
           <div id="loginFormPeserta" class="space-y-2.5">
             <div class="relative">
               <i class="fa-solid fa-location-dot absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
@@ -107,7 +98,7 @@
             </button>
           </div>
 
-          <!-- FORM PANITIA (MINIMALIS) -->
+          <!-- FORM PANITIA -->
           <div id="loginFormPanitia" class="hidden space-y-2.5">
             <div class="relative">
               <i class="fa-solid fa-user-tie absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
@@ -126,7 +117,6 @@
             </button>
           </div>
 
-          <!-- Divider Halus & Tombol Scan QR -->
           <div class="pt-1">
             <div class="flex items-center gap-3 my-2">
               <div class="h-px bg-white/10 flex-1"></div>
@@ -139,18 +129,16 @@
               <span>Masuk dengan Scan QR</span>
             </button>
           </div>
-
         </div>
       </div>
 
-      <!-- Footer Tipis -->
       <div class="text-center text-[10px] font-medium text-slate-500 z-10">
         Kota Kupang • Nusa Tenggara Timur
       </div>
     </div>
 
     <!-- ========================================================== -->
-    <!-- LAYAR UTAMA APLIKASI (TIDAK BERUBAH, SEMUA ID TETAP SAMA)  -->
+    <!-- LAYAR UTAMA APLIKASI ANDROID                               -->
     <!-- ========================================================== -->
     <div id="mainAppScreen" class="hidden flex-1 flex flex-col pb-24">
       <header class="bg-slate-900 text-white px-4 pt-4 pb-3.5 sticky top-0 z-30 shadow-md flex items-center justify-between">
@@ -171,58 +159,125 @@
       </header>
 
       <main class="p-4 space-y-4 flex-1">
-        <!-- BERANDA -->
+        <!-- ================================================== -->
+        <!-- TAB 1: BERANDA (DENGAN 6 MENU LAYANAN SUPER-APP)   -->
+        <!-- ================================================== -->
         <section id="tabContentBeranda" class="animate-view space-y-4">
+          <!-- Banner Live Sesi Sekarang -->
           <div id="liveActiveSessionContainer" class="hidden bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-3xl shadow-lg border border-emerald-400/40 relative overflow-hidden">
             <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-white/10 rounded-full blur-lg"></div>
             <div class="flex items-center justify-between">
               <span class="inline-flex items-center gap-1.5 text-[9px] font-extrabold bg-red-500 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                <span class="w-1.5 h-1.5 bg-white rounded-full"></span> Live Sekarang
+                <span class="w-1.5 h-1.5 bg-white rounded-full"></span> Sesi Sedang Berlangsung
               </span>
               <span id="liveActiveTime" class="text-[10px] font-bold text-emerald-200">00.00</span>
             </div>
-            <h4 id="liveActiveTitle" class="text-xs font-extrabold mt-1.5 leading-snug">Nama Acara Yang Berlangsung</h4>
+            <h4 id="liveActiveTitle" class="text-xs font-extrabold mt-1.5 leading-snug">Nama Acara</h4>
             <p id="liveActiveDesc" class="text-[11px] text-emerald-100 mt-0.5 line-clamp-2">Deskripsi acara...</p>
             <div id="liveActivePic" class="text-[9px] font-bold text-amber-300 mt-1">PIC: Panitia</div>
           </div>
 
+          <!-- Kartu Statistik Utama -->
           <div class="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden">
-            <h3 class="text-base font-extrabold leading-snug">SIM-RAKOR 2026</h3>
-            <p class="text-[11px] text-blue-200 mt-1">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang.</p>
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-extrabold leading-snug">SIM-RAKOR 2026</h3>
+                <p class="text-[11px] text-blue-200 mt-0.5">K3S SD/MI Kota Kupang</p>
+              </div>
+              <span class="text-[10px] font-extrabold bg-amber-400 text-slate-950 px-2.5 py-1 rounded-full">24–26 Sept</span>
+            </div>
             <div class="grid grid-cols-3 gap-2 mt-4 pt-3.5 border-t border-white/10 text-center">
               <div class="bg-white/10 rounded-2xl p-2.5">
                 <div id="homeMetricTotalSekolah" class="text-lg font-extrabold">158</div>
-                <div class="text-[10px] text-blue-200">SD/MI</div>
+                <div class="text-[10px] text-blue-200">Total SD/MI</div>
               </div>
               <div class="bg-white/10 rounded-2xl p-2.5">
                 <div id="homeMetricIkut" class="text-lg font-extrabold text-emerald-300">0</div>
-                <div class="text-[10px] text-blue-200">Ikut</div>
+                <div class="text-[10px] text-blue-200">Terdaftar Ikut</div>
               </div>
               <div class="bg-white/10 rounded-2xl p-2.5">
-                <div id="homeMetricKinerja" class="text-lg font-extrabold text-amber-300">0%</div>
-                <div class="text-[10px] text-blue-200">Kinerja</div>
+                <div id="homeMetricThirdVal" class="text-lg font-extrabold text-amber-300">-</div>
+                <div id="homeMetricThirdLabel" class="text-[10px] text-blue-200">Status</div>
               </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-2.5">
-            <button id="quickBtnQr" class="bg-white p-3.5 rounded-2xl border flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center"><i class="fa-solid fa-qrcode"></i></div><div><div class="text-xs font-extrabold">Buka ID & QR</div><div class="text-[10px] text-slate-500">Akses ID Card</div></div></button>
-            <button id="quickBtnSub" class="bg-white p-3.5 rounded-2xl border flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center"><i class="fa-solid fa-map-location-dot"></i></div><div><div class="text-xs font-extrabold">Cek Sub Rayon</div><div class="text-[10px] text-slate-500">Daftar Sekolah</div></div></button>
+          <!-- GRID 6 MENU LAYANAN & INFORMASI KEGIATAN -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-2xs">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                <i class="fa-solid fa-grip text-blue-700 mr-1"></i> Menu Layanan Peserta & Panitia
+              </h4>
+              <span class="text-[10px] font-semibold text-slate-400">Klik Ikon</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2.5 text-center">
+              <!-- 1. Info Kamar -->
+              <button data-service="kamar" class="service-menu-btn p-3 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+                <div class="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-base shadow-2xs">
+                  <i class="fa-solid fa-bed"></i>
+                </div>
+                <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Info Kamar</span>
+                <span id="badgeHomeKamar" class="text-[9px] font-bold text-indigo-600 truncate max-w-full">Cek Kamar</span>
+              </button>
+
+              <!-- 2. Buku Panduan -->
+              <button data-service="panduan" class="service-menu-btn p-3 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+                <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-base shadow-2xs">
+                  <i class="fa-solid fa-book-open"></i>
+                </div>
+                <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Buku Panduan</span>
+                <span class="text-[9px] font-semibold text-slate-500">Tata Tertib</span>
+              </button>
+
+              <!-- 3. Dokumentasi -->
+              <button data-service="dokumentasi" class="service-menu-btn p-3 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+                <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-base shadow-2xs">
+                  <i class="fa-solid fa-camera-retro"></i>
+                </div>
+                <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Dokumentasi</span>
+                <span class="text-[9px] font-semibold text-slate-500">Galeri Foto</span>
+              </button>
+
+              <!-- 4. E-Sertifikat -->
+              <button data-service="sertifikat" class="service-menu-btn p-3 rounded-2xl bg-slate-50 hover:bg-amber-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+                <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shadow-2xs">
+                  <i class="fa-solid fa-award"></i>
+                </div>
+                <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Sertifikat</span>
+                <span class="text-[9px] font-semibold text-slate-500">Unduh PDF</span>
+              </button>
+
+              <!-- 5. Materi Rakor -->
+              <button data-service="materi" class="service-menu-btn p-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+                <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shadow-2xs">
+                  <i class="fa-solid fa-file-powerpoint"></i>
+                </div>
+                <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Materi Rakor</span>
+                <span class="text-[9px] font-semibold text-slate-500">Narasumber</span>
+              </button>
+
+              <!-- 6. Laporan Kegiatan -->
+              <button data-service="laporan" class="service-menu-btn p-3 rounded-2xl bg-slate-50 hover:bg-purple-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+                <div class="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-base shadow-2xs">
+                  <i class="fa-solid fa-file-contract"></i>
+                </div>
+                <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Laporan / LPJ</span>
+                <span class="text-[9px] font-semibold text-slate-500">Hasil Rakor</span>
+              </button>
+            </div>
           </div>
 
-          <div class="bg-white rounded-3xl p-4 border space-y-2.5">
-            <h4 class="text-xs font-extrabold uppercase flex items-center gap-1.5"><i class="fa-solid fa-bullhorn text-amber-500"></i> Pengumuman K3S</h4>
-            <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs"><b>1. Checklist Kehadiran</b> Sub Rayon oleh Ketua Rayon.</div>
-            <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs"><b>2. Jadwal Live Real-Time</b> Sesi acara yang diaktifkan Sekretaris akan tampil paling atas.</div>
-          </div>
-
-          <div class="bg-white rounded-3xl p-4 border">
-            <h4 class="text-xs font-extrabold uppercase mb-3"><i class="fa-solid fa-chart-simple text-emerald-600 mr-1"></i> Progres Sub Rayon</h4>
+          <!-- Progres Sub Rayon -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200">
+            <h4 class="text-xs font-extrabold uppercase mb-3"><i class="fa-solid fa-chart-simple text-emerald-600 mr-1"></i> Progres Pendaftaran 6 Sub Rayon</h4>
             <div id="homeSubrayonBars" class="space-y-2.5"></div>
           </div>
         </section>
 
-        <!-- JADWAL -->
+        <!-- ================================================== -->
+        <!-- TAB 2: JADWAL KEGIATAN                             -->
+        <!-- ================================================== -->
         <section id="tabContentJadwal" class="hidden animate-view space-y-4">
           <div class="bg-white rounded-3xl p-4 border shadow-xs">
             <div class="flex items-center justify-between">
@@ -248,7 +303,9 @@
           </div>
         </section>
 
-        <!-- ID CARD DIGITAL -->
+        <!-- ================================================== -->
+        <!-- TAB 3: ID CARD DIGITAL & QR                        -->
+        <!-- ================================================== -->
         <section id="tabContentQr" class="hidden animate-view space-y-4">
           <div class="bg-white rounded-3xl p-5 border text-center relative overflow-hidden">
             <div class="absolute top-0 inset-x-0 h-3 bg-gradient-to-r from-blue-900 via-amber-400 to-emerald-500"></div>
@@ -257,19 +314,24 @@
             </div>
             <h3 id="qrCardTitle" class="text-base font-extrabold mt-3">NAMA</h3>
             <p id="qrCardSubtitle" class="text-xs font-semibold text-slate-500">NPSN / Jabatan</p>
-            <div class="my-4"><span id="qrStatusPill" class="inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100">Status Kehadiran</span></div>
+            <div class="my-3 flex items-center justify-center gap-2 flex-wrap">
+              <span id="qrStatusPill" class="inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100">Status Kehadiran</span>
+              <span id="qrRoomPill" class="hidden text-xs font-extrabold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800"><i class="fa-solid fa-bed mr-1"></i>Kamar: -</span>
+            </div>
             <div class="flex justify-center my-3"><div id="qrCodeCanvas" class="p-4 bg-white rounded-3xl border border-dashed inline-block"></div></div>
             <div id="qrKepsekFormBox" class="mt-5 pt-4 border-t text-left">
               <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Nama Kepala Sekolah:</label>
               <div class="flex gap-2">
-                <input id="qrInputNamaKepsek" type="text" class="flex-1 rounded-2xl border bg-slate-50 px-3.5 py-2.5 text-xs font-semibold" />
+                <input id="qrInputNamaKepsek" type="text" placeholder="Ketik Nama Lengkap & Gelar..." class="flex-1 rounded-2xl border bg-slate-50 px-3.5 py-2.5 text-xs font-semibold" />
                 <button id="btnSaveKepsek" class="bg-blue-900 text-white font-extrabold text-xs px-4 rounded-2xl">Simpan</button>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- SUB RAYON -->
+        <!-- ================================================== -->
+        <!-- TAB 4: SUB RAYON (158 SEKOLAH)                     -->
+        <!-- ================================================== -->
         <section id="tabContentSubrayon" class="hidden animate-view space-y-4">
           <div class="bg-white rounded-3xl p-4 border space-y-3">
             <div class="flex items-center justify-between">
@@ -300,13 +362,81 @@
           <div id="srSchoolCardsContainer" class="space-y-2.5"></div>
         </section>
 
-        <!-- KINERJA -->
+        <!-- ================================================== -->
+        <!-- TAB 5A (KHUSUS PESERTA): ABSENSI & PERIJINAN       -->
+        <!-- ================================================== -->
+        <section id="tabContentAbsensi" class="hidden animate-view space-y-4">
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-2xs space-y-3">
+            <div>
+              <h3 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-user-check text-emerald-600"></i> Absensi & Perijinan Peserta
+              </h3>
+              <p id="absensiSchoolSubtitle" class="text-[11px] text-slate-500 mt-0.5">Rekap kehadiran mengikuti Rakor K3S selama 3 hari.</p>
+            </div>
+
+            <!-- Sub-Tab Switcher: Kehadiran vs Perijinan -->
+            <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl">
+              <button id="subTabBtnHadir" class="py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow transition">
+                <i class="fa-solid fa-calendar-check mr-1"></i> Daftar Hadir (H1–H3)
+              </button>
+              <button id="subTabBtnIzin" class="py-2 rounded-xl text-xs font-bold text-slate-600 transition">
+                <i class="fa-solid fa-envelope-open-text mr-1"></i> Tab Perijinan
+              </button>
+            </div>
+
+            <!-- SUB-VIEW 1: PRESENSI HARI 1 - HARI 3 -->
+            <div id="subViewHadirBox" class="space-y-3 pt-1">
+              <div id="absensiDaysContainer" class="space-y-2.5"></div>
+              <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200 text-[11px] text-blue-900 leading-relaxed">
+                <i class="fa-solid fa-circle-info mr-1 text-blue-700"></i>
+                Klik tombol <b>Konfirmasi Hadir</b> pada hari yang sedang berlangsung atau tunjukkan QR Code di meja registrasi Seksi Perlengkapan.
+              </div>
+            </div>
+
+            <!-- SUB-VIEW 2: TAB PERIJINAN PESERTA -->
+            <div id="subViewIzinBox" class="hidden space-y-3 pt-1">
+              <div id="currentIzinStatusBanner" class="hidden p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-xs space-y-1">
+                <div class="font-extrabold text-amber-950 flex items-center justify-between">
+                  <span>Status Perijinan Tercatat:</span>
+                  <span id="badgeCurrentIzinType" class="px-2 py-0.5 rounded-md bg-amber-200 text-amber-900 text-[10px]">Izin</span>
+                </div>
+                <p id="textCurrentIzinReason" class="text-[11px] text-amber-800"></p>
+                <div id="textCurrentIzinTime" class="text-[10px] text-amber-600"></div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Jenis Perijinan:</label>
+                <select id="selectJenisIzin" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-800">
+                  <option value="Hadir Penuh (Tanpa Izin)">Hadir Penuh (Tidak Mengajukan Izin)</option>
+                  <option value="Izin Sakit">Izin Sakit</option>
+                  <option value="Izin Tugas Kedinasan">Izin Tugas Kedinasan Mendesak</option>
+                  <option value="Izin Terlambat Hadir">Izin Terlambat Mengikuti Sesi</option>
+                  <option value="Diwakilkan Guru / Wakasek">Diwakilkan oleh Guru / Wakasek</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-1">Keterangan / Alasan Lengkap (Sertakan Nama Pengganti jika Diwakilkan):</label>
+                <textarea id="inputAlasanIzin" rows="3" placeholder="Tuliskan keterangan izin kepada Panitia K3S..." class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold"></textarea>
+              </div>
+
+              <button id="btnSubmitIzin" class="w-full py-3.5 rounded-2xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2">
+                <i class="fa-solid fa-paper-plane"></i>
+                <span>Kirim Data Perijinan ke Panitia</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================== -->
+        <!-- TAB 5B (KHUSUS PANITIA): KINERJA & REKAP ABSENSI   -->
+        <!-- ================================================== -->
         <section id="tabContentKinerja" class="hidden animate-view space-y-4">
           <div class="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-3xl p-5 shadow-md">
             <div class="flex items-center justify-between">
               <div>
-                <span class="text-[10px] font-extrabold uppercase text-amber-300">Evaluasi Real-Time</span>
-                <h3 class="text-base font-extrabold mt-2">Kinerja Kepanitiaan</h3>
+                <span class="text-[10px] font-extrabold uppercase text-amber-300">Khusus Internal Panitia</span>
+                <h3 class="text-base font-extrabold mt-1">Kinerja Kepanitiaan</h3>
                 <p id="kinerjaSubtitleCount" class="text-[11px] text-blue-200">0 Tugas Selesai</p>
               </div>
               <div id="kinerjaBigPercent" class="text-3xl font-extrabold text-amber-400">0%</div>
@@ -315,9 +445,32 @@
             <div id="kinerjaPhaseGrid" class="grid grid-cols-4 gap-1.5 mt-4 pt-3 border-t border-white/10 text-center"></div>
           </div>
 
+          <!-- Ringkasan Kehadiran & Perijinan Peserta untuk Panitia -->
+          <div class="bg-white rounded-3xl p-4 border border-slate-200 space-y-2.5">
+            <h4 class="font-extrabold text-xs uppercase text-slate-900 flex items-center justify-between">
+              <span><i class="fa-solid fa-clipboard-user text-emerald-600 mr-1"></i> Pantauan Absensi & Izin Peserta</span>
+              <span id="badgePanitiaCountIzin" class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">0 Izin</span>
+            </h4>
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="p-2.5 rounded-2xl bg-slate-50 border">
+                <div id="rekapHadirH1" class="text-sm font-extrabold text-blue-900">0</div>
+                <div class="text-[10px] text-slate-500">Hadir Hari 1</div>
+              </div>
+              <div class="p-2.5 rounded-2xl bg-slate-50 border">
+                <div id="rekapHadirH2" class="text-sm font-extrabold text-blue-900">0</div>
+                <div class="text-[10px] text-slate-500">Hadir Hari 2</div>
+              </div>
+              <div class="p-2.5 rounded-2xl bg-slate-50 border">
+                <div id="rekapHadirH3" class="text-sm font-extrabold text-blue-900">0</div>
+                <div class="text-[10px] text-slate-500">Hadir Hari 3</div>
+              </div>
+            </div>
+            <div id="panitiaIzinListContainer" class="space-y-1.5 max-h-40 overflow-y-auto"></div>
+          </div>
+
           <div class="bg-white rounded-3xl p-4 border">
             <div class="flex items-center justify-between mb-3">
-              <div><h4 class="font-extrabold text-xs uppercase">Rapor 9 Divisi</h4></div>
+              <div><h4 class="font-extrabold text-xs uppercase">Rapor 9 Divisi Panitia</h4></div>
               <button id="btnAddTaskTop" class="bg-blue-900 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl shadow"><i class="fa-solid fa-plus"></i> Tugas</button>
             </div>
             <div id="kinerjaDivisiBars" class="space-y-2.5"></div>
@@ -350,21 +503,53 @@
         </section>
       </main>
 
+      <!-- ========================================================== -->
+      <!-- 5 MENU FOOTER ANDROID (MENU KE-5 OTOMATIS BERUBAH)         -->
+      <!-- ========================================================== -->
       <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t px-2 py-1.5 z-40 shadow-lg">
         <div class="grid grid-cols-5 items-center">
-          <button id="footerBtnBeranda" class="flex flex-col items-center py-1 text-blue-900 font-extrabold"><i class="fa-solid fa-house"></i><span class="text-[10px] mt-1">Beranda</span></button>
-          <button id="footerBtnJadwal" class="flex flex-col items-center py-1 text-slate-400"><i class="fa-solid fa-calendar-check"></i><span class="text-[10px] mt-1">Jadwal</span></button>
+          <button id="footerBtnBeranda" class="flex flex-col items-center py-1 text-blue-900 font-extrabold">
+            <i class="fa-solid fa-house"></i>
+            <span class="text-[10px] mt-1">Beranda</span>
+          </button>
+          <button id="footerBtnJadwal" class="flex flex-col items-center py-1 text-slate-400">
+            <i class="fa-solid fa-calendar-check"></i>
+            <span class="text-[10px] mt-1">Jadwal</span>
+          </button>
           <div class="flex justify-center">
-            <button id="footerBtnQr" class="-mt-6 w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-900 to-indigo-700 text-amber-300 border-4 border-white flex flex-col items-center justify-center"><i class="fa-solid fa-qrcode"></i><span class="text-[9px] font-extrabold text-white leading-none mt-0.5">ID & QR</span></button>
+            <button id="footerBtnQr" class="-mt-6 w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-900 to-indigo-700 text-amber-300 border-4 border-white flex flex-col items-center justify-center">
+              <i class="fa-solid fa-qrcode"></i>
+              <span class="text-[9px] font-extrabold text-white leading-none mt-0.5">ID & QR</span>
+            </button>
           </div>
-          <button id="footerBtnSubrayon" class="flex flex-col items-center py-1 text-slate-400"><i class="fa-solid fa-school-flag"></i><span class="text-[10px] mt-1">Rayon</span></button>
-          <button id="footerBtnKinerja" class="flex flex-col items-center py-1 text-slate-400"><i class="fa-solid fa-chart-pie"></i><span class="text-[10px] mt-1">Kinerja</span></button>
+          <button id="footerBtnSubrayon" class="flex flex-col items-center py-1 text-slate-400">
+            <i class="fa-solid fa-school-flag"></i>
+            <span class="text-[10px] mt-1">Rayon</span>
+          </button>
+          <!-- Tombol ke-5: Otomatis jadi "Absensi" untuk Peserta, dan "Kinerja" untuk Panitia -->
+          <button id="footerBtnFifth" class="flex flex-col items-center py-1 text-slate-400">
+            <i id="footerIconFifth" class="fa-solid fa-user-check"></i>
+            <span id="footerLabelFifth" class="text-[10px] mt-1">Absensi</span>
+          </button>
         </div>
       </nav>
     </div>
   </div>
 
-  <!-- MODALS -->
+  <!-- ========================================================== -->
+  <!-- MODAL LAYANAN BERANDA (KAMAR, PANDUAN, DOKUMENTASI, DLL)   -->
+  <!-- ========================================================== -->
+  <div id="serviceModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-4 shadow-2xl max-h-[85dvh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <h3 id="serviceModalTitle" class="font-extrabold text-sm text-slate-900">Detail Layanan</h3>
+        <button id="btnCloseServiceModal" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">&times;</button>
+      </div>
+      <div id="serviceModalBody" class="space-y-3 text-xs"></div>
+    </div>
+  </div>
+
+  <!-- MODAL JADWAL -->
   <div id="scheduleModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-3.5 shadow-2xl">
       <div class="flex items-center justify-between border-b pb-2.5">
@@ -415,6 +600,7 @@
     </div>
   </div>
 
+  <!-- MODAL TUGAS -->
   <div id="taskModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-3.5 shadow-2xl">
       <div class="flex items-center justify-between border-b pb-2.5">
@@ -466,6 +652,7 @@
     </div>
   </div>
 
+  <!-- MODAL SCANNER QR -->
   <div id="qrScannerModal" class="hidden fixed inset-0 bg-slate-950/85 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-white/15 text-white w-full max-w-sm rounded-3xl p-5 space-y-4">
       <div class="flex items-center justify-between border-b border-white/10 pb-3">
@@ -484,7 +671,6 @@
     <i class="fa-solid fa-circle-check text-emerald-400"></i> <span id="toastText">Berhasil</span>
   </div>
 
-  <!-- LOAD MAIN SCRIPT MODUL -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
