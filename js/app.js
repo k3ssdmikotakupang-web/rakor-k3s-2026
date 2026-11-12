@@ -334,6 +334,10 @@ function openServiceModal(serviceCode) {
     openRoomManagerModal(activeUser, sekolahList, () => loadAllDatabase(false));
     return;
   }
+  if (serviceCode === "dokumentasi") {
+    openDokumentasiModal(activeUser, () => loadAllDatabase(false));
+    return;
+  }
   openLayananDocumentModal(serviceCode, activeUser, layananList, () => loadAllDatabase(false));
 }
 
