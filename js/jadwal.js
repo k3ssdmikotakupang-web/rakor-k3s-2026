@@ -14,7 +14,7 @@ export async function checkSecretaryPrivilege(userSession) {
   );
 }
 
-// Ambil jam mulai & jam selesai dalam satuan menit (00:00 = 0, 13.00 = 780)
+// Ambil jam mulai & selesai dalam satuan menit sejak 00:00 (Contoh: "13.00 - 16.30" -> 780)
 function parseSessionTimeRange(waktuStr, urutanWaktuStr) {
   const source = String(waktuStr || urutanWaktuStr || '').trim();
   const matches = [...source.matchAll(/(\d{1,2})[:.](\d{2})/g)];
@@ -25,7 +25,7 @@ function parseSessionTimeRange(waktuStr, urutanWaktuStr) {
   let endMin = startMin + 60;
   if (matches.length > 1) {
     endMin = parseInt(matches[1][1], 10) * 60 + parseInt(matches[1][2], 10);
-    if (endMin < startMin) endMin += 24 * 60; // Lewat tengah malam (misal 21.00 - 05.00)
+    if (endMin < startMin) endMin += 24 * 60;
   }
   return { startMin, endMin };
 }
@@ -48,7 +48,6 @@ export function initJadwal() {
   document.getElementById("btnCancelSchedule")?.addEventListener("click", closeModal);
   document.getElementById("btnDismissSchedule")?.addEventListener("click", closeModal);
 
-  // Set tampilan awal tombol Hari Ke-1 aktif
   updateDayButtonsUI();
 }
 
@@ -75,18 +74,10 @@ export async function renderLiveJadwal() {
   const { data, error } = await sb.from("jadwal_rakor").select("*");
   if (error || !data) return;
 
-  // URUTKAN BERDASARKAN:
-  // 1. Sesi yang sedang diaktifkan LIVE oleh Sekretaris tampil PALING ATAS!
-  // 2. Urutan jam mulai dari pagi ke malam (startMin)
-  // 3. ID Jadwal
-  scheduleCache = [...data].sort((a, b) => {
+  // 1. Urutkan murni secara kronologis (Hari 1 -> Hari 3, Pagi -> Malam) untuk mencari pasangan "Now & Next"
+  const chronologicalList = [...data].sort((a, b) => {
     const dayDiff = Number(a.hari || 1) - Number(b.hari || 1);
     if (dayDiff !== 0) return dayDiff;
-
-    // Prioritaskan sesi yang berstatus LIVE agar selalu di paling atas pada harinya
-    if (Boolean(a.status_aktif) !== Boolean(b.status_aktif)) {
-      return a.status_aktif ? -1 : 1;
-    }
 
     const rangeA = parseSessionTimeRange(a.waktu, a.urutan_waktu);
     const rangeB = parseSessionTimeRange(b.waktu, b.urutan_waktu);
@@ -95,25 +86,35 @@ export async function renderLiveJadwal() {
     return Number(a.id_jadwal || 0) - Number(b.id_jadwal || 0);
   });
 
-  // 1. TAMPILKAN KARTU SESI LIVE DI BERANDA SELURUH PESERTA & PANITIA
-  const liveActive = scheduleCache.find(j => j.status_aktif === true);
-  const dashboardCard = document.getElementById("liveActiveSessionContainer");
+  // Cari sesi yang sedang diaktifkan LIVE oleh Sekretaris
+  const liveIndex = chronologicalList.findIndex(j => j.status_aktif === true);
+  const liveSession = liveIndex !== -1 ? chronologicalList[liveIndex] : null;
 
-  if (dashboardCard) {
-    if (liveActive) {
-      dashboardCard.classList.remove("hidden");
-      document.getElementById("liveActiveTitle").textContent = liveActive.judul_sesi;
-      document.getElementById("liveActiveDesc").textContent = liveActive.deskripsi || "Sesi sedang berlangsung.";
-      document.getElementById("liveActiveTime").textContent = `Hari Ke-${liveActive.hari} • ${liveActive.waktu} WITA`;
-      document.getElementById("liveActivePic").innerHTML = liveActive.pemateri_pic
-        ? `<i class="fa-solid fa-user-tag mr-1"></i> ${liveActive.pemateri_pic}`
-        : "PIC: Panitia Rakor";
-    } else {
-      dashboardCard.classList.add("hidden");
-    }
+  // Cari sesi "COMING SOON (SEGERA BERLANGSUNG)":
+  // Jika ada sesi LIVE, maka Coming Soon adalah tepat 1 sesi setelahnya.
+  // Jika belum ada sesi LIVE yang diaktifkan, maka Coming Soon adalah sesi pertama di jadwal.
+  let nextSession = null;
+  if (liveIndex !== -1 && liveIndex + 1 < chronologicalList.length) {
+    nextSession = chronologicalList[liveIndex + 1];
+  } else if (liveIndex === -1 && chronologicalList.length > 0) {
+    nextSession = chronologicalList[0];
   }
 
-  // 2. TAMPILKAN DAFTAR JADWAL PADA TAB JADWAL
+  // 2. RENDER WIDGET "NOW & NEXT (COMING SOON)" DI BERANDA PESERTA & PANITIA
+  renderNowAndNextBanner(liveSession, nextSession);
+
+  // 3. Untuk tampilan di Tab Jadwal: Sesi LIVE ditaruh paling atas pada harinya, sisanya urut jam mulai
+  scheduleCache = [...chronologicalList].sort((a, b) => {
+    const dayDiff = Number(a.hari || 1) - Number(b.hari || 1);
+    if (dayDiff !== 0) return dayDiff;
+    if (Boolean(a.status_aktif) !== Boolean(b.status_aktif)) {
+      return a.status_aktif ? -1 : 1;
+    }
+    const rangeA = parseSessionTimeRange(a.waktu, a.urutan_waktu);
+    const rangeB = parseSessionTimeRange(b.waktu, b.urutan_waktu);
+    return rangeA.startMin - rangeB.startMin;
+  });
+
   const rundownContainer = document.getElementById("scheduleListContainer");
   if (!rundownContainer) return;
 
@@ -134,13 +135,18 @@ export async function renderLiveJadwal() {
   rundownContainer.innerHTML = "";
   filtered.forEach((session, idx) => {
     const isLive = session.status_aktif === true;
+    const isNextUp = nextSession && Number(nextSession.id_jadwal) === Number(session.id_jadwal);
 
     const borderStyle = isLive
       ? "border-emerald-500 bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white ring-2 ring-emerald-500/30 shadow-md"
+      : isNextUp
+      ? "border-amber-400 bg-amber-50/40"
       : "border-slate-200 bg-slate-50";
 
     const labelStyle = isLive
       ? "bg-red-600 text-white shadow-xs"
+      : isNextUp
+      ? "bg-amber-500 text-slate-950"
       : session.warna_label === "emas"
       ? "bg-amber-500 text-slate-950"
       : session.warna_label === "hijau"
@@ -179,7 +185,13 @@ export async function renderLiveJadwal() {
           ${isLive ? `
             <div class="mb-1">
               <span class="inline-flex items-center gap-1 text-[9px] font-extrabold bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                <span class="w-1.5 h-1.5 bg-white rounded-full"></span> Sedang Berlangsung Sekarang
+                <span class="w-1.5 h-1.5 bg-white rounded-full"></span> Sedang Berlangsung
+              </span>
+            </div>
+          ` : isNextUp ? `
+            <div class="mb-1">
+              <span class="inline-flex items-center gap-1 text-[9px] font-extrabold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <i class="fa-solid fa-clock text-[8px]"></i> Segera Berlangsung (Coming Soon)
               </span>
             </div>
           ` : ''}
@@ -203,7 +215,7 @@ export async function renderLiveJadwal() {
         await sb.from("jadwal_rakor").update({ status_aktif: false }).neq("id_jadwal", id);
         await sb.from("jadwal_rakor").update({ status_aktif: !currentlyActive }).eq("id_jadwal", id);
 
-        toast(!currentlyActive ? "Sesi Live diaktifkan & tampil di Beranda Peserta!" : "Status Live dimatikan.");
+        toast(!currentlyActive ? "Sesi Live & Coming Soon diperbarui di Beranda Peserta!" : "Status Live dimatikan.");
         renderLiveJadwal();
       });
     });
@@ -218,79 +230,40 @@ export async function renderLiveJadwal() {
   }
 }
 
-function openModal(id = null) {
-  if (!isSekretaris) return toast("Hanya Sekretaris Panitia yang dapat mengubah jadwal!");
-  document.getElementById("scheduleModal")?.classList.remove("hidden");
+// Widget Gabungan "Sedang Berlangsung (LIVE)" & "Segera Berlangsung (COMING SOON)" di Beranda
+function renderNowAndNextBanner(liveSession, nextSession) {
+  const dashboardCard = document.getElementById("liveActiveSessionContainer");
+  if (!dashboardCard) return;
 
-  if (id) {
-    const item = scheduleCache.find(x => Number(x.id_jadwal) === Number(id));
-    if (!item) return;
-    document.getElementById("modalScheduleHeader").textContent = "Edit Sesi Jadwal Kegiatan";
-    document.getElementById("modalScheduleId").value = item.id_jadwal;
-    document.getElementById("modalScheduleDay").value = item.hari;
-    document.getElementById("modalScheduleTime").value = item.waktu;
-    document.getElementById("modalScheduleTitle").value = item.judul_sesi;
-    document.getElementById("modalScheduleDesc").value = item.deskripsi || "";
-    document.getElementById("modalSchedulePic").value = item.pemateri_pic || "";
-    document.getElementById("modalScheduleColor").value = item.warna_label || "biru";
-  } else {
-    document.getElementById("modalScheduleHeader").textContent = "Tambah Sesi Jadwal Baru";
-    document.getElementById("modalScheduleId").value = "";
-    document.getElementById("modalScheduleDay").value = currentDay;
-    document.getElementById("modalScheduleTime").value = "";
-    document.getElementById("modalScheduleTitle").value = "";
-    document.getElementById("modalScheduleDesc").value = "";
-    document.getElementById("modalSchedulePic").value = "";
-    document.getElementById("modalScheduleColor").value = "biru";
-  }
-}
-
-function closeModal() {
-  document.getElementById("scheduleModal")?.classList.add("hidden");
-}
-
-async function saveSesi() {
-  if (!isSekretaris) return;
-
-  const id = document.getElementById("modalScheduleId").value;
-  const hari = Number(document.getElementById("modalScheduleDay").value);
-  const waktu = document.getElementById("modalScheduleTime").value.trim();
-  const judul_sesi = document.getElementById("modalScheduleTitle").value.trim();
-  const deskripsi = document.getElementById("modalScheduleDesc").value.trim();
-  const pemateri_pic = document.getElementById("modalSchedulePic").value.trim();
-  const warna_label = document.getElementById("modalScheduleColor").value;
-  const urutan_waktu = extractSqlTime(waktu);
-
-  if (!waktu || !judul_sesi) {
-    return toast("Jam Sesi dan Judul Acara wajib diisi!");
+  if (!liveSession && !nextSession) {
+    dashboardCard.classList.add("hidden");
+    return;
   }
 
-  const payload = { hari, waktu, judul_sesi, deskripsi, pemateri_pic, warna_label, urutan_waktu };
+  dashboardCard.classList.remove("hidden");
+  dashboardCard.className = "rounded-3xl shadow-lg border border-slate-200 overflow-hidden bg-white";
 
-  if (id) {
-    const { error } = await sb.from("jadwal_rakor").update(payload).eq("id_jadwal", Number(id));
-    if (error) {
-      delete payload.urutan_waktu;
-      await sb.from("jadwal_rakor").update(payload).eq("id_jadwal", Number(id));
-    }
-    toast("Jadwal diperbarui!");
-  } else {
-    const { error } = await sb.from("jadwal_rakor").insert([payload]);
-    if (error) {
-      delete payload.urutan_waktu;
-      await sb.from("jadwal_rakor").insert([payload]);
-    }
-    toast("Sesi baru ditambahkan!");
-  }
+  dashboardCard.innerHTML = `
+    <!-- BAGIAN 1: SESI YANG SEDANG BERLANGSUNG (LIVE NOW) -->
+    ${liveSession ? `
+      <div class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white p-4 relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+        <div class="flex items-center justify-between">
+          <span class="inline-flex items-center gap-1.5 text-[9px] font-extrabold bg-red-600 text-white px-2.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse shadow-2xs">
+            <span class="w-1.5 h-1.5 bg-white rounded-full"></span> Sedang Berlangsung
+          </span>
+          <span class="text-[10px] font-extrabold text-emerald-100 bg-black/20 px-2.5 py-0.5 rounded-full">
+            Hari Ke-${liveSession.hari} •${liveSession.waktu}
+          </span>
+        </div>
+        <h4 class="text-xs font-extrabold mt-2 leading-snug">${liveSession.judul_sesi}</h4>${liveSession.deskripsi ? `<p class="text-[11px] text-emerald-100 mt-0.5 line-clamp-2">${liveSession.deskripsi}</p>` : ''}
+        <div class="text-[10px] font-bold text-amber-300 mt-1.5 flex items-center gap-1">
+          <i class="fa-solid fa-user-tag"></i>
+          <span>${liveSession.pemateri_pic || 'Panitia Pelaksana'}</span>
+        </div>
+      </div>
+    ` : ''}
 
-  closeModal();
-  filterDay(hari);
-}
-
-async function deleteSesi(id) {
-  if (!isSekretaris) return;
-  if (!confirm("Hapus sesi kegiatan ini dari jadwal Rakor?")) return;
-  await sb.from("jadwal_rakor").delete().eq("id_jadwal", Number(id));
-  toast("Sesi jadwal dihapus.");
-  renderLiveJadwal();
-}
+    <!-- BAGIAN 2: SESI YANG AKAN BERLANGSUNG (COMING SOON / SELANJUTNYA) -->
+    ${nextSession ? `
+      <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-3.5 flex items-center justify-between gap-3 ${liveSession ? 'border-t border-
