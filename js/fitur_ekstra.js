@@ -432,3 +432,236 @@ export function openBulkIdCardModal(activeUser, sekolahList, panitiaList) {
         </span>
         <span class="text-[10px] font-bold text-indigo-800">4 Kartu Besar / Halaman</span>
       </div>
+      <p class="text-[11px] text-slate-700 leading-relaxed">
+        Setiap halaman A4 berisi <b>4 Kartu ID Kalung (Name Tag)</b> lengkap dengan Logo K3S, Nama, Asal Sekolah/Divisi, Nomor Kamar, dan <b>QR Code Resmi</b> untuk dimasukkan ke plastik kalung peserta di dalam Rakor Kit.
+      </p>
+    </div>
+
+    <div class="space-y-2">
+      <div class="text-xs font-extrabold text-slate-800 uppercase">1. Cetak Kartu Peserta Per Sub Rayon:</div>
+      <div class="grid grid-cols-2 gap-2">
+        ${SUBRAYON_LIST.map(sr => {
+          const count = sekolahList.filter(s => s.subrayon === sr).length;
+          return `
+            <button type="button" data-sr="${sr}" class="btn-print-sr-cards p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 shadow-2xs text-left flex items-center justify-between transition">
+              <div>
+                <div class="font-extrabold text-xs text-slate-900">Rayon ${sr}</div>
+                <div class="text-[10px] text-slate-500">${count} Kartu Kepsek</div>
+              </div>
+              <div class="w-8 h-8 rounded-xl bg-blue-900 text-amber-300 flex items-center justify-center text-xs shrink-0">
+                <i class="fa-solid fa-file-pdf"></i>
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="space-y-2 pt-2 border-t border-slate-200">
+      <div class="text-xs font-extrabold text-slate-800 uppercase">2. Cetak Kartu Panitia Pelaksana:</div>
+      <button type="button" id="btnPrintPanitiaCards" class="w-full p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 to-blue-950 hover:from-slate-800 hover:to-blue-900 text-white font-extrabold text-xs shadow flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-user-shield text-amber-300 text-base"></i>
+          <span>Unduh PDF ID Card Seluruh Panitia (${panitiaList.length} Orang)</span>
+        </div>
+        <span class="text-[10px] bg-amber-400 text-slate-950 px-2.5 py-1 rounded-xl font-extrabold">Unduh PDF</span>
+      </button>
+    </div>
+
+    <div id="bulkPrintProgressBox" class="hidden p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-center text-xs font-extrabold text-emerald-900">
+      <i class="fa-solid fa-spinner animate-spin mr-1.5"></i> Sedang menyusun halaman PDF & men-generate QR Code...
+    </div>
+  `;
+
+  document.querySelectorAll(".btn-print-sr-cards").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const sr = btn.dataset.sr;
+      const list = sekolahList.filter(s => s.subrayon === sr);
+      await generateBulkIdCardsPdf(`Sub_Rayon_${sr}`, list, "peserta");
+    });
+  });
+
+  document.getElementById("btnPrintPanitiaCards")?.addEventListener("click", async () => {
+    await generateBulkIdCardsPdf("Panitia_Rakor_2026", panitiaList, "panitia");
+  });
+}
+
+function renderSingleQrToImage(payloadText, size = 180) {
+  return new Promise((resolve) => {
+    try {
+      const tempDiv = document.createElement("div");
+      new window.QRCode(tempDiv, {
+        text: payloadText,
+        width: size,
+        height: size,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff"
+      });
+      setTimeout(() => {
+        const qrCanvas = tempDiv.querySelector("canvas");
+        const qrImg = tempDiv.querySelector("img");
+        resolve(qrCanvas || qrImg || null);
+      }, 45);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+async function generateBulkIdCardsPdf(fileLabel, itemList, mode = "peserta") {
+  const progBox = document.getElementById("bulkPrintProgressBox");
+  progBox?.classList.remove("hidden");
+
+  try {
+    await ensureJsPdfLoaded();
+    const logoImg = await preloadLogo();
+    const { jsPDF } = window.jspdf;
+
+    // Ukuran A4 Portrait dalam piksel (794 x 1123) -> 4 Kartu per halaman (Grid 2x2)
+    const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [794, 1123] });
+    const pageCanvas = document.createElement("canvas");
+    pageCanvas.width = 794;
+    pageCanvas.height = 1123;
+    const ctx = pageCanvas.getContext("2d");
+
+    const cardW = 335;
+    const cardH = 495;
+    const positions = [
+      { x: 42, y: 48 },
+      { x: 417, y: 48 },
+      { x: 42, y: 575 },
+      { x: 417, y: 575 }
+    ];
+
+    for (let i = 0; i < itemList.length; i += 4) {
+      if (i > 0) pdf.addPage([794, 1123], "portrait");
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, 794, 1123);
+
+      const chunk = itemList.slice(i, i + 4);
+      for (let j = 0; j < chunk.length; j++) {
+        const item = chunk[j];
+        const pos = positions[j];
+        await drawIdBadgeOnCanvas(ctx, pos.x, pos.y, cardW, cardH, item, mode, logoImg);
+      }
+
+      pdf.addImage(pageCanvas.toDataURL("image/jpeg", 0.94), "JPEG", 0, 0, 794, 1123);
+    }
+
+    pdf.save(`ID_Card_Kalung_${fileLabel}.pdf`);
+    toast(`PDF ID Card (${itemList.length} Kartu) berhasil diunduh!`);
+  } catch (err) {
+    console.error(err);
+    toast("Gagal membuat PDF ID Card.");
+  }
+
+  progBox?.classList.add("hidden");
+}
+
+async function drawIdBadgeOnCanvas(ctx, x, y, w, h, item, mode, logoImg) {
+  // 1. Garis Putus-Putus Potong Gunting Luar
+  ctx.save();
+  ctx.strokeStyle = "#94a3b8";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 6]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+
+  // 2. Header Biru Tua / Emas Kartu ID
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(x + 6, y + 6, w - 12, 112);
+
+  // Lubang Tali Kalung (Lanyard Slot) di Tengah Atas
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x + w / 2 - 28, y + 14, 56, 10);
+
+  // Logo K3S di Header Kartu
+  if (logoImg) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x + 20, y + 34, 58, 58);
+    ctx.drawImage(logoImg, x + 23, y + 37, 52, 52);
+  }
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#fbbf24";
+  ctx.font = "800 13px 'Plus Jakarta Sans', Arial, sans-serif";
+  ctx.fillText("RAKOR KEPALA SD/MI 2026", x + 88, y + 52);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 11.5px 'Plus Jakarta Sans', Arial, sans-serif";
+  ctx.fillText("K3S SD/MI KOTA KUPANG", x + 88, y + 70);
+
+  ctx.fillStyle = "#93c5fd";
+  ctx.font = "bold 10px 'Plus Jakarta Sans', Arial, sans-serif";
+  ctx.fillText("19 – 21 NOVEMBER 2026", x + 88, y + 86);
+
+  // Pita Peran (PESERTA vs PANITIA)
+  const isPeserta = mode === "peserta";
+  ctx.fillStyle = isPeserta ? "#059669" : "#d97706";
+  ctx.fillRect(x + 6, y + 118, w - 12, 30);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 13px 'Plus Jakarta Sans', Arial, sans-serif";
+  const badgeRoleText = isPeserta
+    ? `PESERTA • SUB RAYON ${(item.subrayon || '').toUpperCase()}`
+    : (item.tugas_subrayon ? `PANITIA & KETUA RAYON ${item.tugas_subrayon.toUpperCase()}` : "PANITIA PELAKSANA");
+  ctx.fillText(badgeRoleText, x + w / 2, y + 138);
+
+  // 3. Gambar QR Code di Tengah Kartu
+  const qrPayload = isPeserta
+    ? `PESERTA|${item.npsn}|${item.nama_sekolah}|${item.subrayon}`
+    : `PANITIA|${item.id_panitia}|${item.nama_panitia}|${item.divisi}`;
+
+  const qrSource = await renderSingleQrToImage(qrPayload, 175);
+  const qrX = x + (w - 175) / 2;
+  const qrY = y + 165;
+
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(qrX - 8, qrY - 8, 191, 191);
+  if (qrSource) {
+    ctx.drawImage(qrSource, qrX, qrY, 175, 175);
+  }
+
+  // 4. Nama Lengkap, Nama Sekolah / Divisi & Kamar di Bawah QR
+  const mainTitle = isPeserta
+    ? String(item.nama_sekolah || "").slice(0, 32)
+    : String(item.nama_panitia || "").slice(0, 32);
+
+  const subTitle = isPeserta
+    ? String(item.nama_kepsek || "Kepala Sekolah").slice(0, 36)
+    : String(item.divisi || "Panitia").slice(0, 36);
+
+  const bottomMeta = isPeserta
+    ? `NPSN: ${item.npsn}  |  Kamar: ${item.nomor_kamar && item.nomor_kamar !== 'Belum Ditentukan' ? item.nomor_kamar : '....................'}`
+    : `Jabatan: ${item.jabatan || 'Anggota'}  |  ID: ${item.id_panitia}`;
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "800 14px 'Plus Jakarta Sans', Arial, sans-serif";
+  ctx.fillText(mainTitle, x + w / 2, y + 382);
+
+  ctx.fillStyle = "#1e3a8a";
+  ctx.font = "bold 12px 'Plus Jakarta Sans', Arial, sans-serif";
+  ctx.fillText(subTitle, x + w / 2, y + 404);
+
+  // Kotak Info Kamar / NPSN di Bawah
+  ctx.fillStyle = "#f1f5f9";
+  ctx.fillRect(x + 18, y + 422, w - 36, 34);
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 18, y + 422, w - 36, 34);
+
+  ctx.fillStyle = "#334155";
+  ctx.font = "bold 11px 'Plus Jakarta Sans', Arial, sans-serif";
+  ctx.fillText(bottomMeta, x + w / 2, y + 443);
+
+  // Footer Kartu
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(x + 6, y + h - 24, w - 12, 18);
+  ctx.fillStyle = "#fbbf24";
+  ctx.font = "bold 9px 'Plus Jakarta Sans', Arial, sans-serif";
+  ctx.fillText("SIM-RAKOR K3S KOTA KUPANG • SCAN QR UNTUK PRESENSI & LAYANAN", x + w / 2, y + h - 12);
+}
