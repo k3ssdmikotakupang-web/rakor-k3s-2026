@@ -6,16 +6,16 @@ let certConfig = {
   url_depan: '',
   url_belakang: '',
   nomor_prefix: '421.2/K3S-KK/RAKOR/IX/2026',
-  status_terbit: true,
+  status_terbit: false, // Default terkunci sampai diaktifkan Sekretaris
   wajib_hadir: false,
   posisi_nama_y: 440
 };
 
-let activeSidePreview = 'depan'; // 'depan' | 'belakang'
+let activeSidePreview = 'depan';
 let frontBgImg = null;
 let backBgImg = null;
 
-// Hanya Seksi Kesekretariatan yang berwenang mengunggah template Sisi Depan & Belakang
+// Wewenang Upload Template Desain: Seksi Kesekretariatan
 export function isUserSeksiKesekretariatan(activeUser) {
   return Boolean(
     activeUser &&
@@ -25,7 +25,16 @@ export function isUserSeksiKesekretariatan(activeUser) {
   );
 }
 
-// Cek apakah URL yang dibuka adalah hasil scan QR Code Sertifikat (?verify_cert=...)
+// Wewenang Mengaktifkan / Membuka Akses Sertifikat ke Peserta: Sekretaris Panitia
+export function isUserSekretaris(activeUser) {
+  return Boolean(
+    activeUser &&
+    activeUser.role === 'panitia' &&
+    activeUser.profile &&
+    activeUser.profile.divisi === 'Sekretaris'
+  );
+}
+
 export async function checkCertificateVerificationUrl(sekolahList, panitiaList) {
   const params = new URLSearchParams(window.location.search);
   const verifyCode = params.get('verify_cert');
@@ -94,10 +103,6 @@ export async function checkCertificateVerificationUrl(sekolahList, panitiaList) 
         <span class="text-slate-500">Nama Kegiatan:</span>
         <span class="font-bold text-slate-800 text-right">Rakor Kepala SD/MI Kota Kupang 2026</span>
       </div>
-      <div class="flex justify-between border-b pb-1.5">
-        <span class="text-slate-500">Penyelenggara:</span>
-        <span class="font-bold text-slate-800">K3S SD/MI Kota Kupang</span>
-      </div>
       <div class="flex justify-between">
         <span class="text-slate-500">Waktu & Pola:</span>
         <span class="font-bold text-emerald-700">24–26 Sept 2026 (32 JP)</span>
@@ -119,11 +124,34 @@ export async function openSertifikatModal(activeUser, sekolahList, reloadCallbac
   if (!modal || !titleEl || !bodyEl) return;
 
   modal.classList.remove("hidden");
-  titleEl.innerHTML = `<i class="fa-solid fa-award text-amber-500 mr-1.5"></i> E-Sertifikat 2 Sisi & QR Validasi`;
-  bodyEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Memuat generator E-Sertifikat...</div>`;
+  titleEl.innerHTML = `<i class="fa-solid fa-award text-amber-500 mr-1.5"></i> E-Sertifikat Rakor 2026`;
+  bodyEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Memeriksa status aktivasi E-Sertifikat...</div>`;
 
   const { data } = await sb.from("pengaturan_sertifikat").select("*").eq("id", 1).single();
   if (data) certConfig = data;
+
+  const isPeserta = !activeUser || activeUser.role === 'peserta';
+
+  // JIKA YANG LOGIN ADALAH PESERTA DAN SEKRETARIS BELUM MENGAKTIFKAN SERTIFIKAT -> SEMBUNYIKAN TOTAL!
+  if (isPeserta && !certConfig.status_terbit) {
+    bodyEl.innerHTML = `
+      <div class="p-6 rounded-3xl bg-slate-50 border border-slate-200 text-center space-y-3">
+        <div class="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 mx-auto flex items-center justify-center text-2xl shadow-2xs">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <div class="space-y-1">
+          <h4 class="font-extrabold text-sm text-slate-900">E-Sertifikat Belum Diaktifkan</h4>
+          <p class="text-xs text-slate-500 leading-relaxed">
+            Akses melihat dan mengunduh E-Sertifikat Peserta akan muncul otomatis di halaman ini setelah diaktifkan secara resmi oleh <b>Sekretaris Panitia</b> pada akhir kegiatan Rakor.
+          </p>
+        </div>
+        <div class="pt-2 border-t border-slate-200/80 text-[11px] font-bold text-slate-600">
+          Pastikan Nama Lengkap & Gelar Anda sudah terisi benar pada menu <b>ID & QR</b>.
+        </div>
+      </div>
+    `;
+    return;
+  }
 
   await preloadCertTemplates();
   renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback);
@@ -184,19 +212,52 @@ function getCertificateIdentity(activeUser, sekolahList) {
 
 function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
   const isKesekretariatan = isUserSeksiKesekretariatan(activeUser);
+  const isSekretaris = isUserSekretaris(activeUser);
   const ident = getCertificateIdentity(activeUser, sekolahList);
 
   bodyEl.innerHTML = `
-    <!-- Info Wewenang Seksi Kesekretariatan -->
-    <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between">
-      <div>
-        <div class="text-[10px] font-bold uppercase text-amber-700">Otoritas Penerbitan E-Sertifikat</div>
-        <div class="text-xs font-extrabold text-amber-950">Seksi Kesekretariatan K3S Kota Kupang</div>
+    <!-- PANEL KHUSUS SEKRETARIS: TOMBOL MASTER AKTIVASI AKSES PESERTA -->
+    ${isSekretaris ? `
+      <div class="p-4 rounded-2xl ${certConfig.status_terbit ? 'bg-emerald-50 border-emerald-300' : 'bg-amber-50 border-amber-300'} border space-y-2.5 shadow-2xs">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-900 text-amber-300">Wewenang Khusus Sekretaris</span>
+            <h4 class="font-extrabold text-xs text-slate-900 mt-1">Status Akses Sertifikat Peserta</h4>
+          </div>
+          <span class="text-[11px] font-extrabold px-2.5 py-1 rounded-full ${certConfig.status_terbit ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}">
+            ${certConfig.status_terbit ? 'AKTIF (Terbuka)' : 'TERKUNCI'}
+          </span>
+        </div>
+        <p class="text-[11px] text-slate-600 leading-relaxed">
+          ${certConfig.status_terbit
+            ? 'Saat ini seluruh peserta (Kepala Sekolah) DAPAT melihat dan mengunduh E-Sertifikat mereka.'
+            : 'Saat ini E-Sertifikat DISEMBUNYIKAN dari layar peserta. Klik tombol di bawah jika sertifikat siap diterbitkan.'}
+        </p>
+        <div class="flex items-center justify-between pt-1 border-t border-slate-200/70">
+          <label class="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 cursor-pointer">
+            <input id="chkSecRequireAttend" type="checkbox" ${certConfig.wajib_hadir ? 'checked' : ''} class="rounded accent-blue-900" />
+            <span>Hanya Peserta Tercatat Hadir</span>
+          </label>
+          <button id="btnSecretaryToggleCert" class="px-4 py-2 rounded-xl font-extrabold text-xs text-white shadow transition ${
+            certConfig.status_terbit ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'
+          }">
+            <i class="fa-solid ${certConfig.status_terbit ? 'fa-lock' : 'fa-lock-open'} mr-1"></i>
+            ${certConfig.status_terbit ? 'Kunci Kembali' : 'Aktifkan untuk Peserta'}
+          </button>
+        </div>
       </div>
-      <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${certConfig.status_terbit ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-        ${certConfig.status_terbit ? '✓ Terbit' : '🔒 Belum Dibuka'}
-      </span>
-    </div>
+    ` : `
+      <!-- Info Status untuk Panitia Lain / Peserta -->
+      <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+        <div>
+          <div class="text-[10px] font-bold uppercase text-amber-700">Desain: Seksi Kesekretariatan • Aktivasi: Sekretaris</div>
+          <div class="text-xs font-extrabold text-amber-950">E-Sertifikat Resmi Rakor K3S 2026</div>
+        </div>
+        <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${certConfig.status_terbit ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+          ${certConfig.status_terbit ? '✓ Aktif di Peserta' : '🔒 Terkunci di Peserta'}
+        </span>
+      </div>
+    `}
 
     ${!ident.hasNameFilled && activeUser?.role === 'peserta' ? `
       <div class="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-[11px] text-blue-900 space-y-2">
@@ -218,17 +279,17 @@ function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
       </button>
     </div>
 
-    <!-- Area Canvas Pratinjau Sertifikat (A4 Landscape Ratio) -->
+    <!-- Area Canvas Pratinjau Sertifikat -->
     <div class="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
       <canvas id="certCanvasPreview" width="1123" height="794" class="w-full rounded-xl shadow-lg bg-white"></canvas>
       <div class="flex items-center justify-between text-[10px] text-slate-300 px-1">
-        <span><i class="fa-solid fa-qrcode text-emerald-400 mr-1"></i>QR Code Aktif: Scan untuk cek keaslian</span>
-        <span>Kode: <b>${ident.verifyCodeText}</b></span>
+        <span><i class="fa-solid fa-qrcode text-emerald-400 mr-1"></i>QR Validasi Keaslian Aktif</span>
+        <span>ID: <b>${ident.verifyCodeText}</b></span>
       </div>
     </div>
 
-    <!-- Tombol Unduh Sertifikat (PDF 2 Sisi & Gambar PNG) -->
-    ${(certConfig.status_terbit && ident.isEligible) || isKesekretariatan ? `
+    <!-- Tombol Unduh Sertifikat -->
+    ${ident.isEligible || activeUser?.role === 'panitia' ? `
       <div class="grid grid-cols-2 gap-2">
         <button id="btnDownloadCertPdf2Sides" class="py-3 rounded-2xl bg-gradient-to-r from-blue-900 to-indigo-900 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5">
           <i class="fa-solid fa-file-pdf text-amber-300"></i>
@@ -241,25 +302,22 @@ function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
       </div>
     ` : `
       <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center text-xs text-rose-800 font-bold">
-        <i class="fa-solid fa-lock mr-1"></i>
-        ${!certConfig.status_terbit
-          ? 'Unduhan E-Sertifikat akan dibuka oleh Seksi Kesekretariatan pada akhir kegiatan.'
-          : 'Sertifikat hanya terbuka bagi peserta yang sudah melakukan konfirmasi kehadiran.'}
+        <i class="fa-solid fa-lock mr-1"></i> Sertifikat hanya dapat diunduh oleh peserta yang tercatat hadir.
       </div>
     `}
 
     <!-- PANEL KHUSUS SEKSI KESEKRETARIATAN: UPLOAD TEMPLATE DEPAN & BELAKANG -->
     ${isKesekretariatan ? `
-      <div class="p-4 rounded-2xl bg-emerald-50/90 border border-emerald-300 space-y-3 mt-2">
-        <div class="flex items-center justify-between border-b border-emerald-200 pb-2">
-          <span class="font-extrabold text-xs text-emerald-950">
-            <i class="fa-solid fa-sliders text-emerald-600 mr-1"></i> Panel Desain Sertifikat (Seksi Kesekretariatan)
+      <div class="p-4 rounded-2xl bg-blue-50/90 border border-blue-300 space-y-3 mt-2">
+        <div class="flex items-center justify-between border-b border-blue-200 pb-2">
+          <span class="font-extrabold text-xs text-blue-950">
+            <i class="fa-solid fa-palette text-blue-700 mr-1"></i> Upload Template Sertifikat (Seksi Kesekretariatan)
           </span>
-          <span class="text-[9px] font-extrabold uppercase bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">Khusus Seksi Kesekretariatan</span>
+          <span class="text-[9px] font-extrabold uppercase bg-blue-200 text-blue-900 px-2 py-0.5 rounded">Seksi Kesekretariatan</span>
         </div>
 
-        <p class="text-[10px] text-emerald-800 leading-relaxed">
-          Unggah gambar desain kosong <b>Sisi Depan</b> dan <b>Sisi Belakang</b> (format PNG/JPG ukuran A4 Landscape <code>1123 x 794 px</code>). Sistem otomatis menuliskan Nama, Asal Sekolah, Nomor Surat, dan QR Code Validasi di atasnya!
+        <p class="text-[10px] text-blue-900 leading-relaxed">
+          Unggah desain kosong <b>Sisi Depan</b> dan <b>Sisi Belakang</b> (PNG/JPG ukuran A4 Landscape <code>1123 x 794 px</code>). Untuk membuka akses ke layar peserta, koordinasikan dengan <b>Sekretaris Panitia</b>.
         </p>
 
         <div class="space-y-2">
@@ -282,48 +340,61 @@ function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
 
         <div class="grid grid-cols-2 gap-2 pt-1">
           <div>
-            <label class="block text-[10px] font-bold text-slate-700 mb-1">Format Nomor Sertifikat:</label>
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Format Nomor Surat:</label>
             <input id="inputCertPrefix" type="text" value="${certConfig.nomor_prefix || ''}" class="w-full rounded-xl border bg-white px-2.5 py-1.5 text-xs font-bold" />
           </div>
           <div>
-            <label class="block text-[10px] font-bold text-slate-700 mb-1">Tinggi Posisi Nama (Y: ${certConfig.posisi_nama_y || 440}):</label>
-            <input id="sliderCertNameY" type="range" min="260" max="560" step="5" value="${certConfig.posisi_nama_y || 440}" class="w-full accent-emerald-600 mt-1.5" />
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Posisi Nama (Y: ${certConfig.posisi_nama_y || 440}):</label>
+            <input id="sliderCertNameY" type="range" min="260" max="560" step="5" value="${certConfig.posisi_nama_y || 440}" class="w-full accent-blue-900 mt-1.5" />
           </div>
         </div>
 
-        <div class="flex items-center justify-between gap-2 pt-1">
-          <label class="flex items-center gap-1.5 text-[11px] font-bold text-slate-800 cursor-pointer">
-            <input id="chkCertOpen" type="checkbox" ${certConfig.status_terbit ? 'checked' : ''} class="rounded accent-emerald-600" />
-            <span>Buka Unduhan Sertifikat</span>
-          </label>
-          <label class="flex items-center gap-1.5 text-[11px] font-bold text-slate-800 cursor-pointer">
-            <input id="chkCertRequireAttend" type="checkbox" ${certConfig.wajib_hadir ? 'checked' : ''} class="rounded accent-emerald-600" />
-            <span>Wajib Hadir</span>
-          </label>
-        </div>
-
-        <button id="btnSaveCertSettings" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow">
-          Simpan Pengaturan Sertifikat
+        <button id="btnSaveCertSettings" class="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow">
+          Simpan Tata Letak & Nomor Sertifikat
         </button>
       </div>
     ` : ''}
   `;
 
-  // Gambar pratinjau kanvas sesuai sisi yang aktif
   drawCertificateCanvas(activeSidePreview, ident);
 
-  // Simpan cepat nama kepala sekolah jika belum diisi
+  // Event Khusus Sekretaris: Buka / Kunci Sertifikat untuk Peserta
+  if (isSekretaris) {
+    document.getElementById("btnSecretaryToggleCert")?.addEventListener("click", async () => {
+      const nextStatus = !certConfig.status_terbit;
+      const wajib_hadir = document.getElementById("chkSecRequireAttend")?.checked || false;
+      certConfig.status_terbit = nextStatus;
+      certConfig.wajib_hadir = wajib_hadir;
+
+      await sb.from("pengaturan_sertifikat").upsert([{
+        ...certConfig,
+        id: 1,
+        waktu_update: new Date().toLocaleString("id-ID")
+      }]);
+
+      toast(nextStatus
+        ? "E-Sertifikat resmi DIAKTIFKAN! Seluruh peserta kini dapat melihat & mengunduhnya."
+        : "Akses E-Sertifikat peserta DIKUNCI kembali.");
+      renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback);
+    });
+
+    document.getElementById("chkSecRequireAttend")?.addEventListener("change", async (e) => {
+      certConfig.wajib_hadir = e.target.checked;
+      await sb.from("pengaturan_sertifikat").upsert([{ ...certConfig, id: 1 }]);
+      toast("Syarat kehadiran diperbarui.");
+    });
+  }
+
   document.getElementById("btnSaveCertKepsekName")?.addEventListener("click", async () => {
     const val = document.getElementById("certQuickKepsekName")?.value.trim();
     if (!val) return toast("Ketik nama lengkap & gelar Kepala Sekolah!");
     await sb.from("db_sekolah").update({ nama_kepsek: val }).eq("id_sekolah", activeUser.profile.id_sekolah);
     activeUser.profile.nama_kepsek = val;
     if (reloadCallback) await reloadCallback();
-    toast("Nama Kepala Sekolah berhasil dicetak pada sertifikat!");
+    toast("Nama Kepala Sekolah berhasil disimpan!");
     renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback);
   });
 
-  // Switch Sisi Depan / Belakang
   document.getElementById("btnPreviewDepan")?.addEventListener("click", () => {
     activeSidePreview = 'depan';
     renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback);
@@ -333,7 +404,6 @@ function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
     renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback);
   });
 
-  // Unduh Sisi Aktif (PNG)
   document.getElementById("btnDownloadCertCurrentPng")?.addEventListener("click", () => {
     const canvas = document.getElementById("certCanvasPreview");
     if (!canvas) return;
@@ -341,10 +411,9 @@ function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
     a.download = `Sertifikat_Sisi_${activeSidePreview}_${ident.nama.replace(/\s+/g, '_')}.png`;
     a.href = canvas.toDataURL("image/png");
     a.click();
-    toast(`Sertifikat Sisi ${activeSidePreview} berhasil diunduh!`);
+    toast(`Sertifikat Sisi ${activeSidePreview} diunduh!`);
   });
 
-  // Unduh Gabungan 2 Sisi Menjadi 1 File PDF (Halaman 1: Depan, Halaman 2: Belakang)
   document.getElementById("btnDownloadCertPdf2Sides")?.addEventListener("click", async () => {
     const btn = document.getElementById("btnDownloadCertPdf2Sides");
     btn.disabled = true;
@@ -354,35 +423,27 @@ function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
       await ensureJsPdfLoaded();
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [1123, 794] });
-
       const canvas = document.getElementById("certCanvasPreview");
 
-      // Render Halaman 1 (Sisi Depan)
       await drawCertificateCanvas('depan', ident);
-      const imgDepan = canvas.toDataURL("image/jpeg", 0.95);
-      pdf.addImage(imgDepan, "JPEG", 0, 0, 1123, 794);
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 1123, 794);
 
-      // Render Halaman 2 (Sisi Belakang)
       pdf.addPage([1123, 794], "landscape");
       await drawCertificateCanvas('belakang', ident);
-      const imgBelakang = canvas.toDataURL("image/jpeg", 0.95);
-      pdf.addImage(imgBelakang, "JPEG", 0, 0, 1123, 794);
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 1123, 794);
 
-      // Kembalikan tampilan ke tab semula
       await drawCertificateCanvas(activeSidePreview, ident);
-
       pdf.save(`E-Sertifikat_Rakor2026_${ident.nama.replace(/\s+/g, '_')}.pdf`);
       toast("E-Sertifikat PDF (2 Sisi) berhasil diunduh!");
     } catch (e) {
       console.error(e);
-      toast("Mengunduh gambar sertifikat...");
+      toast("Gagal membuat PDF.");
     }
 
     btn.disabled = false;
     btn.innerHTML = `<i class="fa-solid fa-file-pdf text-amber-300"></i> Unduh PDF (2 Sisi)`;
   });
 
-  // Handler Khusus Seksi Kesekretariatan
   if (isKesekretariatan) {
     document.getElementById("sliderCertNameY")?.addEventListener("input", (e) => {
       certConfig.posisi_nama_y = Number(e.target.value);
@@ -395,22 +456,15 @@ function renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback) {
     document.getElementById("btnSaveCertSettings")?.addEventListener("click", async () => {
       const nomor_prefix = document.getElementById("inputCertPrefix").value.trim();
       const posisi_nama_y = Number(document.getElementById("sliderCertNameY").value || 440);
-      const status_terbit = document.getElementById("chkCertOpen").checked;
-      const wajib_hadir = document.getElementById("chkCertRequireAttend").checked;
+      certConfig = { ...certConfig, nomor_prefix, posisi_nama_y };
 
-      certConfig = { ...certConfig, nomor_prefix, posisi_nama_y, status_terbit, wajib_hadir };
       await sb.from("pengaturan_sertifikat").upsert([{
+        ...certConfig,
         id: 1,
-        url_depan: certConfig.url_depan,
-        url_belakang: certConfig.url_belakang,
-        nomor_prefix,
-        posisi_nama_y,
-        status_terbit,
-        wajib_hadir,
         waktu_update: new Date().toLocaleString("id-ID")
       }]);
 
-      toast("Pengaturan E-Sertifikat berhasil disimpan!");
+      toast("Tata letak & format nomor disimpan!");
       renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback);
     });
   }
@@ -420,7 +474,7 @@ async function uploadCertTemplateSide(side, activeUser, sekolahList, bodyEl, rel
   const inputId = side === 'depan' ? 'inputCertFrontFile' : 'inputCertBackFile';
   const btnId = side === 'depan' ? 'btnUploadCertFront' : 'btnUploadCertBack';
   const file = document.getElementById(inputId)?.files?.[0];
-  if (!file) return toast(`Pilih file gambar desain Sisi ${side} terlebih dahulu!`);
+  if (!file) return toast(`Pilih file desain Sisi ${side} terlebih dahulu!`);
 
   const btn = document.getElementById(btnId);
   btn.disabled = true;
@@ -443,33 +497,28 @@ async function uploadCertTemplateSide(side, activeUser, sekolahList, bodyEl, rel
   await sb.from("pengaturan_sertifikat").upsert([{ ...certConfig, id: 1 }]);
   await preloadCertTemplates();
   activeSidePreview = side;
-  toast(`Template Sisi ${side} berhasil diperbarui!`);
+  toast(`Desain Sisi ${side} berhasil diperbarui!`);
   renderSertifikatUI(activeUser, sekolahList, bodyEl, reloadCallback);
 }
 
-// Mesin Penggambar Sisi Depan & Sisi Belakang + QR Code Verifikasi Unik
 async function drawCertificateCanvas(side, ident) {
   const canvas = document.getElementById("certCanvasPreview");
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
-  const W = canvas.width;  // 1123 px
-  const H = canvas.height; // 794 px
+  const W = canvas.width;
+  const H = canvas.height;
 
   ctx.clearRect(0, 0, W, H);
 
   if (side === 'depan') {
-    // 1. Gambar Desain Latar Sisi Depan
     if (frontBgImg) {
       ctx.drawImage(frontBgImg, 0, 0, W, H);
     } else {
-      // Desain Default Sisi Depan Elegan K3S Kota Kupang
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, W, H);
-
       ctx.strokeStyle = "#1e3a8a";
       ctx.lineWidth = 18;
       ctx.strokeRect(24, 24, W - 48, H - 48);
-
       ctx.strokeStyle = "#d97706";
       ctx.lineWidth = 4;
       ctx.strokeRect(42, 42, W - 84, H - 84);
@@ -478,33 +527,25 @@ async function drawCertificateCanvas(side, ident) {
       ctx.font = "800 24px 'Plus Jakarta Sans', sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("KELOMPOK KERJA KEPALA SEKOLAH (K3S) SD/MI KOTA KUPANG", W / 2, 115);
-
       ctx.fillStyle = "#b45309";
       ctx.font = "800 54px 'Plus Jakarta Sans', sans-serif";
       ctx.fillText("SERTIFIKAT", W / 2, 195);
-
       ctx.fillStyle = "#334155";
       ctx.font = "600 20px 'Plus Jakarta Sans', sans-serif";
       ctx.fillText("Diberikan kepada:", W / 2, 290);
-
-      ctx.fillStyle = "#334155";
       ctx.font = "500 20px 'Plus Jakarta Sans', sans-serif";
       ctx.fillText("Telah berpartisipasi aktif dalam kegiatan Rapat Koordinasi Kepala SD/MI Se-Kota Kupang Tahun 2026", W / 2, 540);
       ctx.fillText("yang diselenggarakan pada tanggal 24 s.d. 26 September 2026 di Kota Kupang (Pola 32 JP).", W / 2, 572);
 
-      // Tanda Tangan Default
       ctx.font = "bold 18px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "#0f172a";
       ctx.fillText("Ketua K3S SD/MI Kota Kupang", W * 0.3, 645);
       ctx.fillText("Joni A. Higa Huki, S.Pd., M.M.", W * 0.3, 725);
-
       ctx.fillText("Ketua Panitia Pelaksana", W * 0.72, 645);
       ctx.fillText("Surahman Husain, S.Pd.", W * 0.72, 725);
     }
 
-    // 2. Cetak Nomor Sertifikat, Nama Pemilik, Sekolah, dan Peran di Atas Sisi Depan
     const nameY = Number(certConfig.posisi_nama_y || 440);
-
     ctx.textAlign = "center";
     ctx.fillStyle = "#475569";
     ctx.font = "bold 20px 'Plus Jakarta Sans', sans-serif";
@@ -514,7 +555,6 @@ async function drawCertificateCanvas(side, ident) {
     ctx.font = "800 40px 'Plus Jakarta Sans', sans-serif";
     ctx.fillText(ident.nama, W / 2, nameY - 55);
 
-    // Garis bawah nama
     ctx.strokeStyle = "#cbd5e1";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -530,7 +570,6 @@ async function drawCertificateCanvas(side, ident) {
     ctx.font = "800 22px 'Plus Jakarta Sans', sans-serif";
     ctx.fillText(`SEBAGAI ${ident.peran}`, W / 2, nameY + 42);
 
-    // 3. Gambar QR Code Keaslian Unik di Pojok Kiri Bawah Sisi Depan
     await drawQrOnCanvas(ctx, ident.verifyUrl, 70, H - 195, 115);
     ctx.textAlign = "left";
     ctx.fillStyle = "#475569";
@@ -538,15 +577,12 @@ async function drawCertificateCanvas(side, ident) {
     ctx.fillText("Scan Uji Keaslian", 74, H - 64);
     ctx.font = "11px monospace";
     ctx.fillText(ident.verifyCodeText, 74, H - 48);
-
   } else {
-    // SISI BELAKANG (STRUKTUR KURIKULUM / MATERI RAKOR 32 JP)
     if (backBgImg) {
       ctx.drawImage(backBgImg, 0, 0, W, H);
     } else {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, W, H);
-
       ctx.strokeStyle = "#1e3a8a";
       ctx.lineWidth = 14;
       ctx.strokeRect(28, 28, W - 56, H - 56);
@@ -559,7 +595,6 @@ async function drawCertificateCanvas(side, ident) {
       ctx.fillStyle = "#475569";
       ctx.fillText(`Pemilik Sertifikat: ${ident.nama} (${ident.instansi})`, W / 2, 130);
 
-      // Tabel Materi Sisi Belakang
       const rows = [
         ["No", "Materi / Pokok Bahasan Rapat Koordinasi", "Narasumber / Fasilitator", "JP"],
         ["1", "Kebijakan Dinas Pendidikan & Kebudayaan Kota Kupang", "Plt. Kadis P&K Kota Kupang", "4 JP"],
@@ -581,7 +616,6 @@ async function drawCertificateCanvas(side, ident) {
 
         ctx.fillStyle = isHeader ? "#1e3a8a" : isTotal ? "#fef3c7" : idx % 2 === 1 ? "#f8fafc" : "#ffffff";
         ctx.fillRect(startX, startY, 990, rowH);
-
         ctx.strokeStyle = "#cbd5e1";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(startX, startY, 990, rowH);
@@ -595,7 +629,6 @@ async function drawCertificateCanvas(side, ident) {
           ctx.fillText(cell, textX, startY + 32);
           curX += colWidths[cIdx];
         });
-
         startY += rowH;
       });
 
@@ -607,7 +640,6 @@ async function drawCertificateCanvas(side, ident) {
       ctx.fillText("Emanuel Nata Huler, S.Pd., Gr.", W - 95, 725);
     }
 
-    // QR Code Validasi juga tersemat di Sisi Belakang
     await drawQrOnCanvas(ctx, ident.verifyUrl, 75, H - 185, 105);
     ctx.textAlign = "left";
     ctx.fillStyle = "#475569";
@@ -620,13 +652,7 @@ function drawQrOnCanvas(ctx, textUrl, x, y, size) {
   return new Promise((resolve) => {
     try {
       const tempDiv = document.createElement("div");
-      new window.QRCode(tempDiv, {
-        text: textUrl,
-        width: size,
-        height: size,
-        colorDark: "#0f172a",
-        colorLight: "#ffffff"
-      });
+      new window.QRCode(tempDiv, { text: textUrl, width: size, height: size, colorDark: "#0f172a", colorLight: "#ffffff" });
       setTimeout(() => {
         const qrCanvas = tempDiv.querySelector("canvas");
         const qrImg = tempDiv.querySelector("img");
@@ -635,15 +661,9 @@ function drawQrOnCanvas(ctx, textUrl, x, y, size) {
         ctx.strokeStyle = "#cbd5e1";
         ctx.lineWidth = 2;
         ctx.strokeRect(x - 6, y - 6, size + 12, size + 12);
-        if (qrCanvas) {
-          ctx.drawImage(qrCanvas, x, y, size, size);
-          resolve();
-        } else if (qrImg && qrImg.complete) {
-          ctx.drawImage(qrImg, x, y, size, size);
-          resolve();
-        } else {
-          resolve();
-        }
+        if (qrCanvas) ctx.drawImage(qrCanvas, x, y, size, size);
+        else if (qrImg && qrImg.complete) ctx.drawImage(qrImg, x, y, size, size);
+        resolve();
       }, 60);
     } catch (e) {
       resolve();
