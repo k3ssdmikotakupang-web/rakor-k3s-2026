@@ -349,76 +349,8 @@ function openServiceModal(serviceCode) {
 
   // Khusus Menu 1: INFO KAMAR
   if (serviceCode === "kamar") {
-    titleEl.innerHTML = `<i class="fa-solid fa-bed text-indigo-600 mr-1.5"></i> Informasi Kamar Peserta`;
-    if (activeUser && activeUser.role === "peserta") {
-      const s = activeUser.profile;
-      const roomName = s.nomor_kamar || "Belum Ditentukan";
-      const roommates = sekolahList.filter(x => x.nomor_kamar && x.nomor_kamar !== "Belum Ditentukan" && x.nomor_kamar === s.nomor_kamar && x.id_sekolah !== s.id_sekolah);
-
-      bodyEl.innerHTML = `
-        <div class="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-center space-y-1">
-          <div class="text-[10px] font-bold uppercase text-indigo-600">Nomor Kamar Anda</div>
-          <div class="text-2xl font-extrabold text-indigo-950">${roomName}</div>
-          <div class="text-xs font-semibold text-slate-600">${s.nama_sekolah}</div>
-        </div>
-        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-          <div class="font-extrabold text-slate-800">Rekan Sekamar:</div>
-          ${roommates.length > 0
-            ? roommates.map(r => `<div class="text-xs font-semibold text-slate-700">• ${r.nama_sekolah} (${r.nama_kepsek || 'Kepsek'})</div>`).join("")
-            : `<div class="text-[11px] text-slate-500">Data rekan sekamar akan tampil setelah nomor kamar yang sama diinput oleh panitia.</div>`
-          }
-        </div>
-        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-          <label class="block text-[11px] font-bold text-slate-700">Update Nomor Kamar (Sesuai Kunci Saat Registrasi):</label>
-          <div class="flex gap-2">
-            <input id="inputSelfRoom" type="text" value="${roomName === 'Belum Ditentukan' ? '' : roomName}" placeholder="Contoh: Kamar 204" class="flex-1 rounded-xl border px-3 py-2 text-xs font-bold" />
-            <button id="btnSaveSelfRoom" class="bg-indigo-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs">Simpan</button>
-          </div>
-        </div>
-      `;
-      document.getElementById("btnSaveSelfRoom")?.addEventListener("click", async () => {
-        const val = document.getElementById("inputSelfRoom").value.trim() || "Belum Ditentukan";
-        await sb.from("db_sekolah").update({ nomor_kamar: val }).eq("id_sekolah", s.id_sekolah);
-        toast("Nomor kamar disimpan!");
-        await loadAllDatabase(false);
-        openServiceModal("kamar");
-      });
-    } else {
-      // Tampilan Panitia: Kelola Kamar 158 Sekolah
-      bodyEl.innerHTML = `
-        <p class="text-[11px] text-slate-500">Pilih atau cari sekolah untuk mengatur nomor kamar peserta:</p>
-        <input id="searchRoomSchool" type="text" placeholder="Ketik nama sekolah..." class="w-full rounded-xl border bg-slate-50 px-3 py-2 text-xs font-semibold" />
-        <div id="roomManageList" class="space-y-2 max-h-72 overflow-y-auto pt-1"></div>
-      `;
-      const renderRoomList = () => {
-        const kw = (document.getElementById("searchRoomSchool")?.value || "").toLowerCase();
-        const box = document.getElementById("roomManageList");
-        if (!box) return;
-        box.innerHTML = "";
-        sekolahList.filter(s => s.nama_sekolah.toLowerCase().includes(kw)).slice(0, 35).forEach(s => {
-          const row = document.createElement("div");
-          row.className = "p-2.5 rounded-xl bg-slate-50 border flex items-center justify-between gap-2";
-          row.innerHTML = `
-            <div class="min-w-0 flex-1">
-              <div class="font-bold text-xs truncate">${s.nama_sekolah}</div>
-              <div class="text-[10px] text-slate-500">Rayon ${s.subrayon}</div>
-            </div>
-            <input type="text" value="${s.nomor_kamar === 'Belum Ditentukan' ? '' : (s.nomor_kamar || '')}" placeholder="No. Kamar" class="inp-room w-24 rounded-lg border px-2 py-1 text-xs font-bold text-center" />
-            <button class="btn-save-room bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold">OK</button>
-          `;
-          row.querySelector(".btn-save-room").addEventListener("click", async () => {
-            const val = row.querySelector(".inp-room").value.trim() || "Belum Ditentukan";
-            await sb.from("db_sekolah").update({ nomor_kamar: val }).eq("id_sekolah", s.id_sekolah);
-            toast(`Kamar ${s.nama_sekolah}: ${val}`);
-            await loadAllDatabase(false);
-          });
-          box.appendChild(row);
-        });
-      };
-      document.getElementById("searchRoomSchool")?.addEventListener("input", renderRoomList);
-      renderRoomList();
-    }
-    return;
+  openRoomManagerModal(activeUser, sekolahList, () => loadAllDatabase(false));
+  return;
   }
 
   // Menu Layanan 2–6 (Buku Panduan, Dokumentasi, Sertifikat, Materi, Laporan)
