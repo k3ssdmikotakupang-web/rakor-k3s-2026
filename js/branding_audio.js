@@ -5,13 +5,11 @@ export const LOGO_K3S_PATH = './logo-k3s.png';
 const DEFAULT_DRIVE_VIEW_URL = 'https://drive.google.com/file/d/1-gXX08p8sx-20XxlKVi3hBJQmNccmlVM/view?usp=sharing';
 const DEFAULT_DRIVE_PREVIEW_URL = 'https://drive.google.com/file/d/1-gXX08p8sx-20XxlKVi3hBJQmNccmlVM/preview';
 
-let k3sAudioObj = null;
 let isAudioPlaying = false;
 let currentSongRecord = null;
 
 // 1. Terapkan Logo Resmi K3S ke Favicon, Layar Login, dan Header
 export function applyK3sLogoBranding(activeUser) {
-  // Pasang Logo K3S sebagai Favicon Tab Browser
   let favLink = document.querySelector("link[rel*='icon']");
   if (!favLink) {
     favLink = document.createElement("link");
@@ -20,7 +18,6 @@ export function applyK3sLogoBranding(activeUser) {
   }
   favLink.href = LOGO_K3S_PATH;
 
-  // Ganti Ikon Topi/Sekolah di Halaman Login menjadi Logo K3S Resmi
   const loginScreen = document.getElementById("loginScreen");
   if (loginScreen && !document.getElementById("loginK3sLogoImg")) {
     const iconBox = loginScreen.querySelector(".fa-graduation-cap, .fa-school, .fa-award")?.parentElement;
@@ -30,7 +27,6 @@ export function applyK3sLogoBranding(activeUser) {
     }
   }
 
-  // Jika pengguna belum upload foto profil pribadi, tampilkan Logo K3S di Avatar Pojok Kiri Atas
   const avatarEl = document.getElementById("topUserAvatar");
   if (avatarEl && activeUser && !activeUser.profile?.foto_profil) {
     const innerBox = avatarEl.querySelector("div");
@@ -41,9 +37,13 @@ export function applyK3sLogoBranding(activeUser) {
   }
 }
 
-// 2. Render Pemutar Lagu K3S di Beranda & Tombol Musik di Header
+// 2. Pasang Hanya Ikon Musik di Header (Tanpa Card di Beranda)
 export async function renderK3sMusicPlayerWidget(activeUser, layananList, reloadCallback) {
   applyK3sLogoBranding(activeUser);
+
+  // Pastikan jika masih ada card lama di Beranda langsung dihapus bersih
+  const oldBanner = document.getElementById("k3sMusicHomeBanner");
+  if (oldBanner) oldBanner.remove();
 
   const songItem = (layananList || []).find(x => x.kode_menu === 'lagu_k3s') || {
     kode_menu: 'lagu_k3s',
@@ -54,64 +54,7 @@ export async function renderK3sMusicPlayerWidget(activeUser, layananList, reload
   };
   currentSongRecord = songItem;
 
-  // Cek apakah URL saat ini adalah file audio langsung (.mp3/.wav/.m4a dari Supabase) atau link Google Drive
-  const isDirectAudio = isDirectAudioFileUrl(songItem.url_link);
-
-  // Pasang Tombol Pintas Musik di Header Sebelah Lonceng Notifikasi
   injectHeaderMusicButton(activeUser, reloadCallback);
-
-  // Pasang Kartu Pemutar Musik Elegan di Beranda (di atas Grid Menu Layanan)
-  const tabBeranda = document.getElementById("tabContentBeranda");
-  if (!tabBeranda) return;
-
-  let playerCard = document.getElementById("k3sMusicHomeBanner");
-  if (!playerCard) {
-    playerCard = document.createElement("div");
-    playerCard.id = "k3sMusicHomeBanner";
-    const firstGrid = tabBeranda.children[1] || null;
-    tabBeranda.insertBefore(playerCard, firstGrid);
-  }
-
-  playerCard.className = "bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl p-3.5 shadow-lg border border-amber-400/30 flex items-center justify-between gap-3";
-  playerCard.innerHTML = `
-    <div class="flex items-center gap-3 min-w-0 flex-1">
-      <div class="w-12 h-12 rounded-2xl bg-white p-1.5 flex items-center justify-center shrink-0 shadow-md border border-amber-300">
-        <img src="${LOGO_K3S_PATH}" alt="Logo K3S" class="w-full h-full object-contain" onerror="this.outerHTML='<i class=\\'fa-solid fa-music text-blue-900 text-lg\\'></i>'" />
-      </div>
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5">
-          <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
-            <i class="fa-solid fa-headphones mr-0.5"></i> Lagu Resmi K3S
-          </span>
-          <span id="k3sAudioStatusBadge" class="text-[9px] font-bold text-emerald-300 truncate">
-            ${isAudioPlaying ? 'Sedang Diputar...' : 'Siap Diputar'}
-          </span>
-        </div>
-        <h4 class="font-extrabold text-xs text-white truncate mt-1">${songItem.judul || 'Mars K3S Kota Kupang'}</h4>
-        <p class="text-[10px] text-blue-200 truncate">Ketuk untuk mendengarkan lagu K3S</p>
-      </div>
-    </div>
-
-    <div class="flex items-center gap-1.5 shrink-0">
-      ${isDirectAudio ? `
-        <button type="button" id="btnQuickPlayK3sSong" class="w-10 h-10 rounded-2xl ${isAudioPlaying ? 'bg-emerald-500 text-slate-950 animate-pulse' : 'bg-amber-400 hover:bg-amber-300 text-slate-950'} font-extrabold flex items-center justify-center text-sm shadow-md active:scale-95 transition" title="Putar / Jeda Lagu">
-          <i class="fa-solid ${isAudioPlaying ? 'fa-pause' : 'fa-play'}"></i>
-        </button>
-      ` : ''}
-      <button type="button" id="btnOpenK3sMusicModal" class="px-3 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-[11px] font-extrabold text-amber-300 flex items-center gap-1.5 active:scale-95 transition">
-        <i class="fa-solid ${isDirectAudio ? 'fa-sliders' : 'fa-circle-play text-sm'}"></i>
-        <span>${isDirectAudio ? 'Player' : 'Putar Lagu'}</span>
-      </button>
-    </div>
-  `;
-
-  document.getElementById("btnQuickPlayK3sSong")?.addEventListener("click", () => {
-    toggleDirectAudioPlayback(songItem.url_link);
-  });
-
-  document.getElementById("btnOpenK3sMusicModal")?.addEventListener("click", () => {
-    openK3sMusicModal(activeUser, songItem, reloadCallback);
-  });
 }
 
 function isDirectAudioFileUrl(url = '') {
@@ -123,46 +66,6 @@ function isDirectAudioFileUrl(url = '') {
     lower.endsWith(".wav") ||
     lower.endsWith(".ogg")
   );
-}
-
-function toggleDirectAudioPlayback(audioUrl) {
-  if (!audioUrl) return;
-
-  if (!k3sAudioObj || k3sAudioObj.src !== audioUrl) {
-    if (k3sAudioObj) k3sAudioObj.pause();
-    k3sAudioObj = new Audio(audioUrl);
-    k3sAudioObj.addEventListener("ended", () => {
-      isAudioPlaying = false;
-      updateAudioButtonsUI();
-    });
-  }
-
-  if (isAudioPlaying) {
-    k3sAudioObj.pause();
-    isAudioPlaying = false;
-    toast("Lagu K3S dijeda.");
-  } else {
-    k3sAudioObj.play().then(() => {
-      isAudioPlaying = true;
-      toast("Memutar Lagu K3S Kota Kupang...");
-      updateAudioButtonsUI();
-    }).catch(() => {
-      toast("Membuka pemutar lagu K3S...");
-    });
-  }
-  updateAudioButtonsUI();
-}
-
-function updateAudioButtonsUI() {
-  const btnQuick = document.getElementById("btnQuickPlayK3sSong");
-  const statusBadge = document.getElementById("k3sAudioStatusBadge");
-  if (btnQuick) {
-    btnQuick.className = `w-10 h-10 rounded-2xl ${isAudioPlaying ? 'bg-emerald-400 text-slate-950 animate-pulse' : 'bg-amber-400 hover:bg-amber-300 text-slate-950'} font-extrabold flex items-center justify-center text-sm shadow-md active:scale-95 transition`;
-    btnQuick.innerHTML = `<i class="fa-solid ${isAudioPlaying ? 'fa-pause' : 'fa-play'}"></i>`;
-  }
-  if (statusBadge) {
-    statusBadge.textContent = isAudioPlaying ? "Sedang Diputar..." : "Siap Diputar";
-  }
 }
 
 function injectHeaderMusicButton(activeUser, reloadCallback) {
@@ -183,7 +86,7 @@ function injectHeaderMusicButton(activeUser, reloadCallback) {
   musicBtn.onclick = () => openK3sMusicModal(activeUser, currentSongRecord, reloadCallback);
 }
 
-// 3. Modal Pemutar Lagu K3S + Fitur Upload File MP3 Langsung (Sekretaris / Kesekretariatan)
+// 3. Modal Pemutar Lagu K3S Saat Ikon Musik di Header Diklik
 export function openK3sMusicModal(activeUser, songItem, reloadCallback) {
   const modal = document.getElementById("serviceModal");
   const titleEl = document.getElementById("serviceModalTitle");
@@ -202,7 +105,6 @@ export function openK3sMusicModal(activeUser, songItem, reloadCallback) {
   const rawUrl = songItem?.url_link || DEFAULT_DRIVE_VIEW_URL;
   const isDirectMp3 = isDirectAudioFileUrl(rawUrl);
 
-  // Konversi link Google Drive view menjadi link preview embed
   let drivePreviewUrl = DEFAULT_DRIVE_PREVIEW_URL;
   const driveIdMatch = String(rawUrl).match(/\/d\/([a-zA-Z0-9_-]+)/);
   if (driveIdMatch && driveIdMatch[1]) {
@@ -210,7 +112,6 @@ export function openK3sMusicModal(activeUser, songItem, reloadCallback) {
   }
 
   bodyEl.innerHTML = `
-    <!-- Kartu Header Logo & Judul Lagu -->
     <div class="p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white text-center space-y-3 shadow-lg border border-amber-400/30">
       <div class="w-24 h-24 rounded-3xl bg-white p-2.5 mx-auto shadow-xl border-2 border-amber-400 flex items-center justify-center">
         <img src="${LOGO_K3S_PATH}" alt="Logo K3S Kota Kupang" class="w-full h-full object-contain" onerror="this.outerHTML='<i class=\\'fa-solid fa-compact-disc text-4xl text-blue-900 animate-spin\\'></i>'" />
@@ -223,7 +124,6 @@ export function openK3sMusicModal(activeUser, songItem, reloadCallback) {
         <p class="text-[11px] text-blue-200 mt-0.5">${songItem?.deskripsi || 'Dengarkan bersama dalam kegiatan Rapat Koordinasi Kepala Sekolah.'}</p>
       </div>
 
-      <!-- PEMUTAR AUDIO LANGSUNG (JIKA SUDAH DIUPLOAD FILE MP3) ATAU EMBED GOOGLE DRIVE -->
       ${isDirectMp3 ? `
         <div class="pt-2">
           <audio id="modalHtml5AudioPlayer" controls preload="metadata" class="w-full rounded-2xl shadow">
@@ -250,7 +150,6 @@ export function openK3sMusicModal(activeUser, songItem, reloadCallback) {
       </div>
     </div>
 
-    <!-- PANEL UPLOAD FILE MP3 LANGSUNG (AGAR BISA DIPUTAR TANPA GOOGLE DRIVE) -->
     ${canUploadAudio ? `
       <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 space-y-2.5">
         <div class="flex items-center justify-between">
@@ -270,6 +169,22 @@ export function openK3sMusicModal(activeUser, songItem, reloadCallback) {
       </div>
     ` : ''}
   `;
+
+  const audioEl = document.getElementById("modalHtml5AudioPlayer");
+  if (audioEl) {
+    audioEl.addEventListener("play", () => {
+      isAudioPlaying = true;
+      injectHeaderMusicButton(activeUser, reloadCallback);
+    });
+    audioEl.addEventListener("pause", () => {
+      isAudioPlaying = false;
+      injectHeaderMusicButton(activeUser, reloadCallback);
+    });
+    audioEl.addEventListener("ended", () => {
+      isAudioPlaying = false;
+      injectHeaderMusicButton(activeUser, reloadCallback);
+    });
+  }
 
   document.getElementById("btnUploadK3sMp3Now")?.addEventListener("click", async () => {
     const file = document.getElementById("inputK3sMp3File")?.files?.[0];
