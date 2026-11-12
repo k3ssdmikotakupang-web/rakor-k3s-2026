@@ -339,78 +339,11 @@ function renderBerandaView() {
 
 // Modal untuk 6 Menu Layanan (Kamar, Buku Panduan, Dokumentasi, Sertifikat, Materi, Laporan)
 function openServiceModal(serviceCode) {
-  const modal = document.getElementById("serviceModal");
-  const titleEl = document.getElementById("serviceModalTitle");
-  const bodyEl = document.getElementById("serviceModalBody");
-  if (!modal || !titleEl || !bodyEl) return;
-
-  modal.classList.remove("hidden");
-  const isPanitiaEditor = activeUser && activeUser.role === "panitia" &&
-    ["Sekretaris", "Seksi Kesekretariatan", "Ketua Panitia", "Seksi Perlengkapan, Dokumentasi, dan Publikasi"].includes(activeUser.profile.divisi);
-
-  // Khusus Menu 1: INFO KAMAR
   if (serviceCode === "kamar") {
-  openRoomManagerModal(activeUser, sekolahList, () => loadAllDatabase(false));
-  return;
+    openRoomManagerModal(activeUser, sekolahList, () => loadAllDatabase(false));
+    return;
   }
-
-  // Menu Layanan 2–6 (Buku Panduan, Dokumentasi, Sertifikat, Materi, Laporan)
-  const item = layananList.find(x => x.kode_menu === serviceCode) ||
-    DEFAULT_LAYANAN.find(x => x.kode_menu === serviceCode);
-
-  if (!item) return;
-  titleEl.textContent = item.judul;
-
-  bodyEl.innerHTML = `
-    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-      <div class="flex items-center justify-between">
-        <span class="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">${item.status_tersedia || 'Informasi'}</span>
-      </div>
-      <p class="text-xs text-slate-700 leading-relaxed">${item.deskripsi || ''}</p>
-      ${item.url_link ? `
-        <a href="${item.url_link}" target="_blank" rel="noopener noreferrer" class="mt-2 w-full py-3 rounded-xl bg-blue-900 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow">
-          <i class="fa-solid fa-up-right-from-square"></i>
-          <span>Buka / Unduh ${item.judul}</span>
-        </a>
-      ` : `
-        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 font-semibold text-center">
-          Tautan dokumen/folder sedang disiapkan oleh Seksi Kesekretariatan & Publikasi.
-        </div>
-      `}
-    </div>
-
-    ${isPanitiaEditor ? `
-      <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2.5">
-        <div class="font-extrabold text-xs text-emerald-950"><i class="fa-solid fa-pen-to-square mr-1"></i> Panel Editor Panitia</div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-700 mb-1">Link Google Drive / URL Dokumen:</label>
-          <input id="editServiceUrl" type="url" value="${item.url_link || ''}" placeholder="https://drive.google.com/..." class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-semibold" />
-        </div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-700 mb-1">Label Status:</label>
-          <input id="editServiceStatus" type="text" value="${item.status_tersedia || ''}" placeholder="Contoh: Siap Diunduh / Live Update" class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-semibold" />
-        </div>
-        <button id="btnSaveServiceInfo" class="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs shadow">
-          Simpan Perubahan Layanan
-        </button>
-      </div>
-    ` : ''}
-  `;
-
-  document.getElementById("btnSaveServiceInfo")?.addEventListener("click", async () => {
-    const url_link = document.getElementById("editServiceUrl").value.trim();
-    const status_tersedia = document.getElementById("editServiceStatus").value.trim() || "Tersedia";
-    await sb.from("info_layanan").upsert([{
-      kode_menu: serviceCode,
-      judul: item.judul,
-      deskripsi: item.deskripsi,
-      url_link,
-      status_tersedia
-    }]);
-    toast("Tautan layanan berhasil diperbarui!");
-    await loadAllDatabase(false);
-    openServiceModal(serviceCode);
-  });
+  openLayananDocumentModal(serviceCode, activeUser, layananList, () => loadAllDatabase(false));
 }
 
 // =========================================================================
