@@ -21,6 +21,7 @@ import { bindUserProfileTrigger } from './profil.js';
 import { initModernDropdowns } from './dropdown_ui.js';
 import { applyK3sLogoBranding, renderK3sMusicPlayerWidget } from './branding_audio.js';
 import { renderSpjBospWidgets } from './spj_bosp.js';
+import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
 
 // Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
@@ -55,6 +56,7 @@ initApp();
 
 async function initApp() {
   initModernDropdowns();
+  initPwaInstallSupport();
   applyK3sLogoBranding(null);
   updateStaticEventDatesToNov2026();
 
@@ -312,6 +314,7 @@ function renderAllViews() {
   renderStatistikSekolahWidget(activeUser, sekolahList, () => loadAllDatabase(false));
   renderK3sMusicPlayerWidget(activeUser, layananList, () => loadAllDatabase(false));
   renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+  renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, () => loadAllDatabase(false));
   if (activeUser && activeUser.role === "panitia") {
     renderKinerjaView();
   }
