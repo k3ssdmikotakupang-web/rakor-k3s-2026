@@ -6,6 +6,7 @@ import { openRoomManagerModal } from './kamar.js';
 import { openLayananDocumentModal, DEFAULT_LAYANAN } from './layanan.js';
 import { openDokumentasiModal } from './dokumentasi.js';
 import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifikat.js';
+import { renderPosScannerWidgets } from './scanner_pos.js';
 
 // Hilangkan error favicon.ico 404 di Console secara otomatis
 if (!document.querySelector("link[rel*='icon']")) {
@@ -268,6 +269,7 @@ function renderAllViews() {
   renderQrView();
   renderSubrayonView();
   renderAbsensiPesertaView();
+  renderPosScannerWidgets(activeUser, sekolahList, () => loadAllDatabase(false));
   if (activeUser && activeUser.role === "panitia") {
     renderKinerjaView();
   }
