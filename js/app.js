@@ -7,7 +7,7 @@ let activeUser = null;
 let panitiaList = [];
 let sekolahList = [];
 let tugasList = [];
-let currentTab = "beranda";
+let layananList = [];
 
 const DIVISI_LIST = [
   "Penanggung Jawab",
@@ -23,7 +23,14 @@ const DIVISI_LIST = [
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
-// Jalankan langsung saat modul dimuat
+const DEFAULT_LAYANAN = [
+  { kode_menu: "panduan", judul: "Buku Panduan Rakor 2026", deskripsi: "Panduan pelaksanaan, tata tertib, dan komisi Rakor K3S.", url_link: "", status_tersedia: "Siap Diunduh" },
+  { kode_menu: "dokumentasi", judul: "Galeri & Dokumentasi", deskripsi: "Kumpulan foto dan video kegiatan Rakor K3S secara real-time.", url_link: "", status_tersedia: "Live Update" },
+  { kode_menu: "sertifikat", judul: "E-Sertifikat Rakor", deskripsi: "Unduh E-Sertifikat resmi bagi Peserta dan Panitia Rakor 2026.", url_link: "", status_tersedia: "Terbit H+3" },
+  { kode_menu: "laporan", judul: "Laporan & Hasil Rakor", deskripsi: "Rumusan hasil rapat koordinasi dan Laporan Pertanggungjawaban (LPJ).", url_link: "", status_tersedia: "Pasca-Acara" },
+  { kode_menu: "materi", judul: "Materi Narasumber", deskripsi: "Bahan paparan Plt. Kadis P&K Kota Kupang dan pemateri Rakor.", url_link: "", status_tersedia: "Tersedia" }
+];
+
 initApp();
 
 async function initApp() {
@@ -41,21 +48,22 @@ async function initApp() {
 
 async function loadAllDatabase(showNotif = false) {
   try {
-    const [rPan, rSek, rTgs] = await Promise.all([
+    const [rPan, rSek, rTgs, rLay] = await Promise.all([
       sb.from("panitia_rakor").select("*").order("no", { ascending: true }),
       sb.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true }),
-      sb.from("manajemen_tugas").select("*").order("deadline", { ascending: true })
+      sb.from("manajemen_tugas").select("*").order("deadline", { ascending: true }),
+      sb.from("info_layanan").select("*")
     ]);
 
     if (rPan.data) panitiaList = rPan.data;
     if (rSek.data) sekolahList = rSek.data;
     if (rTgs.data) tugasList = rTgs.data;
+    layananList = (rLay.data && rLay.data.length > 0) ? rLay.data : DEFAULT_LAYANAN;
 
-    // Isi dropdown login panitia
     const pSelect = document.getElementById("loginPanitiaSelect");
     if (pSelect) {
       const prev = pSelect.value;
-      pSelect.innerHTML = `<option value="">-- Pilih Nama Panitia (${panitiaList.length} Orang) --</option>`;
+      pSelect.innerHTML = `<option value="">Pilih Nama Panitia (${panitiaList.length} Orang)</option>`;
       panitiaList.forEach(p => {
         const srTag = p.tugas_subrayon ? ` ★ Ketua Rayon ${p.tugas_subrayon}` : "";
         pSelect.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${srTag})</option>`;
@@ -64,34 +72,53 @@ async function loadAllDatabase(showNotif = false) {
     }
 
     const badge = document.getElementById("dbStatusBadge");
-    if (badge) badge.textContent = `Server K3S Aktif • ${sekolahList.length} Sekolah`;
+    if (badge) badge.textContent = `Online • ${sekolahList.length} Sekolah`;
 
-    // Segarkan tampilan jika pengguna sudah login
     if (activeUser) {
+      // Perbarui profil sekolah aktif jika login sebagai peserta
+      if (activeUser.role === "peserta") {
+        const updatedSchool = sekolahList.find(s => s.id_sekolah === activeUser.profile.id_sekolah);
+        if (updatedSchool) activeUser.profile = updatedSchool;
+      }
       renderAllViews();
     } else {
       renderBerandaView();
     }
 
-    if (showNotif) toast("Data berhasil dimuat ulang!");
+    if (showNotif) toast("Data berhasil diperbarui!");
   } catch (err) {
-    console.error("Gagal memuat database:", err);
+    console.error("Load error:", err);
   }
 }
 
 function bindNavigationAndActions() {
-  // 5 Menu Footer
   document.getElementById("footerBtnBeranda")?.addEventListener("click", () => showTab("beranda"));
   document.getElementById("footerBtnJadwal")?.addEventListener("click", () => showTab("jadwal"));
   document.getElementById("footerBtnQr")?.addEventListener("click", () => showTab("qr"));
   document.getElementById("footerBtnSubrayon")?.addEventListener("click", () => showTab("subrayon"));
-  document.getElementById("footerBtnKinerja")?.addEventListener("click", () => showTab("kinerja"));
 
-  // Tombol Cepat di Beranda
-  document.getElementById("quickBtnQr")?.addEventListener("click", () => showTab("qr"));
-  document.getElementById("quickBtnSub")?.addEventListener("click", () => showTab("subrayon"));
+  // Tombol ke-5 Dinamis: Jika Peserta -> buka "absensi", jika Panitia -> buka "kinerja"
+  document.getElementById("footerBtnFifth")?.addEventListener("click", () => {
+    if (activeUser && activeUser.role === "panitia") {
+      showTab("kinerja");
+    } else {
+      showTab("absensi");
+    }
+  });
 
-  // Tombol Refresh & Logout
+  // 6 Tombol Menu Layanan di Beranda
+  document.querySelectorAll(".service-menu-btn").forEach(btn => {
+    btn.addEventListener("click", () => openServiceModal(btn.dataset.service));
+  });
+  document.getElementById("btnCloseServiceModal")?.addEventListener("click", () => {
+    document.getElementById("serviceModal")?.classList.add("hidden");
+  });
+
+  // Sub-Tab di dalam Menu Absensi Peserta (Daftar Hadir vs Perijinan)
+  document.getElementById("subTabBtnHadir")?.addEventListener("click", () => switchAbsensiSubTab("hadir"));
+  document.getElementById("subTabBtnIzin")?.addEventListener("click", () => switchAbsensiSubTab("izin"));
+  document.getElementById("btnSubmitIzin")?.addEventListener("click", submitPerijinanPeserta);
+
   document.getElementById("btnForceRefresh")?.addEventListener("click", () => loadAllDatabase(true));
   document.getElementById("btnRefreshApp")?.addEventListener("click", () => loadAllDatabase(true));
 
@@ -101,15 +128,12 @@ function bindNavigationAndActions() {
     document.getElementById("loginScreen")?.classList.remove("hidden");
   });
 
-  // Filter & Aksi Sub Rayon
   document.getElementById("srSelectFilter")?.addEventListener("change", () => renderSubrayonView());
   document.getElementById("srSearchInput")?.addEventListener("input", () => renderSubrayonView());
   document.getElementById("btnMarkAllSr")?.addEventListener("click", markAllSubrayonIkut);
 
-  // Simpan Nama Kepala Sekolah di Tab QR
   document.getElementById("btnSaveKepsek")?.addEventListener("click", saveNamaKepsek);
 
-  // Filter & Modal Tugas Kepanitiaan
   document.getElementById("taskFilterPhase")?.addEventListener("change", () => renderTaskListView());
   document.getElementById("taskFilterDivisi")?.addEventListener("change", () => renderTaskListView());
   document.getElementById("btnAddTaskTop")?.addEventListener("click", () => openTaskModal(null));
@@ -123,6 +147,7 @@ function setupRealtimeListeners() {
     .on("postgres_changes", { event: "*", schema: "public", table: "jadwal_rakor" }, () => renderLiveJadwal())
     .on("postgres_changes", { event: "*", schema: "public", table: "db_sekolah" }, () => loadAllDatabase(false))
     .on("postgres_changes", { event: "*", schema: "public", table: "manajemen_tugas" }, () => loadAllDatabase(false))
+    .on("postgres_changes", { event: "*", schema: "public", table: "info_layanan" }, () => loadAllDatabase(false))
     .subscribe();
 }
 
@@ -130,7 +155,6 @@ async function onLoginSuccess() {
   document.getElementById("loginScreen")?.classList.add("hidden");
   document.getElementById("mainAppScreen")?.classList.remove("hidden");
 
-  // Pastikan data sekolah & tugas sudah terisi penuh saat login selesai
   if (sekolahList.length === 0 || tugasList.length === 0) {
     await loadAllDatabase(false);
   }
@@ -139,12 +163,19 @@ async function onLoginSuccess() {
   const nameEl = document.getElementById("topUserName");
   const roleBadge = document.getElementById("topUserRoleBadge");
   const srBadge = document.getElementById("topUserSubrayonBadge");
+  const fifthIcon = document.getElementById("footerIconFifth");
+  const fifthLabel = document.getElementById("footerLabelFifth");
 
   if (activeUser.role === "panitia") {
     const p = activeUser.profile;
     if (avatar) avatar.textContent = p.nama_panitia.charAt(0);
     if (nameEl) nameEl.textContent = p.nama_panitia;
     if (roleBadge) roleBadge.textContent = p.divisi;
+
+    // Tombol ke-5 untuk Panitia adalah "Kinerja"
+    if (fifthIcon) fifthIcon.className = "fa-solid fa-chart-pie";
+    if (fifthLabel) fifthLabel.textContent = "Kinerja";
+
     if (p.tugas_subrayon) {
       if (srBadge) {
         srBadge.textContent = `Ketua Rayon ${p.tugas_subrayon}`;
@@ -162,6 +193,11 @@ async function onLoginSuccess() {
     if (avatar) avatar.textContent = "K3S";
     if (nameEl) nameEl.textContent = s.nama_sekolah;
     if (roleBadge) roleBadge.textContent = "KEPSEK";
+
+    // Tombol ke-5 untuk Peserta adalah "Absensi" (Kinerja disembunyikan total dari Peserta)
+    if (fifthIcon) fifthIcon.className = "fa-solid fa-user-check";
+    if (fifthLabel) fifthLabel.textContent = "Absensi";
+
     if (srBadge) {
       srBadge.textContent = `Rayon ${s.subrayon}`;
       srBadge.classList.remove("hidden");
@@ -175,44 +211,43 @@ async function onLoginSuccess() {
   showTab("beranda");
 }
 
-// =========================================================================
-// PINDAH TAB & EFEK AKTIF 5 TOMBOL FOOTER
-// =========================================================================
 function showTab(name) {
-  currentTab = name;
+  // Cegah peserta membuka tab kinerja
+  if (name === "kinerja" && (!activeUser || activeUser.role !== "panitia")) {
+    name = "absensi";
+  }
 
   const tabs = {
     beranda: "tabContentBeranda",
     jadwal: "tabContentJadwal",
     qr: "tabContentQr",
     subrayon: "tabContentSubrayon",
+    absensi: "tabContentAbsensi",
     kinerja: "tabContentKinerja"
   };
 
-  const regularBtns = {
-    beranda: "footerBtnBeranda",
-    jadwal: "footerBtnJadwal",
-    subrayon: "footerBtnSubrayon",
-    kinerja: "footerBtnKinerja"
-  };
-
-  // Sembunyikan/tampilkan section konten
   Object.keys(tabs).forEach(k => {
     document.getElementById(tabs[k])?.classList.toggle("hidden", k !== name);
   });
 
-  // Efek warna aktif untuk 4 tombol footer reguler
-  Object.keys(regularBtns).forEach(k => {
-    const btn = document.getElementById(regularBtns[k]);
+  const navMap = {
+    beranda: "footerBtnBeranda",
+    jadwal: "footerBtnJadwal",
+    subrayon: "footerBtnSubrayon",
+    absensi: "footerBtnFifth",
+    kinerja: "footerBtnFifth"
+  };
+
+  ["footerBtnBeranda", "footerBtnJadwal", "footerBtnSubrayon", "footerBtnFifth"].forEach(btnId => {
+    const btn = document.getElementById(btnId);
     if (!btn) return;
-    if (k === name) {
+    if (navMap[name] === btnId) {
       btn.className = "flex flex-col items-center justify-center py-1 text-blue-900 font-extrabold scale-105 transition-all";
     } else {
       btn.className = "flex flex-col items-center justify-center py-1 text-slate-400 font-semibold hover:text-slate-600 transition-all";
     }
   });
 
-  // Efek aktif khusus tombol tengah (ID & QR)
   const qrBtn = document.getElementById("footerBtnQr");
   if (qrBtn) {
     if (name === "qr") {
@@ -235,26 +270,40 @@ function renderAllViews() {
   renderLiveJadwal();
   renderQrView();
   renderSubrayonView();
-  renderKinerjaView();
+  renderAbsensiPesertaView();
+  if (activeUser && activeUser.role === "panitia") {
+    renderKinerjaView();
+  }
 }
 
 // =========================================================================
-// 1. RENDER BERANDA
+// 1. BERANDA & 6 MENU LAYANAN
 // =========================================================================
 function renderBerandaView() {
   const totalSek = sekolahList.length || 158;
   const ikutSek = sekolahList.filter(s => s.status_ikut === "Ikut").length;
-  const totalTgs = tugasList.length || 49;
-  const doneTgs = tugasList.filter(t => t.status === "Selesai").length;
-  const pctTgs = totalTgs > 0 ? Math.round((doneTgs / totalTgs) * 100) : 0;
 
-  const elTot = document.getElementById("homeMetricTotalSekolah");
-  const elIkut = document.getElementById("homeMetricIkut");
-  const elKin = document.getElementById("homeMetricKinerja");
+  document.getElementById("homeMetricTotalSekolah").textContent = totalSek;
+  document.getElementById("homeMetricIkut").textContent = ikutSek;
 
-  if (elTot) elTot.textContent = totalSek;
-  if (elIkut) elIkut.textContent = ikutSek;
-  if (elKin) elKin.textContent = pctTgs + "%";
+  const thirdVal = document.getElementById("homeMetricThirdVal");
+  const thirdLbl = document.getElementById("homeMetricThirdLabel");
+  const kamarBadge = document.getElementById("badgeHomeKamar");
+
+  if (activeUser && activeUser.role === "panitia") {
+    const totalTgs = tugasList.length || 49;
+    const doneTgs = tugasList.filter(t => t.status === "Selesai").length;
+    const pctTgs = totalTgs > 0 ? Math.round((doneTgs / totalTgs) * 100) : 0;
+    if (thirdVal) thirdVal.textContent = pctTgs + "%";
+    if (thirdLbl) thirdLbl.textContent = "Kinerja Panitia";
+    if (kamarBadge) kamarBadge.textContent = "Atur Kamar";
+  } else if (activeUser && activeUser.role === "peserta") {
+    const s = activeUser.profile;
+    const hadirCount = [s.hadir_h1, s.hadir_h2, s.hadir_h3].filter(Boolean).length;
+    if (thirdVal) thirdVal.textContent = `${hadirCount}/3 Hari`;
+    if (thirdLbl) thirdLbl.textContent = "Kehadiran Anda";
+    if (kamarBadge) kamarBadge.textContent = s.nomor_kamar || "Cek Kamar";
+  }
 
   const srBox = document.getElementById("homeSubrayonBars");
   if (!srBox) return;
@@ -286,8 +335,256 @@ function renderBerandaView() {
   });
 }
 
+// Modal untuk 6 Menu Layanan (Kamar, Buku Panduan, Dokumentasi, Sertifikat, Materi, Laporan)
+function openServiceModal(serviceCode) {
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  modal.classList.remove("hidden");
+  const isPanitiaEditor = activeUser && activeUser.role === "panitia" &&
+    ["Sekretaris", "Seksi Kesekretariatan", "Ketua Panitia", "Seksi Perlengkapan, Dokumentasi, dan Publikasi"].includes(activeUser.profile.divisi);
+
+  // Khusus Menu 1: INFO KAMAR
+  if (serviceCode === "kamar") {
+    titleEl.innerHTML = `<i class="fa-solid fa-bed text-indigo-600 mr-1.5"></i> Informasi Kamar Peserta`;
+    if (activeUser && activeUser.role === "peserta") {
+      const s = activeUser.profile;
+      const roomName = s.nomor_kamar || "Belum Ditentukan";
+      const roommates = sekolahList.filter(x => x.nomor_kamar && x.nomor_kamar !== "Belum Ditentukan" && x.nomor_kamar === s.nomor_kamar && x.id_sekolah !== s.id_sekolah);
+
+      bodyEl.innerHTML = `
+        <div class="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-center space-y-1">
+          <div class="text-[10px] font-bold uppercase text-indigo-600">Nomor Kamar Anda</div>
+          <div class="text-2xl font-extrabold text-indigo-950">${roomName}</div>
+          <div class="text-xs font-semibold text-slate-600">${s.nama_sekolah}</div>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+          <div class="font-extrabold text-slate-800">Rekan Sekamar:</div>
+          ${roommates.length > 0
+            ? roommates.map(r => `<div class="text-xs font-semibold text-slate-700">• ${r.nama_sekolah} (${r.nama_kepsek || 'Kepsek'})</div>`).join("")
+            : `<div class="text-[11px] text-slate-500">Data rekan sekamar akan tampil setelah nomor kamar yang sama diinput oleh panitia.</div>`
+          }
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+          <label class="block text-[11px] font-bold text-slate-700">Update Nomor Kamar (Sesuai Kunci Saat Registrasi):</label>
+          <div class="flex gap-2">
+            <input id="inputSelfRoom" type="text" value="${roomName === 'Belum Ditentukan' ? '' : roomName}" placeholder="Contoh: Kamar 204" class="flex-1 rounded-xl border px-3 py-2 text-xs font-bold" />
+            <button id="btnSaveSelfRoom" class="bg-indigo-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs">Simpan</button>
+          </div>
+        </div>
+      `;
+      document.getElementById("btnSaveSelfRoom")?.addEventListener("click", async () => {
+        const val = document.getElementById("inputSelfRoom").value.trim() || "Belum Ditentukan";
+        await sb.from("db_sekolah").update({ nomor_kamar: val }).eq("id_sekolah", s.id_sekolah);
+        toast("Nomor kamar disimpan!");
+        await loadAllDatabase(false);
+        openServiceModal("kamar");
+      });
+    } else {
+      // Tampilan Panitia: Kelola Kamar 158 Sekolah
+      bodyEl.innerHTML = `
+        <p class="text-[11px] text-slate-500">Pilih atau cari sekolah untuk mengatur nomor kamar peserta:</p>
+        <input id="searchRoomSchool" type="text" placeholder="Ketik nama sekolah..." class="w-full rounded-xl border bg-slate-50 px-3 py-2 text-xs font-semibold" />
+        <div id="roomManageList" class="space-y-2 max-h-72 overflow-y-auto pt-1"></div>
+      `;
+      const renderRoomList = () => {
+        const kw = (document.getElementById("searchRoomSchool")?.value || "").toLowerCase();
+        const box = document.getElementById("roomManageList");
+        if (!box) return;
+        box.innerHTML = "";
+        sekolahList.filter(s => s.nama_sekolah.toLowerCase().includes(kw)).slice(0, 35).forEach(s => {
+          const row = document.createElement("div");
+          row.className = "p-2.5 rounded-xl bg-slate-50 border flex items-center justify-between gap-2";
+          row.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-xs truncate">${s.nama_sekolah}</div>
+              <div class="text-[10px] text-slate-500">Rayon ${s.subrayon}</div>
+            </div>
+            <input type="text" value="${s.nomor_kamar === 'Belum Ditentukan' ? '' : (s.nomor_kamar || '')}" placeholder="No. Kamar" class="inp-room w-24 rounded-lg border px-2 py-1 text-xs font-bold text-center" />
+            <button class="btn-save-room bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold">OK</button>
+          `;
+          row.querySelector(".btn-save-room").addEventListener("click", async () => {
+            const val = row.querySelector(".inp-room").value.trim() || "Belum Ditentukan";
+            await sb.from("db_sekolah").update({ nomor_kamar: val }).eq("id_sekolah", s.id_sekolah);
+            toast(`Kamar ${s.nama_sekolah}: ${val}`);
+            await loadAllDatabase(false);
+          });
+          box.appendChild(row);
+        });
+      };
+      document.getElementById("searchRoomSchool")?.addEventListener("input", renderRoomList);
+      renderRoomList();
+    }
+    return;
+  }
+
+  // Menu Layanan 2–6 (Buku Panduan, Dokumentasi, Sertifikat, Materi, Laporan)
+  const item = layananList.find(x => x.kode_menu === serviceCode) ||
+    DEFAULT_LAYANAN.find(x => x.kode_menu === serviceCode);
+
+  if (!item) return;
+  titleEl.textContent = item.judul;
+
+  bodyEl.innerHTML = `
+    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">${item.status_tersedia || 'Informasi'}</span>
+      </div>
+      <p class="text-xs text-slate-700 leading-relaxed">${item.deskripsi || ''}</p>
+      ${item.url_link ? `
+        <a href="${item.url_link}" target="_blank" rel="noopener noreferrer" class="mt-2 w-full py-3 rounded-xl bg-blue-900 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow">
+          <i class="fa-solid fa-up-right-from-square"></i>
+          <span>Buka / Unduh ${item.judul}</span>
+        </a>
+      ` : `
+        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 font-semibold text-center">
+          Tautan dokumen/folder sedang disiapkan oleh Seksi Kesekretariatan & Publikasi.
+        </div>
+      `}
+    </div>
+
+    ${isPanitiaEditor ? `
+      <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2.5">
+        <div class="font-extrabold text-xs text-emerald-950"><i class="fa-solid fa-pen-to-square mr-1"></i> Panel Editor Panitia</div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-700 mb-1">Link Google Drive / URL Dokumen:</label>
+          <input id="editServiceUrl" type="url" value="${item.url_link || ''}" placeholder="https://drive.google.com/..." class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-semibold" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-700 mb-1">Label Status:</label>
+          <input id="editServiceStatus" type="text" value="${item.status_tersedia || ''}" placeholder="Contoh: Siap Diunduh / Live Update" class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-semibold" />
+        </div>
+        <button id="btnSaveServiceInfo" class="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs shadow">
+          Simpan Perubahan Layanan
+        </button>
+      </div>
+    ` : ''}
+  `;
+
+  document.getElementById("btnSaveServiceInfo")?.addEventListener("click", async () => {
+    const url_link = document.getElementById("editServiceUrl").value.trim();
+    const status_tersedia = document.getElementById("editServiceStatus").value.trim() || "Tersedia";
+    await sb.from("info_layanan").upsert([{
+      kode_menu: serviceCode,
+      judul: item.judul,
+      deskripsi: item.deskripsi,
+      url_link,
+      status_tersedia
+    }]);
+    toast("Tautan layanan berhasil diperbarui!");
+    await loadAllDatabase(false);
+    openServiceModal(serviceCode);
+  });
+}
+
 // =========================================================================
-// 2. RENDER ID & QR CODE PESERTA / PANITIA (DIJAMIN MUNCUL)
+// 2. TAB ABSENSI & PERIJINAN (KHUSUS PESERTA)
+// =========================================================================
+function switchAbsensiSubTab(mode) {
+  const isHadir = mode === "hadir";
+  document.getElementById("subViewHadirBox")?.classList.toggle("hidden", !isHadir);
+  document.getElementById("subViewIzinBox")?.classList.toggle("hidden", isHadir);
+
+  document.getElementById("subTabBtnHadir").className = isHadir
+    ? "py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow transition"
+    : "py-2 rounded-xl text-xs font-bold text-slate-600 transition";
+
+  document.getElementById("subTabBtnIzin").className = !isHadir
+    ? "py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow transition"
+    : "py-2 rounded-xl text-xs font-bold text-slate-600 transition";
+}
+
+function renderAbsensiPesertaView() {
+  if (!activeUser || activeUser.role !== "peserta") return;
+  const s = sekolahList.find(x => x.id_sekolah === activeUser.profile.id_sekolah) || activeUser.profile;
+
+  const subEl = document.getElementById("absensiSchoolSubtitle");
+  if (subEl) subEl.textContent = `${s.nama_sekolah} • Sub Rayon ${s.subrayon}`;
+
+  const days = [
+    { key: "hadir_h1", label: "Hari Ke-1 • Kamis, 24 Sept 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
+    { key: "hadir_h2", label: "Hari Ke-2 • Jumat, 25 Sept 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
+    { key: "hadir_h3", label: "Hari Ke-3 • Sabtu, 26 Sept 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
+  ];
+
+  const box = document.getElementById("absensiDaysContainer");
+  if (box) {
+    box.innerHTML = "";
+    days.forEach((d, idx) => {
+      const isHadir = Boolean(s[d.key]);
+      const card = document.createElement("div");
+      card.className = `p-3.5 rounded-2xl border ${isHadir ? 'bg-emerald-50/50 border-emerald-300' : 'bg-slate-50 border-slate-200'} flex items-center justify-between gap-3`;
+      card.innerHTML = `
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${isHadir ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
+              ${isHadir ? '✓ HADIR' : 'BELUM PRESENSI'}
+            </span>
+          </div>
+          <h4 class="font-extrabold text-xs text-slate-900 mt-1">${d.label}</h4>
+          <p class="text-[10px] text-slate-500 mt-0.5">${d.desc}</p>
+        </div>
+        <button class="btn-checkin px-3.5 py-2.5 rounded-xl text-xs font-extrabold shrink-0 transition ${
+          isHadir
+            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+            : 'bg-blue-900 text-white shadow'
+        }">
+          ${isHadir ? 'Tercatat' : 'Konfirmasi Hadir'}
+        </button>
+      `;
+
+      card.querySelector(".btn-checkin").addEventListener("click", async () => {
+        const nextVal = !isHadir;
+        const updateObj = { [d.key]: nextVal };
+        if (nextVal) updateObj.status_ikut = "Ikut";
+        await sb.from("db_sekolah").update(updateObj).eq("id_sekolah", s.id_sekolah);
+        toast(nextVal ? `Presensi Hari Ke-${idx + 1} berhasil dicatat!` : `Presensi Hari Ke-${idx + 1} dibatalkan.`);
+        await loadAllDatabase(false);
+      });
+
+      box.appendChild(card);
+    });
+  }
+
+  // Render Status Perijinan Saat Ini
+  const izinBanner = document.getElementById("currentIzinStatusBanner");
+  if (s.status_izin && s.status_izin !== "Hadir Penuh (Tanpa Izin)") {
+    izinBanner?.classList.remove("hidden");
+    document.getElementById("badgeCurrentIzinType").textContent = s.status_izin;
+    document.getElementById("textCurrentIzinReason").textContent = s.alasan_izin || "-";
+    document.getElementById("textCurrentIzinTime").textContent = `Diperbarui: ${s.waktu_izin || '-'}`;
+    document.getElementById("selectJenisIzin").value = s.status_izin;
+    document.getElementById("inputAlasanIzin").value = s.alasan_izin || "";
+  } else {
+    izinBanner?.classList.add("hidden");
+  }
+}
+
+async function submitPerijinanPeserta() {
+  if (!activeUser || activeUser.role !== "peserta") return;
+  const s = activeUser.profile;
+  const status_izin = document.getElementById("selectJenisIzin").value;
+  const alasan_izin = document.getElementById("inputAlasanIzin").value.trim();
+  const waktu_izin = new Date().toLocaleString("id-ID");
+
+  if (status_izin !== "Hadir Penuh (Tanpa Izin)" && !alasan_izin) {
+    return toast("Tuliskan alasan atau nama pengganti pada kolom keterangan!");
+  }
+
+  await sb.from("db_sekolah").update({
+    status_izin,
+    alasan_izin,
+    waktu_izin
+  }).eq("id_sekolah", s.id_sekolah);
+
+  toast("Data perijinan berhasil dikirim ke Panitia!");
+  await loadAllDatabase(false);
+}
+
+// =========================================================================
+// 3. ID & QR CODE
 // =========================================================================
 function renderQrView() {
   if (!activeUser) return;
@@ -296,6 +593,7 @@ function renderQrView() {
   qrBox.innerHTML = "";
 
   let qrPayloadText = "";
+  const roomPill = document.getElementById("qrRoomPill");
 
   if (activeUser.role === "peserta") {
     const s = sekolahList.find(x => x.id_sekolah === activeUser.profile.id_sekolah) || activeUser.profile;
@@ -305,17 +603,22 @@ function renderQrView() {
     const inpKepsek = document.getElementById("qrInputNamaKepsek");
     if (inpKepsek) inpKepsek.value = s.nama_kepsek || "";
 
+    if (roomPill) {
+      roomPill.classList.remove("hidden");
+      roomPill.innerHTML = `<i class="fa-solid fa-bed mr-1"></i>Kamar: ${s.nomor_kamar || 'Belum Ditentukan'}`;
+    }
+
     const pill = document.getElementById("qrStatusPill");
     if (pill) {
       if (s.status_ikut === "Ikut") {
         pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800";
-        pill.textContent = "✓ Terkonfirmasi Mengikuti Rakor";
+        pill.textContent = "✓ Terdaftar Ikut Rakor";
       } else if (s.status_ikut === "Tidak Ikut") {
         pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-rose-100 text-rose-800";
-        pill.textContent = "✕ Status: Tidak Ikut";
+        pill.textContent = "✕ Tidak Ikut";
       } else {
         pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800";
-        pill.textContent = "Menunggu Checklist Ketua Sub Rayon";
+        pill.textContent = "Menunggu Checklist Rayon";
       }
     }
 
@@ -325,6 +628,7 @@ function renderQrView() {
     document.getElementById("qrCardTitle").textContent = p.nama_panitia;
     document.getElementById("qrCardSubtitle").textContent = `${p.divisi} (${p.jabatan})`;
     document.getElementById("qrKepsekFormBox")?.classList.add("hidden");
+    roomPill?.classList.add("hidden");
 
     const pill = document.getElementById("qrStatusPill");
     if (pill) {
@@ -335,7 +639,6 @@ function renderQrView() {
     qrPayloadText = `PANITIA|${p.id_panitia}|${p.nama_panitia}|${p.divisi}`;
   }
 
-  // Generate QR Code dengan library QRCodeJS + fallback image jika gagal render
   try {
     if (typeof window.QRCode === "function") {
       new window.QRCode(qrBox, {
@@ -346,7 +649,7 @@ function renderQrView() {
         colorLight: "#ffffff"
       });
     } else {
-      throw new Error("QRCode library fallback");
+      throw new Error("QRCode fallback");
     }
   } catch (e) {
     const encoded = encodeURIComponent(qrPayloadText);
@@ -363,7 +666,7 @@ async function saveNamaKepsek() {
 }
 
 // =========================================================================
-// 3. RENDER SUB RAYON (158 SEKOLAH)
+// 4. SUB RAYON (158 SEKOLAH)
 // =========================================================================
 function renderSubrayonView() {
   const srSelect = document.getElementById("srSelectFilter");
@@ -385,13 +688,9 @@ function renderSubrayonView() {
   const ikutSr = allSr.filter(s => s.status_ikut === "Ikut").length;
   const pct = allSr.length > 0 ? Math.round((ikutSr / allSr.length) * 100) : 0;
 
-  const titleEl = document.getElementById("srProgressTitle");
-  const numEl = document.getElementById("srProgressNumbers");
-  const barEl = document.getElementById("srProgressBar");
-
-  if (titleEl) titleEl.textContent = `Sub Rayon ${sr}`;
-  if (numEl) numEl.textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
-  if (barEl) barEl.style.width = pct + "%";
+  document.getElementById("srProgressTitle").textContent = `Sub Rayon ${sr}`;
+  document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
+  document.getElementById("srProgressBar").style.width = pct + "%";
 
   const filtered = allSr.filter(
     s => s.nama_sekolah.toLowerCase().includes(kw) || String(s.npsn).includes(kw)
@@ -401,11 +700,6 @@ function renderSubrayonView() {
   if (!box) return;
   box.innerHTML = "";
 
-  if (filtered.length === 0) {
-    box.innerHTML = `<div class="bg-white rounded-2xl p-6 text-center border text-xs text-slate-500">Data sekolah sedang dimuat atau tidak ditemukan...</div>`;
-    return;
-  }
-
   filtered.forEach((s, i) => {
     const isIkut = s.status_ikut === "Ikut";
     const isTidak = s.status_ikut === "Tidak Ikut";
@@ -414,10 +708,10 @@ function renderSubrayonView() {
     card.className = `bg-white rounded-2xl p-3.5 border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} shadow-xs flex items-center justify-between gap-2`;
     card.innerHTML = `
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 flex-wrap">
           <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
           <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
-          <span class="text-[10px] font-bold text-blue-700">${s.status_sekolah}</span>
+          ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded"><i class="fa-solid fa-bed mr-0.5"></i>${s.nomor_kamar}</span>` : ''}
         </div>
         <h4 class="font-extrabold text-xs text-slate-900 truncate mt-0.5">${s.nama_sekolah}</h4>
         <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
@@ -461,20 +755,39 @@ async function markAllSubrayonIkut() {
 }
 
 // =========================================================================
-// 4. RENDER KINERJA PANITIA (49 TUGAS & 9 DIVISI)
+// 5. KINERJA & PANTAUAN ABSENSI/IZIN (KHUSUS INTERNAL PANITIA)
 // =========================================================================
 function renderKinerjaView() {
   const total = tugasList.length;
   const done = tugasList.filter(t => t.status === "Selesai").length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  const bigPct = document.getElementById("kinerjaBigPercent");
-  const subCnt = document.getElementById("kinerjaSubtitleCount");
-  const bigBar = document.getElementById("kinerjaBigBar");
+  document.getElementById("kinerjaBigPercent").textContent = pct + "%";
+  document.getElementById("kinerjaSubtitleCount").textContent = `${done} dari ${total} Tugas Selesai`;
+  document.getElementById("kinerjaBigBar").style.width = pct + "%";
 
-  if (bigPct) bigPct.textContent = pct + "%";
-  if (subCnt) subCnt.textContent = `${done} dari ${total} Tugas Selesai`;
-  if (bigBar) bigBar.style.width = pct + "%";
+  // Rekap Kehadiran H1, H2, H3 & Daftar Izin Peserta untuk Panitia
+  const h1Count = sekolahList.filter(s => s.hadir_h1).length;
+  const h2Count = sekolahList.filter(s => s.hadir_h2).length;
+  const h3Count = sekolahList.filter(s => s.hadir_h3).length;
+  const izinSchools = sekolahList.filter(s => s.status_izin && s.status_izin !== "Hadir Penuh (Tanpa Izin)");
+
+  document.getElementById("rekapHadirH1").textContent = `${h1Count} Kepsek`;
+  document.getElementById("rekapHadirH2").textContent = `${h2Count} Kepsek`;
+  document.getElementById("rekapHadirH3").textContent = `${h3Count} Kepsek`;
+  document.getElementById("badgePanitiaCountIzin").textContent = `${izinSchools.length} Pengajuan Izin`;
+
+  const izinBox = document.getElementById("panitiaIzinListContainer");
+  if (izinBox) {
+    izinBox.innerHTML = izinSchools.length === 0
+      ? `<div class="text-[11px] text-slate-400 text-center py-2">Belum ada peserta yang mengajukan izin.</div>`
+      : izinSchools.map(s => `
+          <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px]">
+            <div class="font-extrabold text-amber-950">${s.nama_sekolah} (${s.subrayon})</div>
+            <div class="font-bold text-amber-800">${s.status_izin}: <span class="font-normal">${s.alasan_izin || '-'}</span></div>
+          </div>
+        `).join("");
+  }
 
   const phases = ["Perencanaan", "Persiapan", "Pelaksanaan", "Pasca-Acara"];
   const pGrid = document.getElementById("kinerjaPhaseGrid");
@@ -492,8 +805,7 @@ function renderKinerjaView() {
         <div class="text-[9px] text-blue-300">${doneP}/${allP.length}</div>
       `;
       item.addEventListener("click", () => {
-        const phSelect = document.getElementById("taskFilterPhase");
-        if (phSelect) phSelect.value = ph;
+        document.getElementById("taskFilterPhase").value = ph;
         renderTaskListView();
       });
       pGrid.appendChild(item);
@@ -521,8 +833,7 @@ function renderKinerjaView() {
         </div>
       `;
       row.addEventListener("click", () => {
-        const divSelect = document.getElementById("taskFilterDivisi");
-        if (divSelect) divSelect.value = div;
+        document.getElementById("taskFilterDivisi").value = div;
         renderTaskListView();
       });
       dBars.appendChild(row);
@@ -536,8 +847,6 @@ function renderTaskListView() {
   const ph = document.getElementById("taskFilterPhase")?.value || "ALL";
   const div = document.getElementById("taskFilterDivisi")?.value || "ALL";
   const isPanitia = activeUser && activeUser.role === "panitia";
-
-  document.getElementById("btnAddTaskTop")?.classList.toggle("hidden", !isPanitia);
 
   let list = tugasList;
   if (ph !== "ALL") list = list.filter(t => t.tahapan === ph);
@@ -583,7 +892,7 @@ function renderTaskListView() {
     `;
 
     card.querySelector(".btn-toggle-task")?.addEventListener("click", async () => {
-      if (!isPanitia) return toast("Hanya Panitia yang dapat mengubah status tugas!");
+      if (!isPanitia) return;
       const next = isDone ? "Belum Mulai" : "Selesai";
       await sb.from("manajemen_tugas").update({ status: next, waktu_update: new Date().toLocaleString("id-ID") }).eq("id_tugas", t.id_tugas);
       toast(`Status tugas: ${next}`);
