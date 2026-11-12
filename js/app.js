@@ -8,6 +8,14 @@ import { openDokumentasiModal } from './dokumentasi.js';
 import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifikat.js';
 import { renderPosScannerWidgets } from './scanner_pos.js';
 import { renderCatatanPanitiaWidget } from './catatan.js';
+import {
+  TARIF_KONTRIBUSI_DEFAULT,
+  formatRupiah,
+  canAccessInfoKeuangan,
+  canEditPaymentAndParticipation,
+  renderInfoKeuanganWidget,
+  openInfoKeuanganModal
+} from './keuangan.js';
 
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
@@ -21,7 +29,7 @@ let panitiaList = [];
 let sekolahList = [];
 let tugasList = [];
 let layananList = [];
-let tarifKontribusiDefault = 1000000; // Default Rp 1.000.000 per sekolah (Bisa diubah oleh Bendahara)
+let tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT; // Rp 2.000.000 per sekolah
 
 const DIVISI_LIST = [
   "Penanggung Jawab",
@@ -36,23 +44,6 @@ const DIVISI_LIST = [
 ];
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
-
-function formatRupiah(angka) {
-  return "Rp " + Number(angka || 0).toLocaleString("id-ID");
-}
-
-// Cek Wewenang Mengubah Status Ikut & Kontribusi Sekolah: HANYA Bendahara atau Ketua Sub Rayon di Wilayahnya
-function canManageSchoolAndContribution(user, targetSubrayon) {
-  if (!user || user.role !== "panitia" || !user.profile) return false;
-  const p = user.profile;
-  if (p.divisi === "Bendahara") return true; // Bendahara berwenang di seluruh 6 Sub Rayon
-  if (p.tugas_subrayon && p.tugas_subrayon === targetSubrayon) return true; // Ketua Sub Rayon hanya di wilayahnya sendiri
-  return false;
-}
-
-function isUserBendahara(user) {
-  return Boolean(user && user.role === "panitia" && user.profile?.divisi === "Bendahara");
-}
 
 initApp();
 
@@ -71,7 +62,6 @@ async function initApp() {
   setupRealtimeListeners();
 }
 
-// Otomatis ubah label tanggal statis di HTML ke 19–21 November 2026
 function updateStaticEventDatesToNov2026() {
   document.querySelectorAll("span, p, div").forEach(el => {
     if (el.children.length === 0 && el.textContent) {
@@ -84,21 +74,18 @@ function updateStaticEventDatesToNov2026() {
 
 async function loadAllDatabase(showNotif = false) {
   try {
-    const [rPan, rSek, rTgs, rLay, rKeu] = await Promise.all([
+    const [rPan, rSek, rTgs, rLay] = await Promise.all([
       sb.from("panitia_rakor").select("*").order("no", { ascending: true }),
       sb.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true }),
       sb.from("manajemen_tugas").select("*").order("deadline", { ascending: true }),
-      sb.from("info_layanan").select("*"),
-      sb.from("pengaturan_keuangan").select("*").eq("id", 1).maybeSingle()
+      sb.from("info_layanan").select("*")
     ]);
 
     if (rPan.data) panitiaList = rPan.data;
     if (rSek.data) sekolahList = rSek.data;
     if (rTgs.data) tugasList = rTgs.data;
     layananList = (rLay.data && rLay.data.length > 0) ? rLay.data : DEFAULT_LAYANAN;
-    if (rKeu.data && rKeu.data.tarif_per_sekolah !== undefined) {
-      tarifKontribusiDefault = Number(rKeu.data.tarif_per_sekolah);
-    }
+    tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT; // Dikunci Rp 2.000.000 / sekolah
 
     const pSelect = document.getElementById("loginPanitiaSelect");
     if (pSelect) {
@@ -184,7 +171,6 @@ function setupRealtimeListeners() {
     .on("postgres_changes", { event: "*", schema: "public", table: "db_sekolah" }, () => loadAllDatabase(false))
     .on("postgres_changes", { event: "*", schema: "public", table: "manajemen_tugas" }, () => loadAllDatabase(false))
     .on("postgres_changes", { event: "*", schema: "public", table: "info_layanan" }, () => loadAllDatabase(false))
-    .on("postgres_changes", { event: "*", schema: "public", table: "pengaturan_keuangan" }, () => loadAllDatabase(false))
     .subscribe();
 }
 
@@ -307,6 +293,7 @@ function renderAllViews() {
   renderSubrayonView();
   renderAbsensiPesertaView();
   renderPosScannerWidgets(activeUser, sekolahList, () => loadAllDatabase(false));
+  renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, tarifKontribusiDefault, () => loadAllDatabase(false));
   renderCatatanPanitiaWidget(activeUser);
   if (activeUser && activeUser.role === "panitia") {
     renderKinerjaView();
@@ -327,15 +314,17 @@ function renderBerandaView() {
   const kamarBadge = document.getElementById("badgeHomeKamar");
 
   if (activeUser && activeUser.role === "panitia") {
-    const lunasCount = sekolahList.filter(s => s.status_bayar === "Lunas").length;
-    if (thirdVal) thirdVal.textContent = `${lunasCount} Lunas`;
-    if (thirdLbl) thirdLbl.textContent = "Kontribusi";
+    const totalTgs = tugasList.length || 49;
+    const doneTgs = tugasList.filter(t => t.status === "Selesai").length;
+    const pctTgs = totalTgs > 0 ? Math.round((doneTgs / totalTgs) * 100) : 0;
+    if (thirdVal) thirdVal.textContent = pctTgs + "%";
+    if (thirdLbl) thirdLbl.textContent = "Kinerja Panitia";
     if (kamarBadge) kamarBadge.textContent = "Atur Kamar";
   } else if (activeUser && activeUser.role === "peserta") {
     const s = activeUser.profile;
     const statusByr = s.status_bayar || "Belum Bayar";
     if (thirdVal) thirdVal.textContent = statusByr === "Lunas" ? "LUNAS" : statusByr === "Dalam Proses" ? "PROSES" : "BELUM";
-    if (thirdLbl) thirdLbl.textContent = "Kontribusi";
+    if (thirdLbl) thirdLbl.textContent = "Kontribusi (2 Jt)";
     if (kamarBadge) kamarBadge.textContent = s.nomor_kamar || "Cek Kamar";
   }
 
@@ -346,7 +335,6 @@ function renderBerandaView() {
   SUBRAYON_LIST.forEach(sr => {
     const all = sekolahList.filter(s => s.subrayon === sr);
     const ikut = all.filter(s => s.status_ikut === "Ikut").length;
-    const lunas = all.filter(s => s.status_bayar === "Lunas").length;
     const pct = all.length > 0 ? Math.round((ikut / all.length) * 100) : 0;
     const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
 
@@ -355,7 +343,7 @@ function renderBerandaView() {
     div.innerHTML = `
       <div class="flex justify-between text-xs font-bold mb-1">
         <span class="text-slate-800">Sub Rayon ${sr} <span class="text-[10px] font-normal text-slate-500">(${ketua ? ketua.nama_panitia.split(',')[0] : ''})</span></span>
-        <span class="text-emerald-700 font-extrabold">${ikut}/${all.length} Ikut • <span class="text-blue-700">${lunas} Lunas</span></span>
+        <span class="text-emerald-700 font-extrabold">${ikut}/${all.length} (${pct}%)</span>
       </div>
       <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
         <div class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width:${pct}%"></div>
@@ -564,7 +552,7 @@ async function saveNamaKepsek() {
 }
 
 // =========================================================================
-// 4. TAB SUB RAYON & KONTRIBUSI DANA KEGIATAN (KHUSUS KETUA SUB RAYON & BENDAHARA)
+// 4. TAB SUB RAYON (INPUT IKUT & KONTRIBUSI KHUSUS KETUA SUB RAYON & BENDAHARA)
 // =========================================================================
 function renderSubrayonView() {
   const srSelect = document.getElementById("srSelectFilter");
@@ -572,9 +560,8 @@ function renderSubrayonView() {
   const kw = (document.getElementById("srSearchInput")?.value || "").toLowerCase().trim();
   const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
 
-  // Hak Akses: HANYA Ketua Sub Rayon (di wilayahnya sendiri) & Bendahara (semua wilayah)
-  const canEditThisRayon = canManageSchoolAndContribution(activeUser, sr);
-  const isBendahara = isUserBendahara(activeUser);
+  const canEditThisRayon = canEditPaymentAndParticipation(activeUser, sr);
+  const canSeeFinanceBtn = canAccessInfoKeuangan(activeUser);
 
   const coordLabel = document.getElementById("srCoordinatorLabel");
   if (coordLabel) {
@@ -593,16 +580,42 @@ function renderSubrayonView() {
   document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
   document.getElementById("srProgressBar").style.width = pct + "%";
 
-  // Suntikkan Kartu Rekapitulasi Kontribusi & Dana Terkumpul di atas daftar sekolah
-  injectFinanceSummaryWidget(sr, allSr, canEditThisRayon, isBendahara);
+  // Jika pengguna termasuk 5 peran berwenang (PJ, Ketua Panitia, Sekretaris, Bendahara, Ketua Sub Rayon), tampilkan tombol pintas ke Info Keuangan
+  let shortcutBar = document.getElementById("srFinanceShortcutBar");
+  const cardsContainer = document.getElementById("srSchoolCardsContainer");
+  if (!shortcutBar && cardsContainer && cardsContainer.parentElement) {
+    shortcutBar = document.createElement("div");
+    shortcutBar.id = "srFinanceShortcutBar";
+    cardsContainer.parentElement.insertBefore(shortcutBar, cardsContainer);
+  }
+  if (shortcutBar) {
+    if (canSeeFinanceBtn) {
+      const srLunas = allSr.filter(s => s.status_bayar === "Lunas").length;
+      shortcutBar.className = "p-3 rounded-2xl bg-slate-900 text-white flex items-center justify-between gap-2 shadow-xs";
+      shortcutBar.innerHTML = `
+        <div>
+          <div class="text-[10px] font-bold text-amber-300 uppercase">Kas Sub Rayon ${sr} (${srLunas}/${allSr.length} Lunas)</div>
+          <div class="text-xs font-extrabold text-white">${formatRupiah(srLunas * tarifKontribusiDefault)}</div>
+        </div>
+        <button id="btnOpenKeuFromRayon" class="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 font-extrabold text-[11px] shrink-0">
+          <i class="fa-solid fa-sack-dollar mr-1"></i>Buka Info Keuangan
+        </button>
+      `;
+      document.getElementById("btnOpenKeuFromRayon")?.addEventListener("click", () => {
+        openInfoKeuanganModal(activeUser, sekolahList, panitiaList, tarifKontribusiDefault, () => loadAllDatabase(false));
+      });
+    } else {
+      shortcutBar.className = "hidden";
+      shortcutBar.innerHTML = "";
+    }
+  }
 
   const filtered = allSr.filter(
     s => s.nama_sekolah.toLowerCase().includes(kw) || String(s.npsn).includes(kw)
   );
 
-  const box = document.getElementById("srSchoolCardsContainer");
-  if (!box) return;
-  box.innerHTML = "";
+  if (!cardsContainer) return;
+  cardsContainer.innerHTML = "";
 
   filtered.forEach((s, i) => {
     const isIkut = s.status_ikut === "Ikut";
@@ -629,7 +642,6 @@ function renderSubrayonView() {
           <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
         </div>
 
-        <!-- Kontrol Ikut / Tidak (Khusus Ketua Sub Rayon Wilayah Ini & Bendahara) -->
         ${canEditThisRayon ? `
           <div class="flex items-center gap-1 shrink-0">
             <button class="btn-ikut px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition ${isIkut ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600'}">Ikut</button>
@@ -642,13 +654,12 @@ function renderSubrayonView() {
         `}
       </div>
 
-      <!-- Baris Status Kontribusi Uang Kegiatan -->
       <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
         <div class="flex items-center gap-1.5 min-w-0">
           <i class="fa-solid fa-money-bill-wave text-xs ${statusBayar === 'Lunas' ? 'text-emerald-600' : statusBayar === 'Dalam Proses' ? 'text-amber-500' : 'text-slate-400'}"></i>
-          <span class="text-[10px] font-bold text-slate-600">Kontribusi:</span>
+          <span class="text-[10px] font-bold text-slate-600">Kontribusi (Rp 2 Jt):</span>
           <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${bayarBadgeStyle}">
-            ${statusBayar === 'Lunas' ? '✓ LUNAS' : statusBayar === 'Dalam Proses' ? '⏳ DALAM PROSES' : '✕ BELUM BAYAR'}
+            ${statusBayar === 'Lunas' ? '✓ LUNAS' : statusBayar === 'Dalam Proses' ? '⏳ PROSES' : '✕ BELUM BAYAR'}
           </span>
         </div>
 
@@ -671,111 +682,12 @@ function renderSubrayonView() {
         setSchoolPaymentStatus(s.id_sekolah, sr, e.target.value);
       });
     }
-    box.appendChild(card);
+    cardsContainer.appendChild(card);
   });
 }
 
-function injectFinanceSummaryWidget(sr, allSr, canEditThisRayon, isBendahara) {
-  const tabSubrayon = document.getElementById("tabContentSubrayon");
-  const cardsContainer = document.getElementById("srSchoolCardsContainer");
-  if (!tabSubrayon || !cardsContainer) return;
-
-  let finWidget = document.getElementById("srFinanceSummaryBox");
-  if (!finWidget) {
-    finWidget = document.createElement("div");
-    finWidget.id = "srFinanceSummaryBox";
-    tabSubrayon.insertBefore(finWidget, cardsContainer);
-  }
-
-  // Hitung rekap Sub Rayon aktif
-  const srLunas = allSr.filter(s => s.status_bayar === "Lunas").length;
-  const srProses = allSr.filter(s => s.status_bayar === "Dalam Proses").length;
-  const srBelum = allSr.length - srLunas - srProses;
-  const srDanaTerkumpul = srLunas * tarifKontribusiDefault;
-
-  // Hitung rekap Total Kota Kupang (158 Sekolah)
-  const totalLunasAll = sekolahList.filter(s => s.status_bayar === "Lunas").length;
-  const totalProsesAll = sekolahList.filter(s => s.status_bayar === "Dalam Proses").length;
-  const totalDanaAll = totalLunasAll * tarifKontribusiDefault;
-
-  finWidget.className = "bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white rounded-3xl p-4 shadow-md space-y-3";
-  finWidget.innerHTML = `
-    <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
-      <div>
-        <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
-          Rekap Kontribusi Kegiatan
-        </span>
-        <h4 class="text-xs font-extrabold mt-1">Status Pembayaran Sub Rayon ${sr}</h4>
-      </div>
-      <div class="text-right">
-        <div class="text-[10px] text-blue-200">Dana Terkumpul (Rayon ${sr})</div>
-        <div class="text-sm font-extrabold text-emerald-300">${formatRupiah(srDanaTerkumpul)}</div>
-      </div>
-    </div>
-
-    <!-- 3 Kotak Status Bayar Sub Rayon Aktif -->
-    <div class="grid grid-cols-3 gap-2 text-center">
-      <div class="bg-emerald-500/15 border border-emerald-400/30 rounded-2xl p-2">
-        <div class="text-sm font-extrabold text-emerald-300">${srLunas}</div>
-        <div class="text-[9px] text-emerald-100 font-semibold">Lunas</div>
-      </div>
-      <div class="bg-amber-500/15 border border-amber-400/30 rounded-2xl p-2">
-        <div class="text-sm font-extrabold text-amber-300">${srProses}</div>
-        <div class="text-[9px] text-amber-100 font-semibold">Dalam Proses</div>
-      </div>
-      <div class="bg-rose-500/15 border border-rose-400/30 rounded-2xl p-2">
-        <div class="text-sm font-extrabold text-rose-300">${srBelum}</div>
-        <div class="text-[9px] text-rose-100 font-semibold">Belum Bayar</div>
-      </div>
-    </div>
-
-    <!-- Total Keseluruhan 6 Sub Rayon untuk Bendahara & Panitia -->
-    <div class="p-2.5 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-between text-xs">
-      <div>
-        <div class="font-extrabold text-amber-300">Total Kas Masuk (Se-Kota Kupang):</div>
-        <div class="text-[10px] text-blue-200">${totalLunasAll} Lunas • ${totalProsesAll} Dalam Proses (dari ${sekolahList.length} Sekolah)</div>
-      </div>
-      <div class="text-sm font-extrabold text-white">${formatRupiah(totalDanaAll)}</div>
-    </div>
-
-    <!-- Pengaturan Tarif Kontribusi per Sekolah (Khusus Bendahara) -->
-    ${isBendahara ? `
-      <div class="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
-        <span class="text-[10px] font-bold text-amber-200"><i class="fa-solid fa-sliders mr-1"></i>Nominal Kontribusi / Sekolah (Rp):</span>
-        <div class="flex items-center gap-1.5">
-          <input id="inputTarifKontribusi" type="number" step="50000" value="${tarifKontribusiDefault}" class="w-28 rounded-xl bg-slate-900 border border-white/20 px-2.5 py-1 text-xs font-extrabold text-amber-300 text-right" />
-          <button id="btnSaveTarifKontribusi" class="bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold px-2.5 py-1 rounded-xl text-[11px]">
-            Set
-          </button>
-        </div>
-      </div>
-    ` : ''}
-
-    <!-- Info Hak Akses -->
-    <div class="text-[10px] text-center ${canEditThisRayon ? 'text-emerald-300 font-bold' : 'text-slate-400'}">
-      ${canEditThisRayon
-        ? `<i class="fa-solid fa-unlockKeyhole mr-1"></i>Mode Edit Aktif (${isBendahara ? 'Bendahara Panitia' : 'Ketua Sub Rayon ' + sr})`
-        : `<i class="fa-solid fa-lock mr-1"></i>Penginputan Ikut/Tidak & Status Kontribusi hanya oleh Ketua Sub Rayon ${sr} dan Bendahara.`}
-    </div>
-  `;
-
-  if (isBendahara) {
-    document.getElementById("btnSaveTarifKontribusi")?.addEventListener("click", async () => {
-      const val = Number(document.getElementById("inputTarifKontribusi")?.value || 0);
-      tarifKontribusiDefault = val;
-      await sb.from("pengaturan_keuangan").upsert([{
-        id: 1,
-        tarif_per_sekolah: val,
-        waktu_update: new Date().toLocaleString("id-ID")
-      }]);
-      toast(`Nominal kontribusi diatur ke ${formatRupiah(val)} / sekolah`);
-      renderSubrayonView();
-    });
-  }
-}
-
 async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
-  if (!canManageSchoolAndContribution(activeUser, targetSubrayon)) {
+  if (!canEditPaymentAndParticipation(activeUser, targetSubrayon)) {
     return toast("Akses Ditolak: Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
   }
   await sb.from("db_sekolah").update({
@@ -787,13 +699,12 @@ async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
 }
 
 async function setSchoolPaymentStatus(idSekolah, targetSubrayon, statusBayarBaru) {
-  if (!canManageSchoolAndContribution(activeUser, targetSubrayon)) {
+  if (!canEditPaymentAndParticipation(activeUser, targetSubrayon)) {
     return toast("Akses Ditolak: Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
   }
   const petugas = activeUser?.profile?.nama_panitia || "Bendahara/Rayon";
   const waktu = new Date().toLocaleString("id-ID");
 
-  // Jika sekolah sudah Lunas atau Dalam Proses, otomatis tandai status_ikut menjadi "Ikut"
   const updatePayload = {
     status_bayar: statusBayarBaru,
     nominal_kontribusi: statusBayarBaru === "Lunas" ? tarifKontribusiDefault : 0,
@@ -811,7 +722,7 @@ async function setSchoolPaymentStatus(idSekolah, targetSubrayon, statusBayarBaru
 
 async function markAllSubrayonIkut() {
   const sr = document.getElementById("srSelectFilter")?.value || "Maulafa";
-  if (!canManageSchoolAndContribution(activeUser, sr)) {
+  if (!canEditPaymentAndParticipation(activeUser, sr)) {
     return toast("Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
   }
   if (!confirm(`Tandai seluruh sekolah di Sub Rayon ${sr} sebagai IKUT?`)) return;
