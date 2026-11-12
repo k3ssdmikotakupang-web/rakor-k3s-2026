@@ -48,7 +48,7 @@ async function preloadK3sLogo() {
       resolve(img);
     };
     img.onerror = () => resolve(null);
-    img.src = "./logo-k3s.png";
+    img.src = window.__RESOLVED_K3S_LOGO || "./logo-k3s.png";
   });
 }
 
