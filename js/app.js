@@ -16,6 +16,7 @@ import {
   renderInfoKeuanganWidget,
   openInfoKeuanganModal
 } from './keuangan.js';
+import { renderStatistikSekolahWidget } from './statistik_sekolah.js';
 
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
@@ -295,6 +296,7 @@ function renderAllViews() {
   renderPosScannerWidgets(activeUser, sekolahList, () => loadAllDatabase(false));
   renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, tarifKontribusiDefault, () => loadAllDatabase(false));
   renderCatatanPanitiaWidget(activeUser);
+  renderStatistikSekolahWidget(activeUser, sekolahList, () => loadAllDatabase(false));
   if (activeUser && activeUser.role === "panitia") {
     renderKinerjaView();
   }
