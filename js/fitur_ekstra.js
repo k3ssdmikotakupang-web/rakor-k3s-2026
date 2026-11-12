@@ -1,5 +1,5 @@
 // js/fitur_ekstra.js
-// Mencakup: (1) Cetak PDF ID Card Kalung Elegan & Cerah (Khusus Sekretaris & Kesekretariatan), (3) Running Text Live, (5) PWA Install
+// Mencakup: (1) Cetak PDF ID Card Kalung Elegan, (3) Running Text Live dengan Pengatur Kecepatan, (5) PWA Install
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
@@ -7,12 +7,19 @@ let deferredPwaPrompt = null;
 let pwaInitialized = false;
 let logoImgCache = null;
 
-// Wewenang Edit Pengumuman Live
+// Wewenang Merilis Live Info Running Text:
+// HANYA Penanggung Jawab, Ketua Panitia, Sekretaris, Bendahara, dan Seksi Konsumsi
 function canManageBroadcast(activeUser) {
   return Boolean(
     activeUser &&
     activeUser.role === 'panitia' &&
-    ['Sekretaris', 'Seksi Kesekretariatan', 'Seksi Acara dan Humas', 'Ketua Panitia', 'Penanggung Jawab'].includes(activeUser.profile?.divisi)
+    [
+      'Penanggung Jawab',
+      'Ketua Panitia',
+      'Sekretaris',
+      'Bendahara',
+      'Seksi Konsumsi'
+    ].includes(activeUser.profile?.divisi)
   );
 }
 
@@ -52,6 +59,7 @@ function ensureJsPdfLoaded() {
 
 export function renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, reloadCallback) {
   initPwaInstallSupport();
+  injectHeaderInstallButton();
   renderLiveRunningTextBanner(activeUser, layananList, reloadCallback);
   renderBulkIdCardGeneratorWidget(activeUser, sekolahList, panitiaList);
 }
@@ -114,14 +122,18 @@ export function initPwaInstallSupport() {
     e.preventDefault();
     deferredPwaPrompt = e;
     injectInstallAppButtons();
+    injectHeaderInstallButton();
   });
 
   injectInstallAppButtons();
 }
 
+function isRunningStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
 function injectInstallAppButtons() {
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  if (isStandalone) return;
+  if (isRunningStandalone()) return;
 
   const loginScreen = document.getElementById("loginScreen");
   if (loginScreen && !document.getElementById("btnInstallAppLogin")) {
@@ -141,7 +153,31 @@ function injectInstallAppButtons() {
   }
 }
 
+// Tambahkan juga ikon Install Aplikasi di Header Kanan Atas (Jika belum diinstal)
+function injectHeaderInstallButton() {
+  const existing = document.getElementById("btnHeaderPwaInstall");
+  if (isRunningStandalone()) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  const musicBtn = document.getElementById("btnHeaderK3sMusic") || document.getElementById("btnHeaderNotifBell") || document.getElementById("btnRefreshApp");
+  if (!musicBtn || !musicBtn.parentElement) return;
+
+  if (!existing) {
+    const btn = document.createElement("button");
+    btn.id = "btnHeaderPwaInstall";
+    btn.type = "button";
+    btn.title = "Pasang Aplikasi ke Layar Utama HP";
+    btn.className = "w-9 h-9 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 flex items-center justify-center text-xs text-emerald-300 active:scale-95 transition";
+    btn.innerHTML = `<i class="fa-solid fa-mobile-screen-button"></i>`;
+    btn.onclick = () => triggerInstallAppFlow();
+    musicBtn.parentElement.insertBefore(btn, musicBtn);
+  }
+}
+
 export async function triggerInstallAppFlow() {
+  // Jika Chrome Android sudah siap melakukan 1-Click Install
   if (deferredPwaPrompt) {
     deferredPwaPrompt.prompt();
     const { outcome } = await deferredPwaPrompt.userChoice;
@@ -152,11 +188,13 @@ export async function triggerInstallAppFlow() {
     return;
   }
 
+  // Jika dibuka dari browser internal WhatsApp / iOS / atau sudah terinstal, tampilkan modal panduan interaktif
   const modal = document.getElementById("serviceModal");
   const titleEl = document.getElementById("serviceModalTitle");
   const bodyEl = document.getElementById("serviceModalBody");
   if (!modal || !titleEl || !bodyEl) {
-    return toast("Ketuk ikon Titik Tiga di pojok kanan atas browser Chrome Anda, lalu pilih 'Tambahkan ke Layar Utama'.");
+    alert("CARA PASANG DI LAYAR HP:\n\n1. Ketuk ikon Titik Tiga (⋮) di pojok kanan atas browser Chrome Anda.\n2. Pilih 'Instal Aplikasi' atau 'Tambahkan ke Layar Utama' (Add to Home Screen).\n3. Ikon berlogo K3S akan langsung muncul di layar depan HP Anda!");
+    return;
   }
 
   modal.classList.remove("hidden");
@@ -168,32 +206,34 @@ export async function triggerInstallAppFlow() {
       </div>
       <h4 class="font-extrabold text-sm text-amber-300">SIM-RAKOR K3S Kota Kupang</h4>
       <p class="text-[11px] text-slate-300 leading-relaxed">
-        Pasang ikon aplikasi ini di layar depan HP Anda agar dapat dibuka kapan saja dalam mode layar penuh tanpa mengetik alamat link.
+        Pasang ikon aplikasi ini di layar depan HP Anda agar tampil layar penuh seperti aplikasi Play Store dan tidak perlu mengetik alamat link lagi.
       </p>
     </div>
 
-    <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2.5 text-xs text-slate-800">
-      <div class="font-extrabold text-emerald-950 uppercase text-[11px]">
-        <i class="fa-brands fa-android text-emerald-600 mr-1"></i> Cara Pasang di HP Android (Chrome):
+    <div class="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-2.5 text-xs text-slate-800">
+      <div class="font-extrabold text-emerald-950 uppercase text-[11px] flex items-center gap-1.5">
+        <i class="fa-brands fa-android text-emerald-600 text-sm"></i>
+        <span>Langkah Cepat di HP Android (Chrome):</span>
       </div>
-      <ol class="list-decimal list-inside space-y-1.5 text-[11px] font-semibold">
+      <ol class="list-decimal list-inside space-y-2 text-[11px] font-semibold leading-relaxed">
+        <li>Pastikan link ini dibuka di browser <b>Google Chrome</b> (jika Anda membukanya dari dalam chat WhatsApp, ketuk pojok kanan atas lalu pilih <i>"Buka di Chrome"</i>).</li>
         <li>Ketuk ikon <b>Titik Tiga (⋮)</b> di pojok kanan atas browser Chrome Anda.</li>
         <li>Pilih menu <b>"Instal aplikasi"</b> atau <b>"Tambahkan ke layar utama"</b> (<i>Add to Home screen</i>).</li>
-        <li>Ketuk <b>Instal / Tambah</b> — ikon berlogo K3S akan langsung muncul di layar HP Anda!</li>
+        <li>Ketuk <b>Instal / Tambah</b> — ikon berlogo K3S langsung muncul di layar utama HP Anda!</li>
       </ol>
     </div>
 
     <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs text-slate-700">
       <div class="font-extrabold text-slate-900 uppercase text-[10px]">
-        <i class="fa-brands fa-apple mr-1"></i> Cara Pasang di iPhone (Safari):
+        <i class="fa-brands fa-apple mr-1"></i> Pengguna iPhone (Safari):
       </div>
-      <p class="text-[11px]">Ketuk tombol <b>Bagikan (Share)</b> di bagian bawah Safari, lalu pilih <b>"Tambah ke Layar Utama"</b>.</p>
+      <p class="text-[11px]">Ketuk ikon <b>Bagikan (Share)</b> di bagian bawah Safari, lalu pilih <b>"Tambah ke Layar Utama" (Add to Home Screen)</b>.</p>
     </div>
   `;
 }
 
 // =========================================================================
-// FITUR 3: RUNNING TEXT / PENGUMUMAN DARURAT LIVE DI ATAS BERANDA
+// FITUR 3: RUNNING TEXT PENGUMUMAN LIVE + PENGATUR KECEPATAN
 // =========================================================================
 function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
   const tabBeranda = document.getElementById("tabContentBeranda");
@@ -210,9 +250,12 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
       .animate-k3s-marquee {
         display: inline-block;
         white-space: nowrap;
-        animation: k3sMarquee 22s linear infinite;
+        animation-name: k3sMarquee;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
       }
-      .animate-k3s-marquee:hover {
+      .animate-k3s-marquee:hover,
+      .animate-k3s-marquee:active {
         animation-play-state: paused;
       }
     `;
@@ -223,8 +266,13 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
     kode_menu: 'pengumuman_live',
     judul: 'Info Penting Panitia',
     deskripsi: 'Selamat datang Peserta Rakor Kepala SD/MI Kota Kupang (19–21 November 2026). Pastikan menunjukkan QR Code saat registrasi & pengambilan Rakor Kit.',
+    url_link: '45', // Menyimpan durasi kecepatan dalam detik (Default: 45 detik agar santai & mudah dibaca)
     status_tersedia: 'AKTIF'
   };
+
+  // Ambil durasi kecepatan dari kolom url_link (default 45 detik jika belum diatur)
+  const rawSpeedSec = parseInt(broadcastItem.url_link, 10);
+  const speedSeconds = (!isNaN(rawSpeedSec) && rawSpeedSec >= 15 && rawSpeedSec <= 90) ? rawSpeedSec : 45;
 
   const isActive = broadcastItem.status_tersedia !== 'NONAKTIF';
   const canEdit = canManageBroadcast(activeUser);
@@ -242,7 +290,7 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
     return;
   }
 
-  bar.className = `rounded-2xl p-2.5 border shadow-sm flex items-center justify-between gap-2 ${
+  bar.className = `rounded-2xl p-2.5 border shadow-sm flex items-center justify-between gap-2 cursor-pointer ${
     isActive
       ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border-amber-300 text-slate-900'
       : 'bg-slate-100 border-slate-300 text-slate-500'
@@ -255,25 +303,25 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
         <span>${isActive ? 'INFO LIVE' : 'OFF'}</span>
       </span>
       <div class="overflow-hidden flex-1 relative">
-        <div class="text-xs font-extrabold ${isActive ? 'text-slate-900 animate-k3s-marquee' : 'text-slate-500 truncate'}">
-          ${broadcastItem.deskripsi} &nbsp; • &nbsp; <b>[${broadcastItem.judul}]</b> &nbsp; • &nbsp; ${broadcastItem.deskripsi}
+        <div style="animation-duration: ${speedSeconds}s;" class="text-xs font-extrabold ${isActive ? 'text-slate-900 animate-k3s-marquee' : 'text-slate-500 truncate'}">
+          <b>[${broadcastItem.judul}]</b>: ${broadcastItem.deskripsi} &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp; <b>[${broadcastItem.judul}]</b>: ${broadcastItem.deskripsi}
         </div>
       </div>
     </div>
     ${canEdit ? `
       <button type="button" id="btnEditLiveBroadcast" class="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-[10px] shrink-0 flex items-center gap-1 shadow-2xs">
-        <i class="fa-solid fa-pen"></i>
-        <span>Siarkan</span>
+        <i class="fa-solid fa-sliders"></i>
+        <span>Atur Info</span>
       </button>
     ` : ''}
   `;
 
   bar.onclick = () => {
-    openBroadcastEditorModal(activeUser, broadcastItem, reloadCallback);
+    openBroadcastEditorModal(activeUser, broadcastItem, speedSeconds, reloadCallback);
   };
 }
 
-function openBroadcastEditorModal(activeUser, broadcastItem, reloadCallback) {
+function openBroadcastEditorModal(activeUser, broadcastItem, currentSpeedSec, reloadCallback) {
   const modal = document.getElementById("serviceModal");
   const titleEl = document.getElementById("serviceModalTitle");
   const bodyEl = document.getElementById("serviceModalBody");
@@ -302,14 +350,27 @@ function openBroadcastEditorModal(activeUser, broadcastItem, reloadCallback) {
       <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
         <div class="flex items-center justify-between border-b border-slate-200 pb-2">
           <span class="font-extrabold text-xs text-slate-900">
-            <i class="fa-solid fa-tower-broadcast text-blue-800 mr-1"></i> Panel Siaran Pengumuman (Running Text)
+            <i class="fa-solid fa-sliders text-blue-800 mr-1"></i> Pengaturan Siaran & Kecepatan Teks
           </span>
-          <span class="text-[9px] font-extrabold uppercase bg-blue-100 text-blue-900 px-2 py-0.5 rounded">Khusus Panitia</span>
+          <span class="text-[9px] font-extrabold uppercase bg-blue-100 text-blue-900 px-2 py-0.5 rounded">
+            ${activeUser.profile?.divisi}
+          </span>
         </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-700 mb-1">Label / Kategori Info:</label>
-          <input id="inpBroadcastTitle" type="text" value="${broadcastItem.judul || 'Info Penting Panitia'}" placeholder="Contoh: Pengumuman Ruang Komisi / Info Konsumsi" class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-bold" />
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Kategori / Sumber Info:</label>
+            <input id="inpBroadcastTitle" type="text" value="${broadcastItem.judul || 'Info Penting Panitia'}" placeholder="Contoh: Info Seksi Konsumsi" class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-bold" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Kecepatan Jalan Teks:</label>
+            <select id="inpBroadcastSpeed" class="w-full rounded-xl border bg-white px-2.5 py-2 text-xs font-extrabold text-blue-950">
+              <option value="65" ${currentSpeedSec >= 60 ? 'selected' : ''}>Sangat Santai (Lambat)</option>
+              <option value="45" ${currentSpeedSec >= 40 && currentSpeedSec < 60 ? 'selected' : ''}>Normal Nyaman (Default)</option>
+              <option value="32" ${currentSpeedSec >= 28 && currentSpeedSec < 40 ? 'selected' : ''}>Sedang</option>
+              <option value="22" ${currentSpeedSec < 28 ? 'selected' : ''}>Agak Cepat</option>
+            </select>
+          </div>
         </div>
 
         <div>
@@ -326,16 +387,21 @@ function openBroadcastEditorModal(activeUser, broadcastItem, reloadCallback) {
 
         <button type="button" id="btnSaveBroadcastNow" class="w-full py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow flex items-center justify-center gap-2">
           <i class="fa-solid fa-paper-plane"></i>
-          <span>Siarkan Pengumuman Sekarang</span>
+          <span>Simpan & Siarkan Pengumuman</span>
         </button>
       </div>
-    ` : ''}
+    ` : `
+      <div class="text-[10px] text-center text-slate-400 font-semibold">
+        Siaran informasi ini dikelola oleh Pimpinan Panitia, Sekretaris, Bendahara & Seksi Konsumsi.
+      </div>
+    `}
   `;
 
   document.getElementById("btnSaveBroadcastNow")?.addEventListener("click", async () => {
     if (!canEdit) return;
     const judul = document.getElementById("inpBroadcastTitle")?.value.trim() || "Info Penting Panitia";
     const deskripsi = document.getElementById("inpBroadcastText")?.value.trim() || "";
+    const speedVal = document.getElementById("inpBroadcastSpeed")?.value || "45";
     const active = document.getElementById("chkBroadcastActive")?.checked;
 
     if (!deskripsi) return toast("Isi kalimat pengumuman tidak boleh kosong!");
@@ -344,11 +410,11 @@ function openBroadcastEditorModal(activeUser, broadcastItem, reloadCallback) {
       kode_menu: 'pengumuman_live',
       judul,
       deskripsi,
-      url_link: '',
+      url_link: String(speedVal),
       status_tersedia: active ? 'AKTIF' : 'NONAKTIF'
     }]);
 
-    toast(active ? "Pengumuman Live berhasil disiarkan ke seluruh peserta!" : "Running Text disembunyikan.");
+    toast(active ? "Pengumuman & kecepatan teks berhasil diperbarui!" : "Running Text disembunyikan.");
     modal.classList.add("hidden");
     if (reloadCallback) await reloadCallback();
   });
@@ -360,7 +426,6 @@ function openBroadcastEditorModal(activeUser, broadcastItem, reloadCallback) {
 function renderBulkIdCardGeneratorWidget(activeUser, sekolahList, panitiaList) {
   const existingBtn = document.getElementById("btnServiceBulkIdCards");
 
-  // HANYA Sekretaris & Seksi Kesekretariatan yang dapat melihat menu ini
   if (!canPrintIdCards(activeUser)) {
     if (existingBtn) existingBtn.remove();
     return;
@@ -498,7 +563,6 @@ function renderSingleQrToImage(payloadText, size = 180) {
   });
 }
 
-// Helper menggambar kotak bersudut membulat (Rounded Rectangle) di Canvas
 function fillRoundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -579,15 +643,11 @@ async function generateBulkIdCardsPdf(fileLabel, itemList, mode = "peserta") {
   progBox?.classList.add("hidden");
 }
 
-// =========================================================================
-// DESAIN BARU: BRIGHT & ELEGANT MODERN EVENT LANYARD PASS
-// =========================================================================
 async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   const isPeserta = mode === "peserta";
 
   ctx.save();
 
-  // 1. Kliping Area Kartu Bersudut Membulat
   ctx.beginPath();
   ctx.moveTo(x + 18, y);
   ctx.lineTo(x + w - 18, y);
@@ -601,7 +661,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   ctx.closePath();
   ctx.clip();
 
-  // 2. Background Utama: Putih Cerah Keemasan / Biru Sejuk (Sangat Cerah & Bersih)
   const bgGrad = ctx.createLinearGradient(x, y, x, y + h);
   bgGrad.addColorStop(0, "#ffffff");
   bgGrad.addColorStop(0.55, "#f8fafc");
@@ -609,7 +668,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   ctx.fillStyle = bgGrad;
   ctx.fillRect(x, y, w, h);
 
-  // Ornamen Pola Titik-Titik Halus (Subtle Dot Pattern) di Sudut Kanan Atas
   ctx.fillStyle = isPeserta ? "rgba(59, 130, 246, 0.08)" : "rgba(245, 158, 11, 0.12)";
   for (let gx = x + w - 110; gx < x + w - 15; gx += 14) {
     for (let gy = y + 25; gy < y + 115; gy += 14) {
@@ -619,8 +677,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
     }
   }
 
-  // 3. Gelombang Kurva Atas Cerah (Mengikuti Lekukan Pita Emas & Biru Logo K3S)
-  // Pita Emas Melengkung di Bawah Gelombang Biru
   const goldWaveGrad = ctx.createLinearGradient(x, y, x + w, y + 90);
   goldWaveGrad.addColorStop(0, "#fbbf24");
   goldWaveGrad.addColorStop(0.5, "#f59e0b");
@@ -634,7 +690,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   ctx.closePath();
   ctx.fill();
 
-  // Gelombang Biru Cerah di Paling Atas
   const topWaveGrad = ctx.createLinearGradient(x, y, x + w, y);
   if (isPeserta) {
     topWaveGrad.addColorStop(0, "#1d4ed8");
@@ -654,19 +709,16 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   ctx.closePath();
   ctx.fill();
 
-  // Lubang Tali Kalung (Lanyard Slot) Putih Bersih dengan Garis Pinggir Halus
   ctx.fillStyle = "#ffffff";
   fillRoundRect(ctx, x + w / 2 - 30, y + 12, 60, 11, 5.5);
   ctx.strokeStyle = "#cbd5e1";
   ctx.lineWidth = 1;
   strokeRoundRect(ctx, x + w / 2 - 30, y + 12, 60, 11, 5.5);
 
-  // 4. Logo Resmi K3S Kota Kupang (Tampil Utuh & Tajam di Atas Latar Putih)
   if (logoImg) {
     ctx.drawImage(logoImg, x + (w - 138) / 2, y + 50, 138, 68);
   }
 
-  // Judul Kegiatan dengan Tipografi Modern & Elegan
   ctx.textAlign = "center";
   ctx.fillStyle = "#1e3a8a";
   ctx.font = "800 12.5px 'Plus Jakarta Sans', Arial, sans-serif";
@@ -676,7 +728,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   ctx.font = "800 10px 'Plus Jakarta Sans', Arial, sans-serif";
   ctx.fillText("KOTA KUPANG • 19 – 21 NOVEMBER 2026", x + w / 2, y + 146);
 
-  // 5. Pita Kapsul Peran (Pill Badge) Bergradasi Cerah
   const pillW = w - 48;
   const pillX = x + 24;
   const pillY = y + 156;
@@ -702,34 +753,26 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
     : (item.tugas_subrayon ? `PANITIA • KETUA RAYON ${item.tugas_subrayon.toUpperCase()}` : "PANITIA PELAKSANA RAKOR");
   ctx.fillText(roleLabel, x + w / 2, pillY + 18);
 
-  // 6. Kartu QR Code Modern dengan Bingkai Emas/Biru & Sudut Bidik Kamera
   const qrSize = 152;
   const qrBoxSize = qrSize + 20;
   const qrBoxX = x + (w - qrBoxSize) / 2;
   const qrBoxY = y + 195;
 
-  // Bayangan Lembut di Bawah Kotak QR
   ctx.fillStyle = "rgba(15, 23, 42, 0.06)";
   fillRoundRect(ctx, qrBoxX + 3, qrBoxY + 4, qrBoxSize, qrBoxSize, 18);
 
-  // Kotak Putih QR
   ctx.fillStyle = "#ffffff";
   fillRoundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 18);
   ctx.strokeStyle = isPeserta ? "#93c5fd" : "#fcd34d";
   ctx.lineWidth = 2;
   strokeRoundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 18);
 
-  // Ornamen 4 Sudut Bidik Emas pada Kotak QR
   ctx.strokeStyle = "#f59e0b";
   ctx.lineWidth = 3;
   const cLen = 14;
-  // Kiri Atas
   ctx.beginPath(); ctx.moveTo(qrBoxX + 6, qrBoxY + 6 + cLen); ctx.lineTo(qrBoxX + 6, qrBoxY + 6); ctx.lineTo(qrBoxX + 6 + cLen, qrBoxY + 6); ctx.stroke();
-  // Kanan Atas
   ctx.beginPath(); ctx.moveTo(qrBoxX + qrBoxSize - 6 - cLen, qrBoxY + 6); ctx.lineTo(qrBoxX + qrBoxSize - 6, qrBoxY + 6); ctx.lineTo(qrBoxX + qrBoxSize - 6, qrBoxY + 6 + cLen); ctx.stroke();
-  // Kiri Bawah
   ctx.beginPath(); ctx.moveTo(qrBoxX + 6, qrBoxY + qrBoxSize - 6 - cLen); ctx.lineTo(qrBoxX + 6, qrBoxY + qrBoxSize - 6); ctx.lineTo(qrBoxX + 6 + cLen, qrBoxY + qrBoxSize - 6); ctx.stroke();
-  // Kanan Bawah
   ctx.beginPath(); ctx.moveTo(qrBoxX + qrBoxSize - 6 - cLen, qrBoxY + qrBoxSize - 6); ctx.lineTo(qrBoxX + qrBoxSize - 6, qrBoxY + qrBoxSize - 6); ctx.lineTo(qrBoxX + qrBoxSize - 6, qrBoxY + qrBoxSize - 6 - cLen); ctx.stroke();
 
   const qrPayload = isPeserta
@@ -741,7 +784,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
     ctx.drawImage(qrSource, qrBoxX + 10, qrBoxY + 10, qrSize, qrSize);
   }
 
-  // 7. Kotak Identitas Utama (Nama Sekolah / Nama Panitia)
   const mainTitle = isPeserta
     ? String(item.nama_sekolah || "").slice(0, 32)
     : String(item.nama_panitia || "").slice(0, 32);
@@ -759,7 +801,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   ctx.font = "bold 11.5px 'Plus Jakarta Sans', Arial, sans-serif";
   ctx.fillText(subTitle, x + w / 2, y + 410);
 
-  // 8. Kapsul Info Kamar & NPSN Berwarna Cerah
   const infoBoxX = x + 22;
   const infoBoxY = y + 422;
   const infoBoxW = w - 44;
@@ -778,7 +819,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
   ctx.font = "800 10.5px 'Plus Jakarta Sans', Arial, sans-serif";
   ctx.fillText(bottomMeta, x + w / 2, infoBoxY + 21);
 
-  // 9. Pita Gelombang Bawah Cerah (Biru & Emas)
   ctx.fillStyle = goldWaveGrad;
   ctx.fillRect(x, y + h - 32, w, 6);
 
@@ -791,7 +831,6 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
 
   ctx.restore();
 
-  // 10. Garis Potong Halus di Sekeliling Luar Kartu
   ctx.save();
   ctx.strokeStyle = "#cbd5e1";
   ctx.lineWidth = 1.2;
