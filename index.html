@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <title>SIM-RAKOR 2026 | K3S SD/MI Kota Kupang</title>
+  <title>SIM-RAKOR 2026 | K3S Kota Kupang</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -17,117 +17,141 @@
     .animate-view { animation: fadeIn 0.22s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     #qrReader video { border-radius: 16px; object-fit: cover; }
+    select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
   </style>
 </head>
 <body>
   <div class="app-shell flex flex-col justify-between">
 
-    <!-- LAYAR LOGIN ANDROID -->
-    <div id="loginScreen" class="min-h-dvh bg-gradient-to-b from-slate-950 via-blue-950 to-slate-900 text-white flex flex-col justify-between p-5 relative overflow-hidden">
-      <div class="absolute -top-24 -right-24 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
-      <div class="absolute top-1/3 -left-24 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
+    <!-- ========================================================== -->
+    <!-- LAYAR LOGIN MINIMALIS & ELEGAN                             -->
+    <!-- ========================================================== -->
+    <div id="loginScreen" class="min-h-dvh bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 text-white flex flex-col justify-between p-6 relative overflow-hidden">
+      
+      <!-- Glow Latar Halus -->
+      <div class="absolute -top-28 left-1/2 -translate-x-1/2 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 right-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
+      <!-- Bar Atas Minimalis -->
       <div class="flex justify-between items-center z-10">
-        <div class="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase text-emerald-300 bg-emerald-500/10 border border-emerald-400/20 px-3 py-1 rounded-full">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span id="dbStatusBadge">Menghubungkan...</span>
+        <div class="inline-flex items-center gap-2 text-[10px] font-semibold tracking-wider text-slate-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span id="dbStatusBadge">Online</span>
         </div>
-        <button id="btnForceRefresh" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-blue-200 text-xs">
+        <button id="btnForceRefresh" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white text-xs transition" title="Refresh">
           <i class="fa-solid fa-rotate"></i>
         </button>
       </div>
 
-      <div class="my-auto py-3 z-10 space-y-4">
-        <div class="text-center">
-          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 mx-auto flex flex-col items-center justify-center shadow-xl shadow-amber-500/25 border-2 border-white/30">
-            <i class="fa-solid fa-graduation-cap text-xl"></i>
-            <span class="font-extrabold text-[10px] tracking-tighter mt-0.5">K3S KUPANG</span>
+      <!-- Konten Tengah Login -->
+      <div class="my-auto z-10 space-y-6">
+        
+        <!-- Brand & Judul Singkat -->
+        <div class="text-center space-y-1.5">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 mx-auto flex items-center justify-center shadow-lg shadow-amber-500/20 mb-3">
+            <i class="fa-solid fa-graduation-cap text-2xl"></i>
           </div>
-          <h1 class="text-xl font-extrabold tracking-tight mt-2.5">SIM-RAKOR 2026</h1>
-          <p class="text-[11px] text-blue-200">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang</p>
+          <h1 class="text-2xl font-extrabold tracking-tight text-white">SIM-RAKOR</h1>
+          <p class="text-[11px] font-medium tracking-widest uppercase text-slate-400">K3S SD/MI Kota Kupang • 2026</p>
         </div>
 
-        <button id="btnOpenScanner" class="w-full bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/20 border border-emerald-400/40 rounded-2xl p-3 flex items-center justify-between shadow-lg">
-          <div class="flex items-center gap-3 text-left">
-            <div class="w-10 h-10 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center text-lg shadow">
-              <i class="fa-solid fa-camera"></i>
-            </div>
-            <div>
-              <div class="text-xs font-extrabold text-white">Login Cepat via Scan QR Code</div>
-              <div class="text-[10px] text-emerald-200 font-semibold">Arahkan kamera ke Kartu ID Anda</div>
-            </div>
-          </div>
-          <i class="fa-solid fa-chevron-right text-emerald-300 text-xs mr-1"></i>
-        </button>
-
-        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-3xl p-4 shadow-2xl">
-          <div class="grid grid-cols-2 gap-1.5 bg-slate-950/65 p-1.5 rounded-2xl mb-4">
-            <button id="btnRolePeserta" class="py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow">
-              <i class="fa-solid fa-school mr-1"></i> Peserta (Kepsek)
+        <!-- Glass Card Minimalis -->
+        <div class="bg-white/[0.06] backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-2xl space-y-4">
+          
+          <!-- Switch Peran -->
+          <div class="grid grid-cols-2 gap-1 bg-slate-950/60 p-1 rounded-2xl">
+            <button id="btnRolePeserta" class="py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition">
+              Peserta
             </button>
-            <button id="btnRolePanitia" class="py-2.5 rounded-xl text-xs font-bold text-slate-300">
-              <i class="fa-solid fa-user-shield mr-1"></i> Panitia / Rayon
+            <button id="btnRolePanitia" class="py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition">
+              Panitia
             </button>
           </div>
 
-          <div id="loginFormPeserta" class="space-y-3">
-            <div>
-              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
-                <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">1</span> Pilih Sub Rayon</span>
-              </label>
-              <select id="loginSubrayonSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white">
-                <option value="">-- Klik untuk Pilih Sub Rayon --</option>
-                <option value="Maulafa">Sub Rayon Maulafa (34 Sekolah)</option>
-                <option value="Alak">Sub Rayon Alak (31 Sekolah)</option>
-                <option value="Kota Raja">Sub Rayon Kota Raja (29 Sekolah)</option>
-                <option value="Oebobo">Sub Rayon Oebobo (27 Sekolah)</option>
-                <option value="Kelapa Lima">Sub Rayon Kelapa Lima (19 Sekolah)</option>
-                <option value="Kota Lama">Sub Rayon Kota Lama (18 Sekolah)</option>
+          <!-- FORM PESERTA (TANPA LABEL BERLEBIH) -->
+          <div id="loginFormPeserta" class="space-y-2.5">
+            <div class="relative">
+              <i class="fa-solid fa-location-dot absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+              <select id="loginSubrayonSelect" class="w-full rounded-2xl bg-slate-900/80 border border-white/10 pl-10 pr-9 py-3.5 text-xs font-semibold text-white focus:outline-none focus:border-amber-400 transition">
+                <option value="">Pilih Sub Rayon</option>
+                <option value="Maulafa">Sub Rayon Maulafa</option>
+                <option value="Alak">Sub Rayon Alak</option>
+                <option value="Kota Raja">Sub Rayon Kota Raja</option>
+                <option value="Oebobo">Sub Rayon Oebobo</option>
+                <option value="Kelapa Lima">Sub Rayon Kelapa Lima</option>
+                <option value="Kota Lama">Sub Rayon Kota Lama</option>
               </select>
+              <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
             </div>
 
-            <div>
-              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
-                <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">2</span> Pilih Nama Sekolah</span>
-                <span id="schoolCountHint" class="text-[10px] text-slate-300">Pilih rayon dulu</span>
-              </label>
-              <select id="loginSchoolSelect" disabled class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white">
-                <option value="">-- Pilih Sub Rayon Terlebih Dahulu --</option>
+            <div class="relative">
+              <i class="fa-solid fa-school absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+              <select id="loginSchoolSelect" disabled class="w-full rounded-2xl bg-slate-900/80 border border-white/10 pl-10 pr-9 py-3.5 text-xs font-semibold text-white disabled:opacity-40 focus:outline-none focus:border-amber-400 transition">
+                <option value="">Pilih Sekolah</option>
               </select>
+              <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
+              <span id="schoolCountHint" class="hidden"></span>
             </div>
 
-            <div>
-              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
-                <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">3</span> Password (Ketik NPSN Sekolah)</span>
-                <button type="button" id="togglePswdBtn" class="text-[10px] text-amber-300 hover:underline"><i class="fa-solid fa-eye"></i> Lihat</button>
-              </label>
-              <input id="loginNpsnPassword" type="password" inputmode="numeric" placeholder="Masukkan 8 Digit Nomor NPSN..." class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-amber-300 placeholder:font-normal placeholder:tracking-normal focus:outline-none" />
+            <div class="relative">
+              <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+              <input id="loginNpsnPassword" type="password" inputmode="numeric" placeholder="NPSN Sekolah" class="w-full rounded-2xl bg-slate-900/80 border border-white/10 pl-10 pr-10 py-3.5 text-xs font-bold tracking-widest text-amber-300 placeholder:font-medium placeholder:tracking-normal placeholder:text-slate-400 focus:outline-none focus:border-amber-400 transition" />
+              <button type="button" id="togglePswdBtn" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-300 text-xs p-1">
+                <i class="fa-solid fa-eye"></i>
+              </button>
             </div>
 
-            <button id="btnSubmitPeserta" class="w-full mt-1 bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 font-extrabold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2">
-              <span>MASUK PORTAL PESERTA</span> <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            <button id="btnSubmitPeserta" class="w-full mt-1 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 active:scale-[0.99] text-slate-950 font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition">
+              <span>Masuk</span>
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
             </button>
           </div>
 
-          <div id="loginFormPanitia" class="hidden space-y-3">
-            <div>
-              <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Nama Anggota Panitia / Ketua Sub Rayon:</label>
-              <select id="loginPanitiaSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-bold text-white"></select>
+          <!-- FORM PANITIA (MINIMALIS) -->
+          <div id="loginFormPanitia" class="hidden space-y-2.5">
+            <div class="relative">
+              <i class="fa-solid fa-user-tie absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+              <select id="loginPanitiaSelect" class="w-full rounded-2xl bg-slate-900/80 border border-white/10 pl-10 pr-9 py-3.5 text-xs font-semibold text-white focus:outline-none focus:border-blue-400 transition"></select>
+              <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] pointer-events-none"></i>
             </div>
-            <div>
-              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">PIN Akses Kepanitiaan:</label>
-              <input id="loginPinInput" type="password" inputmode="numeric" value="2026" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-center text-amber-300" />
+
+            <div class="relative">
+              <i class="fa-solid fa-key absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+              <input id="loginPinInput" type="password" inputmode="numeric" value="2026" placeholder="PIN Akses" class="w-full rounded-2xl bg-slate-900/80 border border-white/10 pl-10 pr-4 py-3.5 text-xs font-extrabold tracking-widest text-amber-300 focus:outline-none focus:border-blue-400 transition" />
             </div>
-            <button id="btnSubmitPanitia" class="w-full mt-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-extrabold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2">
-              <span>MASUK DASHBOARD PANITIA</span> <i class="fa-solid fa-shield-halved"></i>
+
+            <button id="btnSubmitPanitia" class="w-full mt-1 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition">
+              <span>Masuk Panitia</span>
+              <i class="fa-solid fa-arrow-right text-[11px]"></i>
             </button>
           </div>
+
+          <!-- Divider Halus & Tombol Scan QR -->
+          <div class="pt-1">
+            <div class="flex items-center gap-3 my-2">
+              <div class="h-px bg-white/10 flex-1"></div>
+              <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-400">atau</span>
+              <div class="h-px bg-white/10 flex-1"></div>
+            </div>
+
+            <button id="btnOpenScanner" class="w-full py-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-200 flex items-center justify-center gap-2 active:scale-[0.99] transition">
+              <i class="fa-solid fa-qrcode text-emerald-400 text-sm"></i>
+              <span>Masuk dengan Scan QR</span>
+            </button>
+          </div>
+
         </div>
       </div>
-      <div class="text-center text-[10px] text-slate-400 z-10">K3S SD/MI Kota Kupang</div>
+
+      <!-- Footer Tipis -->
+      <div class="text-center text-[10px] font-medium text-slate-500 z-10">
+        Kota Kupang • Nusa Tenggara Timur
+      </div>
     </div>
 
-    <!-- LAYAR UTAMA APLIKASI -->
+    <!-- ========================================================== -->
+    <!-- LAYAR UTAMA APLIKASI (TIDAK BERUBAH, SEMUA ID TETAP SAMA)  -->
+    <!-- ========================================================== -->
     <div id="mainAppScreen" class="hidden flex-1 flex flex-col pb-24">
       <header class="bg-slate-900 text-white px-4 pt-4 pb-3.5 sticky top-0 z-30 shadow-md flex items-center justify-between">
         <div class="flex items-center gap-3 min-w-0">
@@ -149,7 +173,6 @@
       <main class="p-4 space-y-4 flex-1">
         <!-- BERANDA -->
         <section id="tabContentBeranda" class="animate-view space-y-4">
-          <!-- LIVE Sesi Berlangsung (Akan Muncul Jika Ada Sesi Sched Aktif) -->
           <div id="liveActiveSessionContainer" class="hidden bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-3xl shadow-lg border border-emerald-400/40 relative overflow-hidden">
             <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-white/10 rounded-full blur-lg"></div>
             <div class="flex items-center justify-between">
@@ -190,7 +213,7 @@
           <div class="bg-white rounded-3xl p-4 border space-y-2.5">
             <h4 class="text-xs font-extrabold uppercase flex items-center gap-1.5"><i class="fa-solid fa-bullhorn text-amber-500"></i> Pengumuman K3S</h4>
             <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs"><b>1. Checklist Kehadiran</b> Sub Rayon oleh Ketua Rayon.</div>
-            <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs"><b>2. Jadwal Live Real-Time</b> Sesi acara yang diaktifkan Sekretaris akan tersemat paling atas!</div>
+            <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs"><b>2. Jadwal Live Real-Time</b> Sesi acara yang diaktifkan Sekretaris akan tampil paling atas.</div>
           </div>
 
           <div class="bg-white rounded-3xl p-4 border">
@@ -199,7 +222,7 @@
           </div>
         </section>
 
-        <!-- JADWAL (EDITABLE SEKRETARIS) -->
+        <!-- JADWAL -->
         <section id="tabContentJadwal" class="hidden animate-view space-y-4">
           <div class="bg-white rounded-3xl p-4 border shadow-xs">
             <div class="flex items-center justify-between">
@@ -342,7 +365,6 @@
   </div>
 
   <!-- MODALS -->
-  <!-- 1. JADWAL MODAL -->
   <div id="scheduleModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-3.5 shadow-2xl">
       <div class="flex items-center justify-between border-b pb-2.5">
@@ -393,7 +415,6 @@
     </div>
   </div>
 
-  <!-- 2. TASK MODAL -->
   <div id="taskModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-3.5 shadow-2xl">
       <div class="flex items-center justify-between border-b pb-2.5">
@@ -445,18 +466,17 @@
     </div>
   </div>
 
-  <!-- 3. QR SCANNER MODAL -->
   <div id="qrScannerModal" class="hidden fixed inset-0 bg-slate-950/85 z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-white/15 text-white w-full max-w-sm rounded-3xl p-5 space-y-4">
       <div class="flex items-center justify-between border-b border-white/10 pb-3">
-        <h3 class="font-extrabold text-sm"><i class="fa-solid fa-qrcode text-emerald-400"></i> Scan QR Code Login</h3>
+        <h3 class="font-extrabold text-sm"><i class="fa-solid fa-qrcode text-emerald-400 mr-1.5"></i> Scan QR</h3>
         <button id="btnCancelScan" class="w-8 h-8 rounded-full bg-white/10 font-bold">&times;</button>
       </div>
       <div id="qrReader" class="w-full overflow-hidden rounded-2xl bg-black border border-white/20 min-h-[240px]"></div>
       <label class="w-full py-2.5 px-4 rounded-2xl bg-white/10 border border-white/15 text-xs font-bold text-center block cursor-pointer">
-        <i class="fa-solid fa-image text-amber-300"></i> Pilih dari Galeri HP <input id="qrFileInput" type="file" accept="image/*" class="hidden" />
+        <i class="fa-solid fa-image text-amber-300 mr-1"></i> Pilih dari Galeri <input id="qrFileInput" type="file" accept="image/*" class="hidden" />
       </label>
-      <button id="btnCloseScanner" class="w-full py-2.5 rounded-2xl bg-rose-500/20 text-rose-300 font-bold text-xs">Tutup Kamera</button>
+      <button id="btnCloseScanner" class="w-full py-2.5 rounded-2xl bg-rose-500/20 text-rose-300 font-bold text-xs">Tutup</button>
     </div>
   </div>
 
