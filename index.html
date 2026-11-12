@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>SIM-RAKOR 2026 | K3S SD/MI Kota Kupang</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -14,55 +12,32 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background-color: #090d16;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-    }
-    .app-shell {
-      max-width: 430px;
-      margin: 0 auto;
-      min-height: 100dvh;
-      background-color: #f8fafc;
-      position: relative;
-      box-shadow: 0 0 50px rgba(0,0,0,0.6);
-      overflow-x: hidden;
-    }
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #090d16; -webkit-tap-highlight-color: transparent; user-select: none; }
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100dvh; background-color: #f8fafc; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.6); overflow-x: hidden; }
     .animate-view { animation: fadeIn 0.22s ease-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     #qrReader video { border-radius: 16px; object-fit: cover; }
   </style>
 </head>
 <body>
-
   <div class="app-shell flex flex-col justify-between">
 
-    <!-- ========================================================== -->
-    <!-- LAYAR LOGIN ANDROID (3 STEP PESERTA + QR SCANNER)          -->
-    <!-- ========================================================== -->
+    <!-- LAYAR LOGIN ANDROID -->
     <div id="loginScreen" class="min-h-dvh bg-gradient-to-b from-slate-950 via-blue-950 to-slate-900 text-white flex flex-col justify-between p-5 relative overflow-hidden">
-      
       <div class="absolute -top-24 -right-24 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
       <div class="absolute top-1/3 -left-24 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div class="flex justify-between items-center z-10">
         <div class="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase text-emerald-300 bg-emerald-500/10 border border-emerald-400/20 px-3 py-1 rounded-full">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span id="dbStatusBadge">Terhubung ke Server K3S</span>
+          <span id="dbStatusBadge">Menghubungkan...</span>
         </div>
-        <button onclick="refreshAllData(true)" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-blue-200 text-xs" title="Muat Ulang Data">
+        <button id="btnForceRefresh" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-blue-200 text-xs">
           <i class="fa-solid fa-rotate"></i>
         </button>
       </div>
 
       <div class="my-auto py-3 z-10 space-y-4">
-        
         <div class="text-center">
           <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 mx-auto flex flex-col items-center justify-center shadow-xl shadow-amber-500/25 border-2 border-white/30">
             <i class="fa-solid fa-graduation-cap text-xl"></i>
@@ -72,40 +47,35 @@
           <p class="text-[11px] text-blue-200">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang</p>
         </div>
 
-        <!-- Tombol Utama Scan QR Code -->
-        <button onclick="openQrScannerModal()" class="w-full bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-400/40 rounded-2xl p-3 flex items-center justify-between shadow-lg active:scale-[0.99] transition">
+        <button id="btnOpenScanner" class="w-full bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/20 border border-emerald-400/40 rounded-2xl p-3 flex items-center justify-between shadow-lg">
           <div class="flex items-center gap-3 text-left">
             <div class="w-10 h-10 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center text-lg shadow">
               <i class="fa-solid fa-camera"></i>
             </div>
             <div>
               <div class="text-xs font-extrabold text-white">Login Cepat via Scan QR Code</div>
-              <div class="text-[10px] text-emerald-200">Arahkan kamera ke Kartu ID Peserta / Panitia</div>
+              <div class="text-[10px] text-emerald-200 font-semibold">Arahkan kamera ke Kartu ID Anda</div>
             </div>
           </div>
           <i class="fa-solid fa-chevron-right text-emerald-300 text-xs mr-1"></i>
         </button>
 
-        <!-- Kartu Form Login -->
         <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-3xl p-4 shadow-2xl">
-          
           <div class="grid grid-cols-2 gap-1.5 bg-slate-950/65 p-1.5 rounded-2xl mb-4">
-            <button id="btnRolePeserta" onclick="setLoginRole('peserta')" class="py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition">
+            <button id="btnRolePeserta" class="py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow">
               <i class="fa-solid fa-school mr-1"></i> Peserta (Kepsek)
             </button>
-            <button id="btnRolePanitia" onclick="setLoginRole('panitia')" class="py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition">
+            <button id="btnRolePanitia" class="py-2.5 rounded-xl text-xs font-bold text-slate-300">
               <i class="fa-solid fa-user-shield mr-1"></i> Panitia / Rayon
             </button>
           </div>
 
-          <!-- FORM 1: LOGIN PESERTA (3 LANGKAH + PASSWORD NPSN) -->
           <div id="loginFormPeserta" class="space-y-3">
             <div>
               <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
                 <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">1</span> Pilih Sub Rayon</span>
-                <span class="text-[10px] text-slate-300">6 Wilayah</span>
               </label>
-              <select id="loginSubrayonSelect" onchange="onSubrayonLoginChange()" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+              <select id="loginSubrayonSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white">
                 <option value="">-- Klik untuk Pilih Sub Rayon --</option>
                 <option value="Maulafa">Sub Rayon Maulafa (34 Sekolah)</option>
                 <option value="Alak">Sub Rayon Alak (31 Sekolah)</option>
@@ -121,7 +91,7 @@
                 <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">2</span> Pilih Nama Sekolah</span>
                 <span id="schoolCountHint" class="text-[10px] text-slate-300">Pilih rayon dulu</span>
               </label>
-              <select id="loginSchoolSelect" disabled class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white disabled:opacity-40 focus:outline-none focus:border-amber-400">
+              <select id="loginSchoolSelect" disabled class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-bold text-white">
                 <option value="">-- Pilih Sub Rayon Terlebih Dahulu --</option>
               </select>
             </div>
@@ -129,279 +99,165 @@
             <div>
               <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
                 <span><span class="bg-amber-400 text-slate-950 font-extrabold px-1.5 py-0.2 rounded mr-1">3</span> Password (Ketik NPSN Sekolah)</span>
-                <button type="button" onclick="togglePasswordVisibility('loginNpsnPassword', 'eyeIconNpsn')" class="text-[10px] text-amber-300 hover:underline">
-                  <i id="eyeIconNpsn" class="fa-solid fa-eye mr-0.5"></i> Lihat
-                </button>
+                <button type="button" id="togglePswdBtn" class="text-[10px] text-amber-300 hover:underline"><i class="fa-solid fa-eye"></i> Lihat</button>
               </label>
-              <input id="loginNpsnPassword" type="password" inputmode="numeric" placeholder="Masukkan 8 Digit Nomor NPSN..." class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-amber-300 placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 focus:outline-none focus:border-amber-400" />
+              <input id="loginNpsnPassword" type="password" inputmode="numeric" placeholder="Masukkan 8 Digit Nomor NPSN..." class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-amber-300 placeholder:font-normal placeholder:tracking-normal focus:outline-none" />
             </div>
 
-            <button onclick="handleLoginSubmit('peserta')" class="w-full mt-1 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 active:scale-[0.99] text-slate-950 font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition">
-              <span>MASUK PORTAL PESERTA</span>
-              <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            <button id="btnSubmitPeserta" class="w-full mt-1 bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 font-extrabold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2">
+              <span>MASUK PORTAL PESERTA</span> <i class="fa-solid fa-arrow-right-to-bracket"></i>
             </button>
           </div>
 
-          <!-- FORM 2: LOGIN PANITIA & KETUA SUB RAYON -->
           <div id="loginFormPanitia" class="hidden space-y-3">
             <div>
               <label class="block text-[11px] font-bold text-blue-200 mb-1">Pilih Nama Anggota Panitia / Ketua Sub Rayon:</label>
-              <select id="loginPanitiaSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-bold text-white focus:outline-none focus:border-blue-400">
-                <option value="">-- Memuat 19 Panitia... --</option>
-              </select>
+              <select id="loginPanitiaSelect" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-3 text-xs font-bold text-white"></select>
             </div>
             <div>
-              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">
-                <span>PIN Akses Kepanitiaan:</span>
-                <span class="text-[10px] text-blue-300">Default: 2026</span>
-              </label>
-              <input id="loginPinInput" type="password" inputmode="numeric" value="2026" placeholder="Masukkan PIN Panitia" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-center text-amber-300 focus:outline-none focus:border-blue-400" />
+              <label class="flex items-center justify-between text-[11px] font-bold text-blue-200 mb-1">PIN Akses Kepanitiaan:</label>
+              <input id="loginPinInput" type="password" inputmode="numeric" value="2026" class="w-full rounded-2xl bg-slate-900/90 border border-white/20 px-3.5 py-2.5 text-xs font-extrabold tracking-widest text-center text-amber-300" />
             </div>
-            <button onclick="handleLoginSubmit('panitia')" class="w-full mt-1 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition">
-              <span>MASUK DASHBOARD PANITIA</span>
-              <i class="fa-solid fa-shield-halved"></i>
+            <button id="btnSubmitPanitia" class="w-full mt-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-extrabold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2">
+              <span>MASUK DASHBOARD PANITIA</span> <i class="fa-solid fa-shield-halved"></i>
             </button>
           </div>
-
         </div>
       </div>
-
-      <div class="text-center text-[10px] text-slate-400 z-10">
-        K3S SD/MI Kota Kupang • Dinas Pendidikan & Kebudayaan Kota Kupang
-      </div>
+      <div class="text-center text-[10px] text-slate-400 z-10">K3S SD/MI Kota Kupang</div>
     </div>
 
-    <!-- ========================================================== -->
-    <!-- LAYAR UTAMA APLIKASI ANDROID (5 MENU FOOTER)               -->
-    <!-- ========================================================== -->
+    <!-- LAYAR UTAMA APLIKASI -->
     <div id="mainAppScreen" class="hidden flex-1 flex flex-col pb-24">
-
-      <!-- TOP BAR ANDROID -->
       <header class="bg-slate-900 text-white px-4 pt-4 pb-3.5 sticky top-0 z-30 shadow-md flex items-center justify-between">
         <div class="flex items-center gap-3 min-w-0">
-          <div id="topUserAvatar" class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 font-extrabold flex items-center justify-center text-sm shrink-0 shadow">
-            K3S
-          </div>
+          <div id="topUserAvatar" class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 font-extrabold flex items-center justify-center text-sm shrink-0">K3S</div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5">
-              <span id="topUserRoleBadge" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30">Peserta</span>
-              <span id="topUserSubrayonBadge" class="hidden text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">Rayon</span>
+              <span id="topUserRoleBadge" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300">Peserta</span>
+              <span id="topUserSubrayonBadge" class="hidden text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">Rayon</span>
             </div>
             <h2 id="topUserName" class="font-extrabold text-xs text-white truncate mt-0.5">Nama Pengguna</h2>
           </div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          <button onclick="refreshAllData(true)" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-slate-200" title="Refresh Data">
-            <i class="fa-solid fa-arrows-rotate"></i>
-          </button>
-          <button onclick="logoutApp()" class="w-8 h-8 rounded-xl bg-rose-500/20 hover:bg-rose-500/40 flex items-center justify-center text-xs text-rose-300" title="Keluar">
-            <i class="fa-solid fa-power-off"></i>
-          </button>
+          <button id="btnRefreshApp" class="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-xs"><i class="fa-solid fa-arrows-rotate"></i></button>
+          <button id="btnLogout" class="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-300 text-xs"><i class="fa-solid fa-power-off"></i></button>
         </div>
       </header>
 
-      <!-- ISI KONTEN 5 MENU -->
       <main class="p-4 space-y-4 flex-1">
-
-        <!-- ================================================== -->
-        <!-- MENU 1: BERANDA (HOME DASHBOARD)                   -->
-        <!-- ================================================== -->
+        <!-- BERANDA -->
         <section id="tabContentBeranda" class="animate-view space-y-4">
-          <div class="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden">
-            <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-amber-400/15 rounded-full blur-xl"></div>
+          <!-- LIVE Sesi Berlangsung (Akan Muncul Jika Ada Sesi Sched Aktif) -->
+          <div id="liveActiveSessionContainer" class="hidden bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-3xl shadow-lg border border-emerald-400/40 relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-white/10 rounded-full blur-lg"></div>
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
-                24–26 September 2026
+              <span class="inline-flex items-center gap-1.5 text-[9px] font-extrabold bg-red-500 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                <span class="w-1.5 h-1.5 bg-white rounded-full"></span> Live Sekarang
               </span>
-              <span class="text-[10px] font-bold text-emerald-300 flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Realtime Sync
-              </span>
+              <span id="liveActiveTime" class="text-[10px] font-bold text-emerald-200">00.00</span>
             </div>
-            <h3 class="text-base font-extrabold mt-2.5 leading-snug">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang Tahun 2026</h3>
-            <p class="text-[11px] text-blue-200 mt-1">Sinergitas Program Kerja K3S SD/MI Kota Kupang Menuju Pendidikan Berkualitas.</p>
+            <h4 id="liveActiveTitle" class="text-xs font-extrabold mt-1.5 leading-snug">Nama Acara Yang Berlangsung</h4>
+            <p id="liveActiveDesc" class="text-[11px] text-emerald-100 mt-0.5 line-clamp-2">Deskripsi acara...</p>
+            <div id="liveActivePic" class="text-[9px] font-bold text-amber-300 mt-1">PIC: Panitia</div>
+          </div>
 
+          <div class="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden">
+            <h3 class="text-base font-extrabold leading-snug">SIM-RAKOR 2026</h3>
+            <p class="text-[11px] text-blue-200 mt-1">Rapat Koordinasi Kepala SD/MI Se-Kota Kupang.</p>
             <div class="grid grid-cols-3 gap-2 mt-4 pt-3.5 border-t border-white/10 text-center">
               <div class="bg-white/10 rounded-2xl p-2.5">
-                <div id="homeMetricTotalSekolah" class="text-lg font-extrabold text-white">158</div>
-                <div class="text-[10px] text-blue-200">Total SD/MI</div>
+                <div id="homeMetricTotalSekolah" class="text-lg font-extrabold">158</div>
+                <div class="text-[10px] text-blue-200">SD/MI</div>
               </div>
               <div class="bg-white/10 rounded-2xl p-2.5">
                 <div id="homeMetricIkut" class="text-lg font-extrabold text-emerald-300">0</div>
-                <div class="text-[10px] text-blue-200">Sekolah Ikut</div>
+                <div class="text-[10px] text-blue-200">Ikut</div>
               </div>
               <div class="bg-white/10 rounded-2xl p-2.5">
                 <div id="homeMetricKinerja" class="text-lg font-extrabold text-amber-300">0%</div>
-                <div class="text-[10px] text-blue-200">Kinerja Panitia</div>
+                <div class="text-[10px] text-blue-200">Kinerja</div>
               </div>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-2.5">
-            <button onclick="switchTab('qr')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 text-left active:scale-95 transition">
-              <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shrink-0">
-                <i class="fa-solid fa-qrcode"></i>
-              </div>
-              <div>
-                <div class="text-xs font-extrabold text-slate-900">Buka ID & QR</div>
-                <div class="text-[10px] text-slate-500">Kartu Akses & Presensi</div>
-              </div>
-            </button>
-            <button onclick="switchTab('subrayon')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3 text-left active:scale-95 transition">
-              <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shrink-0">
-                <i class="fa-solid fa-map-location-dot"></i>
-              </div>
-              <div>
-                <div class="text-xs font-extrabold text-slate-900">Cek Sub Rayon</div>
-                <div class="text-[10px] text-slate-500">Data 6 Kecamatan</div>
-              </div>
-            </button>
+            <button id="quickBtnQr" class="bg-white p-3.5 rounded-2xl border flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center"><i class="fa-solid fa-qrcode"></i></div><div><div class="text-xs font-extrabold">Buka ID & QR</div><div class="text-[10px] text-slate-500">Akses ID Card</div></div></button>
+            <button id="quickBtnSub" class="bg-white p-3.5 rounded-2xl border flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center"><i class="fa-solid fa-map-location-dot"></i></div><div><div class="text-xs font-extrabold">Cek Sub Rayon</div><div class="text-[10px] text-slate-500">Daftar Sekolah</div></div></button>
           </div>
 
-          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-2.5">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <i class="fa-solid fa-bullhorn text-amber-500"></i> Informasi Kepanitiaan
-              </h4>
-              <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">Penting</span>
-            </div>
-            <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs space-y-1">
-              <div class="font-extrabold text-amber-950">1. Checklist Kehadiran Sekolah oleh Ketua Sub Rayon</div>
-              <p class="text-[11px] text-amber-900 leading-relaxed">Masing-masing Ketua Sub Rayon dapat memvalidasi sekolah yang mengikuti Rakor melalui menu <b>Sub Rayon</b> di bagian bawah layar.</p>
-            </div>
-            <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-xs space-y-1">
-              <div class="font-extrabold text-blue-950">2. Pembaruan Jadwal Resmi oleh Sekretaris Panitia</div>
-              <p class="text-[11px] text-blue-900 leading-relaxed">Perubahan jam atau sesi acara yang diinput oleh Sekretaris Panitia akan langsung tampil secara otomatis pada menu <b>Jadwal</b> di seluruh HP peserta.</p>
-            </div>
+          <div class="bg-white rounded-3xl p-4 border space-y-2.5">
+            <h4 class="text-xs font-extrabold uppercase flex items-center gap-1.5"><i class="fa-solid fa-bullhorn text-amber-500"></i> Pengumuman K3S</h4>
+            <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs"><b>1. Checklist Kehadiran</b> Sub Rayon oleh Ketua Rayon.</div>
+            <div class="p-3 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs"><b>2. Jadwal Live Real-Time</b> Sesi acara yang diaktifkan Sekretaris akan tersemat paling atas!</div>
           </div>
 
-          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs">
-            <div class="flex items-center justify-between mb-3">
-              <h4 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-                <i class="fa-solid fa-chart-simple text-emerald-600 mr-1"></i> Progres Pendaftaran Sub Rayon
-              </h4>
-              <button onclick="switchTab('subrayon')" class="text-[11px] font-bold text-blue-700">Lihat Detail &rarr;</button>
-            </div>
+          <div class="bg-white rounded-3xl p-4 border">
+            <h4 class="text-xs font-extrabold uppercase mb-3"><i class="fa-solid fa-chart-simple text-emerald-600 mr-1"></i> Progres Sub Rayon</h4>
             <div id="homeSubrayonBars" class="space-y-2.5"></div>
           </div>
         </section>
 
-        <!-- ================================================== -->
-        <!-- MENU 2: JADWAL & MATERI (WEWENANG SEKRETARIS)      -->
-        <!-- ================================================== -->
+        <!-- JADWAL (EDITABLE SEKRETARIS) -->
         <section id="tabContentJadwal" class="hidden animate-view space-y-4">
-          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs">
+          <div class="bg-white rounded-3xl p-4 border shadow-xs">
             <div class="flex items-center justify-between">
               <div>
-                <h3 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                  <i class="fa-solid fa-calendar-days text-blue-700"></i> Jadwal & Alur Kegiatan Rakor
-                </h3>
-                <p id="jadwalRoleSubtitle" class="text-[11px] text-slate-500 mt-0.5">Rangkaian kegiatan Rakor Kepala SD/MI selama 3 hari.</p>
+                <h3 class="font-extrabold text-sm text-slate-900 flex items-center gap-2"><i class="fa-solid fa-calendar-days text-blue-700"></i> Jadwal Kegiatan</h3>
+                <p class="text-[11px] text-slate-500">Rundown 3 hari Rakor K3S 2026.</p>
               </div>
-              <!-- Tombol Tambah Sesi (Hanya Muncul Jika Login = Sekretaris) -->
-              <button id="btnAddSchedule" onclick="openScheduleModal()" class="hidden bg-blue-900 hover:bg-blue-800 text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow flex items-center gap-1.5 shrink-0">
-                <i class="fa-solid fa-plus"></i> Sesi
-              </button>
+              <button id="btnAddSchedule" class="hidden bg-blue-900 text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shadow">+ Sesi</button>
             </div>
 
-            <!-- Banner Info Khusus Sekretaris -->
             <div id="secretaryScheduleBanner" class="hidden mt-3 p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-2 text-[11px] text-emerald-900 font-semibold">
               <i class="fa-solid fa-user-pen text-emerald-600"></i>
-              <span>Mode Editor Sekretaris Aktif: Anda dapat menambah, mengedit, atau menghapus jadwal.</span>
+              <span>Editor Sekretaris Aktif • Atur Urutan Sesi</span>
             </div>
 
-            <!-- Pilih Hari 1, 2, 3 -->
             <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-2xl mt-3">
-              <button id="btnDay1" onclick="filterScheduleDay(1)" class="py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow">Hari Ke-1</button>
-              <button id="btnDay2" onclick="filterScheduleDay(2)" class="py-2 rounded-xl text-xs font-bold text-slate-600">Hari Ke-2</button>
-              <button id="btnDay3" onclick="filterScheduleDay(3)" class="py-2 rounded-xl text-xs font-bold text-slate-600">Hari Ke-3</button>
+              <button id="btnDay1" class="py-2 rounded-xl text-xs font-extrabold">Hari Ke-1</button>
+              <button id="btnDay2" class="py-2 rounded-xl text-xs font-bold">Hari Ke-2</button>
+              <button id="btnDay3" class="py-2 rounded-xl text-xs font-bold">Hari Ke-3</button>
             </div>
 
-            <!-- Kontainer Dinamis Sesi Jadwal dari Supabase -->
             <div id="scheduleListContainer" class="mt-4 space-y-3"></div>
           </div>
-
-          <!-- Kartu Info Kostum & Unduh Materi -->
-          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
-            <h4 class="font-extrabold text-xs text-slate-900 uppercase tracking-wider">
-              <i class="fa-solid fa-folder-open text-amber-500 mr-1"></i> Dokumen & Panduan Peserta
-            </h4>
-            <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
-              <div class="flex items-center gap-3">
-                <i class="fa-solid fa-book text-blue-700 text-lg"></i>
-                <div>
-                  <div class="text-xs font-extrabold text-slate-900">Buku Panduan Workshop & Rakor 2026</div>
-                  <div class="text-[10px] text-slate-500">Disediakan oleh Seksi Kesekretariatan</div>
-                </div>
-              </div>
-              <span class="text-[10px] font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-lg">Siap</span>
-            </div>
-            <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
-              <div class="flex items-center gap-3">
-                <i class="fa-solid fa-certificate text-emerald-600 text-lg"></i>
-                <div>
-                  <div class="text-xs font-extrabold text-slate-900">E-Sertifikat Peserta & Panitia</div>
-                  <div class="text-[10px] text-slate-500">Terbit otomatis pada tahap Pasca-Acara</div>
-                </div>
-              </div>
-              <span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-lg">25 Sept</span>
-            </div>
-          </div>
         </section>
 
-        <!-- ================================================== -->
-        <!-- MENU 3 (TENGAH): ID CARD DIGITAL & QR CODE         -->
-        <!-- ================================================== -->
+        <!-- ID CARD DIGITAL -->
         <section id="tabContentQr" class="hidden animate-view space-y-4">
-          <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-md text-center relative overflow-hidden">
+          <div class="bg-white rounded-3xl p-5 border text-center relative overflow-hidden">
             <div class="absolute top-0 inset-x-0 h-3 bg-gradient-to-r from-blue-900 via-amber-400 to-emerald-500"></div>
-            
-            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-900 border border-blue-200">
-              <i class="fa-solid fa-id-badge"></i> KARTU AKSES & LOGIN QR RAKOR 2026
+            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-50 text-blue-900 border">
+              <i class="fa-solid fa-id-badge"></i> KARTU AKSES RAKOR 2026
             </div>
-
-            <h3 id="qrCardTitle" class="text-base font-extrabold text-slate-900 mt-3 leading-snug">NAMA SEKOLAH / PANITIA</h3>
-            <p id="qrCardSubtitle" class="text-xs font-semibold text-slate-500 mt-0.5">NPSN / Jabatan</p>
-
-            <div class="my-4">
-              <span id="qrStatusPill" class="inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800">
-                Status Kehadiran
-              </span>
-            </div>
-
-            <div class="flex justify-center my-3">
-              <div id="qrCodeCanvas" class="p-4 bg-white rounded-3xl border-2 border-dashed border-slate-300 shadow-inner inline-block"></div>
-            </div>
-            <p class="text-[11px] text-slate-500 font-medium">QR Code ini dapat digunakan untuk <b>Presensi Kehadiran</b> sekaligus <b>Login Cepat</b> di halaman depan.</p>
-
-            <div id="qrKepsekFormBox" class="mt-5 pt-4 border-t border-slate-100 text-left">
-              <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Nama Lengkap Kepala Sekolah:</label>
+            <h3 id="qrCardTitle" class="text-base font-extrabold mt-3">NAMA</h3>
+            <p id="qrCardSubtitle" class="text-xs font-semibold text-slate-500">NPSN / Jabatan</p>
+            <div class="my-4"><span id="qrStatusPill" class="inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100">Status Kehadiran</span></div>
+            <div class="flex justify-center my-3"><div id="qrCodeCanvas" class="p-4 bg-white rounded-3xl border border-dashed inline-block"></div></div>
+            <div id="qrKepsekFormBox" class="mt-5 pt-4 border-t text-left">
+              <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Nama Kepala Sekolah:</label>
               <div class="flex gap-2">
-                <input id="qrInputNamaKepsek" type="text" placeholder="Ketik Nama & Gelar Kepala Sekolah..." class="flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold" />
-                <button onclick="saveKepsekName()" class="bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-2xl shadow">
-                  Simpan
-                </button>
+                <input id="qrInputNamaKepsek" type="text" class="flex-1 rounded-2xl border bg-slate-50 px-3.5 py-2.5 text-xs font-semibold" />
+                <button id="btnSaveKepsek" class="bg-blue-900 text-white font-extrabold text-xs px-4 rounded-2xl">Simpan</button>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- ================================================== -->
-        <!-- MENU 4: SUB RAYON (CHECKLIST 158 SEKOLAH)          -->
-        <!-- ================================================== -->
+        <!-- SUB RAYON -->
         <section id="tabContentSubrayon" class="hidden animate-view space-y-4">
-          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
+          <div class="bg-white rounded-3xl p-4 border space-y-3">
             <div class="flex items-center justify-between">
               <div>
-                <h3 class="font-extrabold text-sm text-slate-900">Data 6 Sub Rayon (158 SD/MI)</h3>
-                <p id="srCoordinatorLabel" class="text-[11px] font-semibold text-emerald-700">Ketua Sub Rayon: -</p>
+                <h3 class="font-extrabold text-sm">Data 6 Sub Rayon (158 SD/MI)</h3>
+                <p id="srCoordinatorLabel" class="text-[11px] font-semibold text-emerald-700">Ketua Rayon...</p>
               </div>
-              <button id="btnMarkAllSr" onclick="markAllSubrayonSchools()" class="hidden text-[11px] font-extrabold bg-emerald-600 text-white px-3 py-1.5 rounded-xl shadow-xs">
-                <i class="fa-solid fa-check-double mr-1"></i> Ikut Semua
-              </button>
+              <button id="btnMarkAllSr" class="hidden text-[11px] font-extrabold bg-emerald-600 text-white px-3 py-1.5 rounded-xl">Ikut Semua</button>
             </div>
-
             <div class="grid grid-cols-2 gap-2">
-              <select id="srSelectFilter" onchange="renderSubrayonTab()" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-extrabold text-blue-950">
+              <select id="srSelectFilter" class="w-full rounded-2xl border bg-slate-50 px-3 py-2.5 text-xs font-extrabold text-blue-950">
                 <option value="Maulafa">Sub Rayon Maulafa (34)</option>
                 <option value="Alak">Sub Rayon Alak (31)</option>
                 <option value="Kota Raja">Sub Rayon Kota Raja (29)</option>
@@ -409,71 +265,51 @@
                 <option value="Kelapa Lima">Sub Rayon Kelapa Lima (19)</option>
                 <option value="Kota Lama">Sub Rayon Kota Lama (18)</option>
               </select>
-              <input id="srSearchInput" oninput="renderSubrayonTab()" type="text" placeholder="Cari Sekolah / NPSN..." class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs font-semibold" />
+              <input id="srSearchInput" type="text" placeholder="Cari Sekolah..." class="w-full rounded-2xl border bg-slate-50 px-3 py-2.5 text-xs font-semibold" />
             </div>
-
-            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+            <div class="bg-slate-50 p-3 rounded-2xl border">
               <div class="flex justify-between items-center text-xs font-extrabold mb-1.5">
-                <span id="srProgressTitle" class="text-slate-700">Progres Sub Rayon</span>
-                <span id="srProgressNumbers" class="text-emerald-700">0 / 0 Ikut (0%)</span>
+                <span id="srProgressTitle">Rayon</span> <span id="srProgressNumbers">0/0</span>
               </div>
-              <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                <div id="srProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
-              </div>
+              <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden"><div id="srProgressBar" class="bg-emerald-500 h-full rounded-full transition-all" style="width: 0%"></div></div>
             </div>
           </div>
-
           <div id="srSchoolCardsContainer" class="space-y-2.5"></div>
         </section>
 
-        <!-- ================================================== -->
-        <!-- MENU 5: KINERJA PANITIA (MONITOR & CRUD 49 TUGAS)  -->
-        <!-- ================================================== -->
+        <!-- KINERJA -->
         <section id="tabContentKinerja" class="hidden animate-view space-y-4">
           <div class="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-3xl p-5 shadow-md">
             <div class="flex items-center justify-between">
               <div>
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 bg-amber-400/10 px-2.5 py-1 rounded-full">
-                  Evaluasi Kinerja Real-Time
-                </span>
-                <h3 class="text-base font-extrabold mt-2">Total Progres Kepanitiaan</h3>
-                <p id="kinerjaSubtitleCount" class="text-[11px] text-blue-200">0 dari 49 Tugas Selesai</p>
+                <span class="text-[10px] font-extrabold uppercase text-amber-300">Evaluasi Real-Time</span>
+                <h3 class="text-base font-extrabold mt-2">Kinerja Kepanitiaan</h3>
+                <p id="kinerjaSubtitleCount" class="text-[11px] text-blue-200">0 Tugas Selesai</p>
               </div>
               <div id="kinerjaBigPercent" class="text-3xl font-extrabold text-amber-400">0%</div>
             </div>
-            <div class="w-full bg-white/15 h-3 rounded-full mt-3 overflow-hidden">
-              <div id="kinerjaBigBar" class="bg-gradient-to-r from-amber-400 to-emerald-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
-            </div>
+            <div class="w-full bg-white/15 h-3 rounded-full mt-3 overflow-hidden"><div id="kinerjaBigBar" class="bg-gradient-to-r from-amber-400 to-emerald-400 h-full rounded-full" style="width:0%"></div></div>
             <div id="kinerjaPhaseGrid" class="grid grid-cols-4 gap-1.5 mt-4 pt-3 border-t border-white/10 text-center"></div>
           </div>
 
-          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs">
+          <div class="bg-white rounded-3xl p-4 border">
             <div class="flex items-center justify-between mb-3">
-              <div>
-                <h4 class="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Rapor Kinerja 9 Divisi Panitia</h4>
-                <p class="text-[10px] text-slate-500">Klik salah satu divisi untuk memfilter daftar tugas di bawah</p>
-              </div>
-              <button id="btnAddTaskTop" onclick="openTaskModal()" class="bg-blue-900 hover:bg-blue-800 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1">
-                <i class="fa-solid fa-plus"></i> Tugas Baru
-              </button>
+              <div><h4 class="font-extrabold text-xs uppercase">Rapor 9 Divisi</h4></div>
+              <button id="btnAddTaskTop" class="bg-blue-900 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl shadow"><i class="fa-solid fa-plus"></i> Tugas</button>
             </div>
             <div id="kinerjaDivisiBars" class="space-y-2.5"></div>
           </div>
 
-          <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
-            <div class="flex items-center justify-between">
-              <h4 class="font-extrabold text-xs text-slate-900 uppercase tracking-wider">Daftar Rincian Tugas Divisi</h4>
-              <button onclick="resetTaskFilters()" class="text-[11px] font-bold text-blue-700">Tampilkan Semua</button>
-            </div>
+          <div class="bg-white rounded-3xl p-4 border space-y-3">
             <div class="grid grid-cols-2 gap-2">
-              <select id="taskFilterPhase" onchange="renderTaskList()" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-bold">
+              <select id="taskFilterPhase" class="w-full rounded-2xl border bg-slate-50 px-3 py-2 text-xs font-bold">
                 <option value="ALL">Semua Tahapan (4)</option>
                 <option value="Perencanaan">1. Perencanaan</option>
                 <option value="Persiapan">2. Persiapan</option>
                 <option value="Pelaksanaan">3. Pelaksanaan</option>
                 <option value="Pasca-Acara">4. Pasca-Acara</option>
               </select>
-              <select id="taskFilterDivisi" onchange="renderTaskList()" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-bold">
+              <select id="taskFilterDivisi" class="w-full rounded-2xl border bg-slate-50 px-3 py-2 text-xs font-bold">
                 <option value="ALL">Semua Divisi</option>
                 <option value="Penanggung Jawab">Penanggung Jawab</option>
                 <option value="Ketua Panitia">Ketua Panitia</option>
@@ -482,150 +318,94 @@
                 <option value="Seksi Kesekretariatan">Seksi Kesekretariatan</option>
                 <option value="Seksi Acara dan Humas">Seksi Acara dan Humas</option>
                 <option value="Seksi Konsumsi">Seksi Konsumsi</option>
-                <option value="Seksi Perlengkapan, Dokumentasi, dan Publikasi">Seksi Perlengkapan & Dok.</option>
+                <option value="Seksi Perlengkapan, Dokumentasi, dan Publikasi">Seksi Perlengkapan</option>
                 <option value="Seksi Keamanan dan Ketertiban">Seksi Keamanan</option>
               </select>
             </div>
           </div>
-
           <div id="taskCardsContainer" class="space-y-2.5"></div>
         </section>
-
       </main>
 
-      <!-- ========================================================== -->
-      <!-- 5 MENU FOOTER ANDROID (BOTTOM NAVIGATION BAR)              -->
-      <!-- ========================================================== -->
-      <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-slate-200 px-2 py-1.5 z-40 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
+      <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t px-2 py-1.5 z-40 shadow-lg">
         <div class="grid grid-cols-5 items-center">
-          <button id="footerBtnBeranda" onclick="switchTab('beranda')" class="flex flex-col items-center justify-center py-1 text-blue-900 font-extrabold">
-            <i class="fa-solid fa-house text-base"></i>
-            <span class="text-[10px] mt-1">Beranda</span>
-          </button>
-          <button id="footerBtnJadwal" onclick="switchTab('jadwal')" class="flex flex-col items-center justify-center py-1 text-slate-400 font-semibold">
-            <i class="fa-solid fa-calendar-check text-base"></i>
-            <span class="text-[10px] mt-1">Jadwal</span>
-          </button>
+          <button id="footerBtnBeranda" class="flex flex-col items-center py-1 text-blue-900 font-extrabold"><i class="fa-solid fa-house"></i><span class="text-[10px] mt-1">Beranda</span></button>
+          <button id="footerBtnJadwal" class="flex flex-col items-center py-1 text-slate-400"><i class="fa-solid fa-calendar-check"></i><span class="text-[10px] mt-1">Jadwal</span></button>
           <div class="flex justify-center">
-            <button id="footerBtnQr" onclick="switchTab('qr')" class="-mt-6 w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-900 to-indigo-700 text-amber-300 shadow-lg shadow-blue-900/40 border-4 border-white flex flex-col items-center justify-center active:scale-95 transition">
-              <i class="fa-solid fa-qrcode text-lg"></i>
-              <span class="text-[9px] font-extrabold text-white leading-none mt-0.5">ID & QR</span>
-            </button>
+            <button id="footerBtnQr" class="-mt-6 w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-900 to-indigo-700 text-amber-300 border-4 border-white flex flex-col items-center justify-center"><i class="fa-solid fa-qrcode"></i><span class="text-[9px] font-extrabold text-white leading-none mt-0.5">ID & QR</span></button>
           </div>
-          <button id="footerBtnSubrayon" onclick="switchTab('subrayon')" class="flex flex-col items-center justify-center py-1 text-slate-400 font-semibold">
-            <i class="fa-solid fa-school-flag text-base"></i>
-            <span class="text-[10px] mt-1">Sub Rayon</span>
-          </button>
-          <button id="footerBtnKinerja" onclick="switchTab('kinerja')" class="flex flex-col items-center justify-center py-1 text-slate-400 font-semibold">
-            <i class="fa-solid fa-chart-pie text-base"></i>
-            <span class="text-[10px] mt-1">Kinerja</span>
-          </button>
+          <button id="footerBtnSubrayon" class="flex flex-col items-center py-1 text-slate-400"><i class="fa-solid fa-school-flag"></i><span class="text-[10px] mt-1">Rayon</span></button>
+          <button id="footerBtnKinerja" class="flex flex-col items-center py-1 text-slate-400"><i class="fa-solid fa-chart-pie"></i><span class="text-[10px] mt-1">Kinerja</span></button>
         </div>
       </nav>
-
     </div>
-
   </div>
 
-  <!-- ========================================================== -->
-  <!-- MODAL TAMBAH / EDIT JADWAL KEGIATAN (KHUSUS SEKRETARIS)    -->
-  <!-- ========================================================== -->
-  <div id="scheduleModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <!-- MODALS -->
+  <!-- 1. JADWAL MODAL -->
+  <div id="scheduleModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-3.5 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-        <h3 id="modalScheduleHeader" class="font-extrabold text-sm text-slate-900">Edit Jadwal Kegiatan Rakor</h3>
-        <button onclick="closeScheduleModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">&times;</button>
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <h3 id="modalScheduleHeader" class="font-extrabold text-sm">Edit Sesi Jadwal</h3>
+        <button id="btnCancelSchedule" class="w-8 h-8 rounded-full bg-slate-100 font-bold">&times;</button>
       </div>
       <input type="hidden" id="modalScheduleId" />
       <div class="grid grid-cols-2 gap-2.5">
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Hari Pelaksanaan:</label>
-          <select id="modalScheduleDay" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
-            <option value="1">Hari Ke-1 (Kamis, 24 Sept)</option>
-            <option value="2">Hari Ke-2 (Jumat, 25 Sept)</option>
-            <option value="3">Hari Ke-3 (Sabtu, 26 Sept)</option>
+          <label class="block text-[11px] font-bold">Hari Ke-:</label>
+          <select id="modalScheduleDay" class="w-full rounded-2xl border px-3 py-2.5 text-xs font-semibold">
+            <option value="1">Hari Ke-1</option>
+            <option value="2">Hari Ke-2</option>
+            <option value="3">Hari Ke-3</option>
           </select>
         </div>
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Jam / Waktu Sesi:</label>
-          <input id="modalScheduleTime" type="text" placeholder="Contoh: 08.00 - 09.30" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold" />
+          <label class="block text-[11px] font-bold">Jam Sesi:</label>
+          <input id="modalScheduleTime" type="text" class="w-full rounded-2xl border px-3 py-2.5 text-xs" />
         </div>
       </div>
       <div>
-        <label class="block text-[11px] font-bold text-slate-700 mb-1">Judul Sesi / Acara:</label>
-        <input id="modalScheduleTitle" type="text" placeholder="Contoh: Pembukaan & Sambutan..." class="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-xs font-semibold" />
+        <label class="block text-[11px] font-bold">Judul Acara:</label>
+        <input id="modalScheduleTitle" type="text" class="w-full rounded-2xl border px-3.5 py-2.5 text-xs" />
       </div>
       <div>
-        <label class="block text-[11px] font-bold text-slate-700 mb-1">Rincian / Keterangan Kegiatan:</label>
-        <textarea id="modalScheduleDesc" rows="2" placeholder="Deskripsi singkat sesi kegiatan..." class="w-full rounded-2xl border border-slate-300 px-3.5 py-2 text-xs font-semibold"></textarea>
+        <label class="block text-[11px] font-bold">Deskripsi:</label>
+        <textarea id="modalScheduleDesc" rows="2" class="w-full rounded-2xl border px-3.5 py-2 text-xs"></textarea>
       </div>
-      <div class="grid grid-cols-2 gap-2.5">
-        <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Narasumber / PIC Seksi:</label>
-          <input id="modalSchedulePic" type="text" placeholder="Contoh: Seksi Acara" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold" />
+      <div class="grid grid-cols-3 gap-2.5">
+        <div class="col-span-2">
+          <label class="block text-[11px] font-bold">Narasumber / PIC:</label>
+          <input id="modalSchedulePic" type="text" class="w-full rounded-2xl border px-3 py-2.5 text-xs" />
         </div>
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Warna Label Jam:</label>
-          <select id="modalScheduleColor" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
-            <option value="biru">Biru Tua (Utama)</option>
-            <option value="emas">Kuning Emas (Penting)</option>
-            <option value="hijau">Hijau Emerald (Sidang/Penutup)</option>
+          <label class="block text-[11px] font-bold">Label:</label>
+          <select id="modalScheduleColor" class="w-full rounded-2xl border px-3 py-2.5 text-xs">
+            <option value="biru">Biru</option>
+            <option value="emas">Emas</option>
+            <option value="hijau">Hijau</option>
           </select>
         </div>
       </div>
       <div class="pt-2 flex gap-2">
-        <button onclick="closeScheduleModal()" class="w-1/3 py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-xs">Batal</button>
-        <button onclick="saveScheduleModal()" class="w-2/3 py-3 rounded-2xl bg-blue-900 text-white font-extrabold text-xs shadow-lg">Simpan Jadwal</button>
+        <button id="btnDismissSchedule" class="w-1/3 py-3 rounded-2xl bg-slate-100 font-bold text-xs">Batal</button>
+        <button id="btnSaveSchedule" class="w-2/3 py-3 rounded-2xl bg-blue-900 text-white font-extrabold text-xs">Simpan Jadwal</button>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================== -->
-  <!-- MODAL PEMINDAI QR CODE (LOGIN CEPAT PESERTA & PANITIA)     -->
-  <!-- ========================================================== -->
-  <div id="qrScannerModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-white/15 text-white w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-white/10 pb-3">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-qrcode text-emerald-400 text-lg"></i>
-          <h3 class="font-extrabold text-sm">Scan QR Code Login</h3>
-        </div>
-        <button onclick="closeQrScannerModal()" class="w-8 h-8 rounded-full bg-white/10 text-white font-bold">&times;</button>
-      </div>
-      <p class="text-[11px] text-slate-300 leading-relaxed">
-        Arahkan kamera ke <b>Kartu QR Peserta (Kepala Sekolah)</b> atau <b>Kartu QR Panitia</b> untuk masuk otomatis tanpa mengetik password.
-      </p>
-      <div id="qrReader" class="w-full overflow-hidden rounded-2xl bg-black border border-white/20 min-h-[240px]"></div>
-      <div class="pt-1">
-        <label class="w-full py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-bold text-center block cursor-pointer">
-          <i class="fa-solid fa-image mr-1.5 text-amber-300"></i> Atau Pilih Gambar QR dari Galeri HP
-          <input id="qrFileInput" type="file" accept="image/*" onchange="scanQrFromFile(event)" class="hidden" />
-        </label>
-      </div>
-      <button onclick="closeQrScannerModal()" class="w-full py-2.5 rounded-2xl bg-rose-500/20 text-rose-300 font-bold text-xs">
-        Tutup Kamera
-      </button>
-    </div>
-  </div>
-
-  <!-- ========================================================== -->
-  <!-- MODAL TAMBAH / EDIT TUGAS KEPANITIAAN                      -->
-  <!-- ========================================================== -->
-  <div id="taskModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <!-- 2. TASK MODAL -->
+  <div id="taskModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full max-w-[430px] rounded-t-3xl sm:rounded-3xl p-5 space-y-3.5 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-        <h3 id="modalTaskHeader" class="font-extrabold text-sm text-slate-900">Tambah Tugas Kepanitiaan</h3>
-        <button onclick="closeTaskModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">&times;</button>
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <h3 id="modalTaskHeader" class="font-extrabold text-sm">Task Manager</h3>
+        <button id="btnCancelTask" class="w-8 h-8 rounded-full bg-slate-100 font-bold">&times;</button>
       </div>
       <input type="hidden" id="modalTaskId" />
-      <div>
-        <label class="block text-[11px] font-bold text-slate-700 mb-1">Nama Pekerjaan / Tugas:</label>
-        <input id="modalTaskName" type="text" placeholder="Contoh: Penataan Parkir & Keamanan..." class="w-full rounded-2xl border border-slate-300 px-3.5 py-2.5 text-xs font-semibold" />
-      </div>
+      <div><label class="block text-[11px] font-bold">Nama Pekerjaan:</label><input id="modalTaskName" type="text" class="w-full rounded-2xl border px-3.5 py-2.5 text-xs" /></div>
       <div class="grid grid-cols-2 gap-2.5">
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Divisi / Seksi:</label>
-          <select id="modalTaskDivisi" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
+          <label class="block text-[11px] font-bold">Divisi:</label>
+          <select id="modalTaskDivisi" class="w-full rounded-2xl border px-3 py-2.5 text-xs">
             <option value="Penanggung Jawab">Penanggung Jawab</option>
             <option value="Ketua Panitia">Ketua Panitia</option>
             <option value="Sekretaris">Sekretaris</option>
@@ -638,8 +418,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Tahapan:</label>
-          <select id="modalTaskPhase" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
+          <label class="block text-[11px] font-bold">Tahapan:</label>
+          <select id="modalTaskPhase" class="w-full rounded-2xl border px-3 py-2.5 text-xs">
             <option value="Perencanaan">Perencanaan</option>
             <option value="Persiapan">Persiapan</option>
             <option value="Pelaksanaan">Pelaksanaan</option>
@@ -648,13 +428,10 @@
         </div>
       </div>
       <div class="grid grid-cols-2 gap-2.5">
+        <div><label class="block text-[11px] font-bold">Tenggat Waktu:</label><input id="modalTaskDeadline" type="date" class="w-full rounded-2xl border px-3 py-2.5 text-xs" /></div>
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Tenggat Waktu:</label>
-          <input id="modalTaskDeadline" type="date" value="2026-09-23" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold" />
-        </div>
-        <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Status Tugas:</label>
-          <select id="modalTaskStatus" class="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-xs font-semibold">
+          <label class="block text-[11px] font-bold">Status:</label>
+          <select id="modalTaskStatus" class="w-full rounded-2xl border px-3 py-2.5 text-xs">
             <option value="Belum Mulai">Belum Mulai</option>
             <option value="Sedang Berjalan">Sedang Berjalan</option>
             <option value="Selesai">Selesai</option>
@@ -662,920 +439,32 @@
         </div>
       </div>
       <div class="pt-2 flex gap-2">
-        <button onclick="closeTaskModal()" class="w-1/3 py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-xs">Batal</button>
-        <button onclick="saveTaskModal()" class="w-2/3 py-3 rounded-2xl bg-blue-900 text-white font-extrabold text-xs shadow-lg">Simpan Tugas</button>
+        <button id="btnDismissTask" class="w-1/3 py-3 rounded-2xl bg-slate-100 font-bold text-xs">Batal</button>
+        <button id="btnSaveTask" class="w-2/3 py-3 rounded-2xl bg-blue-900 text-white font-extrabold text-xs">Simpan Tugas</button>
       </div>
     </div>
   </div>
 
-  <!-- TOAST NOTIFICATION -->
-  <div id="toastBanner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white border border-white/15 text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2">
-    <i class="fa-solid fa-circle-check text-emerald-400"></i>
-    <span id="toastText">Berhasil</span>
+  <!-- 3. QR SCANNER MODAL -->
+  <div id="qrScannerModal" class="hidden fixed inset-0 bg-slate-950/85 z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-white/15 text-white w-full max-w-sm rounded-3xl p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <h3 class="font-extrabold text-sm"><i class="fa-solid fa-qrcode text-emerald-400"></i> Scan QR Code Login</h3>
+        <button id="btnCancelScan" class="w-8 h-8 rounded-full bg-white/10 font-bold">&times;</button>
+      </div>
+      <div id="qrReader" class="w-full overflow-hidden rounded-2xl bg-black border border-white/20 min-h-[240px]"></div>
+      <label class="w-full py-2.5 px-4 rounded-2xl bg-white/10 border border-white/15 text-xs font-bold text-center block cursor-pointer">
+        <i class="fa-solid fa-image text-amber-300"></i> Pilih dari Galeri HP <input id="qrFileInput" type="file" accept="image/*" class="hidden" />
+      </label>
+      <button id="btnCloseScanner" class="w-full py-2.5 rounded-2xl bg-rose-500/20 text-rose-300 font-bold text-xs">Tutup Kamera</button>
+    </div>
   </div>
 
-  <script>
-    // =========================================================================
-    // KONFIGURASI SUPABASE PERMANEN
-    // =========================================================================
-    const DEFAULT_SB_URL = "https://etjdsxqodvfozjkshzxp.supabase.co";
-    const DEFAULT_SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV0amRzeHFvZHZmb3pqa3NoenhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzODcyMTUsImV4cCI6MjEwOTk2MzIxNX0.w2Jn2UnCtJhlvBg0cAkvjJ7qTjDhryDcEn5X0tqEjjA";
-
-    let sb = null;
-    let panitiaList = [];
-    let tugasList = [];
-    let sekolahList = [];
-    let jadwalList = [];
-    let selectedScheduleDay = 1;
-    let activeSession = null; // { role: 'peserta'|'panitia', profile: {...} }
-    let html5QrScanner = null;
-
-    // Jadwal Cadangan Otomatis (Jika Tabel jadwal_rakor di Supabase Belum Dibuat)
-    const FALLBACK_JADWAL = [
-      { id_jadwal: 1, hari: 1, waktu: "08.00 - 09.30", judul_sesi: "Registrasi & Check-In Peserta (Scan QR)", deskripsi: "Pembagian Workshop Kit, ID Card & Absensi Hari Ke-1.", pemateri_pic: "Seksi Kesekretariatan & Perlengkapan", warna_label: "biru" },
-      { id_jadwal: 2, hari: 1, waktu: "09.30 - 12.00", judul_sesi: "Upacara Pembukaan Rakor K3S 2026", deskripsi: "Sambutan Ketua Panitia, Ketua K3S SD/MI Kota Kupang, dan Pembukaan Resmi oleh Kepala Dinas Pendidikan.", pemateri_pic: "Seksi Acara dan Humas", warna_label: "emas" },
-      { id_jadwal: 3, hari: 1, waktu: "15.30 - 20.00", judul_sesi: "Sesi Materi Kebijakan & Makan Malam", deskripsi: "Pemaparan Narasumber Utama dilanjutkan istirahat Snack Sore & Makan Malam Hari Ke-1.", pemateri_pic: "Narasumber & Seksi Konsumsi", warna_label: "hijau" },
-      { id_jadwal: 4, hari: 2, waktu: "07.30 - 09.00", judul_sesi: "Sarapan Pagi & Presensi Hari Ke-2", deskripsi: "Final Check Absensi Hari Ke-2 sebelum masuk ruang sidang.", pemateri_pic: "Seksi Perlengkapan & Konsumsi", warna_label: "biru" },
-      { id_jadwal: 5, hari: 2, waktu: "09.00 - 13.00", judul_sesi: "Sidang Komisi & Penyusunan Program K3S", deskripsi: "Pembahasan program kerja tahunan per komisi dan koordinasi antar 6 Sub Rayon.", pemateri_pic: "Sekretaris & Koordinator Komisi", warna_label: "hijau" },
-      { id_jadwal: 6, hari: 2, waktu: "13.00 - 20.00", judul_sesi: "Makan Siang, Pleno Komisi & Makan Malam", deskripsi: "Pemaparan hasil sidang tiap komisi dan penyelarasan program tingkat Kota Kupang.", pemateri_pic: "Seluruh Peserta & Panitia", warna_label: "emas" },
-      { id_jadwal: 7, hari: 3, waktu: "08.00 - 11.00", judul_sesi: "Presensi Hari Ke-3 & Perumusan Hasil Akhir", deskripsi: "Penandatanganan kesepakatan program kerja K3S SD/MI Kota Kupang 2026.", pemateri_pic: "Pengurus Inti K3S & Sekretaris", warna_label: "biru" },
-      { id_jadwal: 8, hari: 3, waktu: "11.00 - 13.00", judul_sesi: "Penutupan Resmi, Makan Siang & E-Sertifikat", deskripsi: "Penyelesaian administrasi transpor peserta dan penerbitan E-Sertifikat Rakor 2026.", pemateri_pic: "Seksi Kesekretariatan & Bendahara", warna_label: "hijau" }
-    ];
-
-    const DIVISI_LIST = [
-      "Penanggung Jawab",
-      "Ketua Panitia",
-      "Sekretaris",
-      "Bendahara",
-      "Seksi Kesekretariatan",
-      "Seksi Acara dan Humas",
-      "Seksi Konsumsi",
-      "Seksi Perlengkapan, Dokumentasi, dan Publikasi",
-      "Seksi Keamanan dan Ketertiban"
-    ];
-
-    const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
-
-    window.addEventListener("DOMContentLoaded", () => {
-      bootSupabase();
-    });
-
-    function bootSupabase() {
-      sb = window.supabase.createClient(DEFAULT_SB_URL, DEFAULT_SB_KEY);
-      refreshAllData(false);
-      setupRealtimeChannel();
-    }
-
-    async function refreshAllData(showNotif = false) {
-      if (!sb) return;
-      try {
-        const [rPan, rTgs, rSek, rJdw] = await Promise.all([
-          sb.from("panitia_rakor").select("*").order("no", { ascending: true }),
-          sb.from("manajemen_tugas").select("*").order("deadline", { ascending: true }),
-          sb.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true }),
-          sb.from("jadwal_rakor").select("*").order("id_jadwal", { ascending: true })
-        ]);
-
-        if (rPan.data) panitiaList = rPan.data;
-        if (rTgs.data) tugasList = rTgs.data;
-        if (rSek.data) sekolahList = rSek.data;
-        if (rJdw.data && rJdw.data.length > 0) {
-          jadwalList = rJdw.data;
-        } else {
-          jadwalList = FALLBACK_JADWAL;
-        }
-
-        document.getElementById("dbStatusBadge").textContent = `Server Aktif • ${sekolahList.length} Sekolah`;
-        populatePanitiaLoginDropdown();
-        onSubrayonLoginChange();
-        renderAllTabs();
-        if (showNotif) toast("Data terbaru berhasil dimuat!");
-      } catch (e) {
-        console.error(e);
-        document.getElementById("dbStatusBadge").textContent = "Gangguan Jaringan";
-      }
-    }
-
-    function setupRealtimeChannel() {
-      if (!sb) return;
-      sb.channel("k3s-live-sync")
-        .on("postgres_changes", { event: "*", schema: "public", table: "manajemen_tugas" }, () => refreshAllData(false))
-        .on("postgres_changes", { event: "*", schema: "public", table: "db_sekolah" }, () => refreshAllData(false))
-        .on("postgres_changes", { event: "*", schema: "public", table: "jadwal_rakor" }, () => refreshAllData(false))
-        .subscribe();
-    }
-
-    // Cek Apakah yang Login Adalah Sekretaris Panitia
-    function isUserSecretary() {
-      return (
-        activeSession &&
-        activeSession.role === "panitia" &&
-        activeSession.profile &&
-        activeSession.profile.divisi === "Sekretaris"
-      );
-    }
-
-    // =========================================================================
-    // SISTEM LOGIN BERTINGKAT & SCAN QR
-    // =========================================================================
-    function setLoginRole(role) {
-      const isPeserta = role === "peserta";
-      document.getElementById("loginFormPeserta").classList.toggle("hidden", !isPeserta);
-      document.getElementById("loginFormPanitia").classList.toggle("hidden", isPeserta);
-
-      document.getElementById("btnRolePeserta").className = isPeserta
-        ? "py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition"
-        : "py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition";
-
-      document.getElementById("btnRolePanitia").className = !isPeserta
-        ? "py-2.5 rounded-xl text-xs font-extrabold bg-blue-500 text-white shadow transition"
-        : "py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition";
-    }
-
-    function onSubrayonLoginChange() {
-      const sr = document.getElementById("loginSubrayonSelect").value;
-      const selSek = document.getElementById("loginSchoolSelect");
-      const hint = document.getElementById("schoolCountHint");
-
-      if (!sr) {
-        selSek.disabled = true;
-        selSek.innerHTML = `<option value="">-- Pilih Sub Rayon Terlebih Dahulu --</option>`;
-        hint.textContent = "Pilih rayon dulu";
-        return;
-      }
-
-      const list = sekolahList.filter(s => s.subrayon === sr);
-      selSek.disabled = false;
-      hint.textContent = `${list.length} Sekolah tersedia`;
-      selSek.innerHTML = `<option value="">-- Pilih Nama Sekolah (${list.length} SD/MI) --</option>`;
-      list.forEach(s => {
-        selSek.innerHTML += `<option value="${s.id_sekolah}">${s.nama_sekolah}</option>`;
-      });
-    }
-
-    function populatePanitiaLoginDropdown() {
-      const selPan = document.getElementById("loginPanitiaSelect");
-      const curVal = selPan.value;
-      selPan.innerHTML = `<option value="">-- Pilih Nama Panitia (${panitiaList.length} Orang) --</option>`;
-      panitiaList.forEach(p => {
-        const rayonTag = p.tugas_subrayon ? ` ★ Ketua Rayon ${p.tugas_subrayon}` : "";
-        selPan.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${rayonTag})</option>`;
-      });
-      if (curVal) selPan.value = curVal;
-    }
-
-    function togglePasswordVisibility(inputId, iconId) {
-      const inp = document.getElementById(inputId);
-      const ic = document.getElementById(iconId);
-      if (inp.type === "password") {
-        inp.type = "text";
-        ic.className = "fa-solid fa-eye-slash mr-0.5";
-      } else {
-        inp.type = "password";
-        ic.className = "fa-solid fa-eye mr-0.5";
-      }
-    }
-
-    function handleLoginSubmit(role) {
-      if (role === "peserta") {
-        const sr = document.getElementById("loginSubrayonSelect").value;
-        const idSek = document.getElementById("loginSchoolSelect").value;
-        const inputNpsn = document.getElementById("loginNpsnPassword").value.trim();
-
-        if (!sr) return toast("Langkah 1: Pilih Sub Rayon terlebih dahulu!");
-        if (!idSek) return toast("Langkah 2: Pilih Nama Sekolah Anda!");
-        if (!inputNpsn) return toast("Langkah 3: Masukkan Password berupa NPSN sekolah!");
-
-        const school = sekolahList.find(s => s.id_sekolah === idSek);
-        if (!school) return toast("Data sekolah tidak ditemukan.");
-
-        if (String(school.npsn).trim() !== inputNpsn) {
-          return toast("Password NPSN tidak cocok dengan sekolah yang dipilih!");
-        }
-
-        activeSession = { role: "peserta", profile: school };
-        toast(`Selamat datang, Kepsek ${school.nama_sekolah}!`);
-      } else {
-        const idPan = document.getElementById("loginPanitiaSelect").value;
-        const pin = document.getElementById("loginPinInput").value.trim();
-        if (!idPan) return toast("Pilih nama anggota panitia terlebih dahulu!");
-        if (pin !== "2026") return toast("PIN Panitia salah! Gunakan PIN: 2026");
-
-        const person = panitiaList.find(p => p.id_panitia === idPan);
-        if (!person) return;
-        activeSession = { role: "panitia", profile: person };
-        toast(`Selamat bertugas, ${person.nama_panitia}!`);
-      }
-
-      enterMainApp();
-    }
-
-    function openQrScannerModal() {
-      document.getElementById("qrScannerModal").classList.remove("hidden");
-      startCameraQrScanner();
-    }
-
-    async function closeQrScannerModal() {
-      document.getElementById("qrScannerModal").classList.add("hidden");
-      if (html5QrScanner) {
-        try {
-          await html5QrScanner.stop();
-          html5QrScanner.clear();
-        } catch (e) {}
-        html5QrScanner = null;
-      }
-    }
-
-    function startCameraQrScanner() {
-      if (html5QrScanner) return;
-      html5QrScanner = new Html5Qrcode("qrReader");
-      html5QrScanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 210, height: 210 } },
-        (decodedText) => {
-          processScannedQrLogin(decodedText);
-        },
-        () => {}
-      ).catch(() => {
-        toast("Izinkan akses kamera atau pilih gambar QR dari galeri.");
-      });
-    }
-
-    function scanQrFromFile(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const fileScanner = new Html5Qrcode("qrReader");
-      fileScanner.scanFile(file, true)
-        .then(decodedText => {
-          processScannedQrLogin(decodedText);
-        })
-        .catch(() => {
-          toast("QR Code tidak terbaca pada gambar tersebut.");
-        });
-    }
-
-    async function processScannedQrLogin(rawText) {
-      const clean = String(rawText || "").trim();
-      if (!clean) return;
-
-      const parts = clean.split("|");
-      if (parts[0] === "PESERTA" || parts[0] === "RAKOR2026") {
-        const npsn = parts[1];
-        const school = sekolahList.find(s => String(s.npsn) === String(npsn));
-        if (school) {
-          await closeQrScannerModal();
-          activeSession = { role: "peserta", profile: school };
-          toast(`Login QR Berhasil: ${school.nama_sekolah}`);
-          enterMainApp();
-          return;
-        }
-      }
-
-      if (parts[0] === "PANITIA") {
-        const idPan = parts[1];
-        const person = panitiaList.find(p => p.id_panitia === idPan);
-        if (person) {
-          await closeQrScannerModal();
-          activeSession = { role: "panitia", profile: person };
-          toast(`Login QR Panitia: ${person.nama_panitia}`);
-          enterMainApp();
-          return;
-        }
-      }
-
-      const schoolByNpsn = sekolahList.find(s => String(s.npsn) === clean || s.id_sekolah === clean);
-      if (schoolByNpsn) {
-        await closeQrScannerModal();
-        activeSession = { role: "peserta", profile: schoolByNpsn };
-        toast(`Login QR Berhasil: ${schoolByNpsn.nama_sekolah}`);
-        enterMainApp();
-        return;
-      }
-
-      const panitiaById = panitiaList.find(p => p.id_panitia === clean);
-      if (panitiaById) {
-        await closeQrScannerModal();
-        activeSession = { role: "panitia", profile: panitiaById };
-        toast(`Login QR Panitia: ${panitiaById.nama_panitia}`);
-        enterMainApp();
-        return;
-      }
-
-      toast("QR Code tidak dikenali dalam database Rakor 2026.");
-    }
-
-    function enterMainApp() {
-      document.getElementById("loginScreen").classList.add("hidden");
-      document.getElementById("mainAppScreen").classList.remove("hidden");
-
-      const avatar = document.getElementById("topUserAvatar");
-      const nameEl = document.getElementById("topUserName");
-      const roleBadge = document.getElementById("topUserRoleBadge");
-      const srBadge = document.getElementById("topUserSubrayonBadge");
-
-      if (activeSession.role === "panitia") {
-        const p = activeSession.profile;
-        avatar.textContent = p.nama_panitia.charAt(0);
-        nameEl.textContent = p.nama_panitia;
-        roleBadge.textContent = p.divisi;
-        if (p.tugas_subrayon) {
-          srBadge.textContent = `Ketua Rayon ${p.tugas_subrayon}`;
-          srBadge.classList.remove("hidden");
-          document.getElementById("srSelectFilter").value = p.tugas_subrayon;
-        } else {
-          srBadge.classList.add("hidden");
-        }
-        document.getElementById("taskFilterDivisi").value = p.divisi;
-      } else {
-        const s = activeSession.profile;
-        avatar.textContent = "SD";
-        nameEl.textContent = s.nama_sekolah;
-        roleBadge.textContent = `NPSN: ${s.npsn}`;
-        srBadge.textContent = `Sub Rayon ${s.subrayon}`;
-        srBadge.classList.remove("hidden");
-        document.getElementById("srSelectFilter").value = s.subrayon;
-      }
-
-      switchTab("beranda");
-      renderAllTabs();
-    }
-
-    function logoutApp() {
-      activeSession = null;
-      document.getElementById("loginNpsnPassword").value = "";
-      document.getElementById("mainAppScreen").classList.add("hidden");
-      document.getElementById("loginScreen").classList.remove("hidden");
-    }
-
-    // =========================================================================
-    // NAVIGASI 5 MENU FOOTER ANDROID
-    // =========================================================================
-    function switchTab(tabName) {
-      const tabs = {
-        beranda: "tabContentBeranda",
-        jadwal: "tabContentJadwal",
-        qr: "tabContentQr",
-        subrayon: "tabContentSubrayon",
-        kinerja: "tabContentKinerja"
-      };
-      const btns = {
-        beranda: "footerBtnBeranda",
-        jadwal: "footerBtnJadwal",
-        subrayon: "footerBtnSubrayon",
-        kinerja: "footerBtnKinerja"
-      };
-
-      Object.keys(tabs).forEach(k => {
-        document.getElementById(tabs[k]).classList.toggle("hidden", k !== tabName);
-      });
-
-      Object.keys(btns).forEach(k => {
-        document.getElementById(btns[k]).className =
-          k === tabName
-            ? "flex flex-col items-center justify-center py-1 text-blue-900 font-extrabold"
-            : "flex flex-col items-center justify-center py-1 text-slate-400 font-semibold";
-      });
-
-      renderAllTabs();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    // =========================================================================
-    // RENDER & CRUD JADWAL KEGIATAN (KHUSUS WEWENANG SEKRETARIS)
-    // =========================================================================
-    function filterScheduleDay(day) {
-      selectedScheduleDay = day;
-      [1, 2, 3].forEach(d => {
-        document.getElementById(`btnDay${d}`).className =
-          d === day
-            ? "py-2 rounded-xl text-xs font-extrabold bg-blue-900 text-white shadow"
-            : "py-2 rounded-xl text-xs font-bold text-slate-600";
-      });
-      renderJadwalTab();
-    }
-
-    function renderJadwalTab() {
-      const isSekretaris = isUserSecretary();
-      document.getElementById("btnAddSchedule").classList.toggle("hidden", !isSekretaris);
-      document.getElementById("secretaryScheduleBanner").classList.toggle("hidden", !isSekretaris);
-
-      const container = document.getElementById("scheduleListContainer");
-      const dayItems = jadwalList.filter(j => Number(j.hari) === Number(selectedScheduleDay));
-
-      if (dayItems.length === 0) {
-        container.innerHTML = `
-          <div class="p-6 text-center rounded-2xl bg-slate-50 border border-slate-200">
-            <p class="text-xs text-slate-500 font-semibold">Belum ada jadwal untuk Hari Ke-${selectedScheduleDay}.</p>
-            ${isSekretaris ? `<button onclick="openScheduleModal()" class="mt-2 text-xs font-extrabold text-blue-800 underline">+ Tambah Sesi Hari Ke-${selectedScheduleDay}</button>` : ''}
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = "";
-      dayItems.forEach(item => {
-        const badgeStyle =
-          item.warna_label === "emas"
-            ? "bg-amber-500 text-slate-950"
-            : item.warna_label === "hijau"
-            ? "bg-emerald-600 text-white"
-            : "bg-blue-900 text-white";
-
-        const secretaryButtons = isSekretaris
-          ? `<div class="flex flex-col gap-1 shrink-0">
-               <button onclick="openScheduleModal(${item.id_jadwal})" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-blue-800 text-xs flex items-center justify-center shadow-2xs" title="Edit Jadwal">
-                 <i class="fa-solid fa-pen"></i>
-               </button>
-               <button onclick="deleteScheduleItem(${item.id_jadwal})" class="w-7 h-7 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs flex items-center justify-center shadow-2xs" title="Hapus Jadwal">
-                 <i class="fa-solid fa-trash"></i>
-               </button>
-             </div>`
-          : "";
-
-        container.innerHTML += `
-          <div class="flex gap-3 items-start p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-            <div class="px-2.5 py-1.5 rounded-xl ${badgeStyle} font-extrabold text-[10px] shrink-0 text-center">
-              ${item.waktu}
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="font-extrabold text-xs text-slate-900 leading-snug">${item.judul_sesi}</div>
-              <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed">${item.deskripsi || ""}</p>
-              ${item.pemateri_pic ? `<div class="text-[10px] font-bold text-blue-800 mt-1"><i class="fa-solid fa-user-tag mr-1"></i>${item.pemateri_pic}</div>` : ""}
-            </div>
-            ${secretaryButtons}
-          </div>
-        `;
-      });
-    }
-
-    function openScheduleModal(idJadwal = null) {
-      if (!isUserSecretary()) {
-        return toast("Akses Ditolak: Hanya Sekretaris Panitia yang berwenang mengedit jadwal!");
-      }
-      document.getElementById("scheduleModal").classList.remove("hidden");
-
-      if (idJadwal) {
-        const item = jadwalList.find(j => Number(j.id_jadwal) === Number(idJadwal));
-        if (!item) return;
-        document.getElementById("modalScheduleHeader").textContent = "Edit Sesi Jadwal Kegiatan";
-        document.getElementById("modalScheduleId").value = item.id_jadwal;
-        document.getElementById("modalScheduleDay").value = item.hari;
-        document.getElementById("modalScheduleTime").value = item.waktu;
-        document.getElementById("modalScheduleTitle").value = item.judul_sesi;
-        document.getElementById("modalScheduleDesc").value = item.deskripsi || "";
-        document.getElementById("modalSchedulePic").value = item.pemateri_pic || "";
-        document.getElementById("modalScheduleColor").value = item.warna_label || "biru";
-      } else {
-        document.getElementById("modalScheduleHeader").textContent = "Tambah Sesi Jadwal Baru";
-        document.getElementById("modalScheduleId").value = "";
-        document.getElementById("modalScheduleDay").value = selectedScheduleDay;
-        document.getElementById("modalScheduleTime").value = "";
-        document.getElementById("modalScheduleTitle").value = "";
-        document.getElementById("modalScheduleDesc").value = "";
-        document.getElementById("modalSchedulePic").value = "";
-        document.getElementById("modalScheduleColor").value = "biru";
-      }
-    }
-
-    function closeScheduleModal() {
-      document.getElementById("scheduleModal").classList.add("hidden");
-    }
-
-    async function saveScheduleModal() {
-      if (!isUserSecretary()) {
-        return toast("Hanya Sekretaris Panitia yang berwenang menyimpan jadwal!");
-      }
-
-      const id = document.getElementById("modalScheduleId").value;
-      const hari = Number(document.getElementById("modalScheduleDay").value);
-      const waktu = document.getElementById("modalScheduleTime").value.trim();
-      const judul_sesi = document.getElementById("modalScheduleTitle").value.trim();
-      const deskripsi = document.getElementById("modalScheduleDesc").value.trim();
-      const pemateri_pic = document.getElementById("modalSchedulePic").value.trim();
-      const warna_label = document.getElementById("modalScheduleColor").value;
-
-      if (!waktu || !judul_sesi) {
-        return toast("Jam sesi dan Judul acara wajib diisi!");
-      }
-
-      if (id) {
-        const { error } = await sb
-          .from("jadwal_rakor")
-          .update({ hari, waktu, judul_sesi, deskripsi, pemateri_pic, warna_label })
-          .eq("id_jadwal", Number(id));
-        if (error) return toast("Pastikan tabel jadwal_rakor sudah di-Run di SQL Supabase!");
-        toast("Jadwal kegiatan berhasil diperbarui!");
-      } else {
-        const { error } = await sb
-          .from("jadwal_rakor")
-          .insert([{ hari, waktu, judul_sesi, deskripsi, pemateri_pic, warna_label }]);
-        if (error) return toast("Pastikan tabel jadwal_rakor sudah di-Run di SQL Supabase!");
-        toast("Sesi jadwal baru berhasil ditambahkan!");
-      }
-
-      selectedScheduleDay = hari;
-      closeScheduleModal();
-      refreshAllData(false);
-    }
-
-    async function deleteScheduleItem(idJadwal) {
-      if (!isUserSecretary()) {
-        return toast("Hanya Sekretaris Panitia yang dapat menghapus jadwal!");
-      }
-      if (!confirm("Hapus sesi kegiatan ini dari jadwal Rakor?")) return;
-      const { error } = await sb.from("jadwal_rakor").delete().eq("id_jadwal", Number(idJadwal));
-      if (error) return toast("Gagal menghapus, pastikan tabel jadwal_rakor sudah dibuat.");
-      toast("Sesi jadwal dihapus.");
-      refreshAllData(false);
-    }
-
-    // =========================================================================
-    // RENDER SELURUH DATA KE 5 TAB
-    // =========================================================================
-    function renderAllTabs() {
-      renderBerandaTab();
-      renderJadwalTab();
-      renderQrTab();
-      renderSubrayonTab();
-      renderKinerjaTab();
-    }
-
-    function renderBerandaTab() {
-      const totalSek = sekolahList.length || 158;
-      const ikutSek = sekolahList.filter(s => s.status_ikut === "Ikut").length;
-      const totalTgs = tugasList.length || 1;
-      const doneTgs = tugasList.filter(t => t.status === "Selesai").length;
-      const pctTgs = Math.round((doneTgs / totalTgs) * 100);
-
-      document.getElementById("homeMetricTotalSekolah").textContent = totalSek;
-      document.getElementById("homeMetricIkut").textContent = ikutSek;
-      document.getElementById("homeMetricKinerja").textContent = pctTgs + "%";
-
-      const srBox = document.getElementById("homeSubrayonBars");
-      srBox.innerHTML = "";
-      SUBRAYON_LIST.forEach(sr => {
-        const all = sekolahList.filter(s => s.subrayon === sr);
-        const ikut = all.filter(s => s.status_ikut === "Ikut").length;
-        const pct = all.length > 0 ? Math.round((ikut / all.length) * 100) : 0;
-        const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
-
-        srBox.innerHTML += `
-          <div onclick="openSubrayonFromHome('${sr}')" class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
-            <div class="flex justify-between text-xs font-bold mb-1">
-              <span class="text-slate-800">Sub Rayon ${sr} <span class="text-[10px] font-normal text-slate-500">(${ketua ? ketua.nama_panitia.split(',')[0] : ''})</span></span>
-              <span class="text-emerald-700 font-extrabold">${ikut}/${all.length} (${pct}%)</span>
-            </div>
-            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-              <div class="bg-emerald-500 h-full rounded-full" style="width:${pct}%"></div>
-            </div>
-          </div>
-        `;
-      });
-    }
-
-    function openSubrayonFromHome(sr) {
-      document.getElementById("srSelectFilter").value = sr;
-      switchTab("subrayon");
-    }
-
-    function renderQrTab() {
-      if (!activeSession) return;
-      const qrBox = document.getElementById("qrCodeCanvas");
-      qrBox.innerHTML = "";
-
-      if (activeSession.role === "peserta") {
-        const s = sekolahList.find(x => x.id_sekolah === activeSession.profile.id_sekolah) || activeSession.profile;
-        document.getElementById("qrCardTitle").textContent = s.nama_sekolah;
-        document.getElementById("qrCardSubtitle").textContent = `NPSN: ${s.npsn} • Sub Rayon ${s.subrayon}`;
-        document.getElementById("qrKepsekFormBox").classList.remove("hidden");
-        document.getElementById("qrInputNamaKepsek").value = s.nama_kepsek || "";
-
-        const pill = document.getElementById("qrStatusPill");
-        if (s.status_ikut === "Ikut") {
-          pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800";
-          pill.textContent = "✓ Terkonfirmasi Mengikuti Rakor";
-        } else if (s.status_ikut === "Tidak Ikut") {
-          pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-rose-100 text-rose-800";
-          pill.textContent = "✕ Status: Tidak Ikut";
-        } else {
-          pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800";
-          pill.textContent = "Menunggu Checklist Ketua Sub Rayon";
-        }
-
-        new QRCode(qrBox, {
-          text: `PESERTA|${s.npsn}|${s.nama_sekolah}|${s.subrayon}`,
-          width: 165,
-          height: 165
-        });
-      } else {
-        const p = activeSession.profile;
-        document.getElementById("qrCardTitle").textContent = p.nama_panitia;
-        document.getElementById("qrCardSubtitle").textContent = `${p.divisi} (${p.jabatan})`;
-        document.getElementById("qrKepsekFormBox").classList.add("hidden");
-
-        const pill = document.getElementById("qrStatusPill");
-        pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-blue-100 text-blue-900";
-        pill.textContent = p.tugas_subrayon ? `Panitia & Ketua Sub Rayon ${p.tugas_subrayon}` : "Panitia Resmi Rakor K3S 2026";
-
-        new QRCode(qrBox, {
-          text: `PANITIA|${p.id_panitia}|${p.nama_panitia}|${p.divisi}`,
-          width: 165,
-          height: 165
-        });
-      }
-    }
-
-    async function saveKepsekName() {
-      if (!activeSession || activeSession.role !== "peserta") return;
-      const val = document.getElementById("qrInputNamaKepsek").value.trim();
-      await sb.from("db_sekolah").update({ nama_kepsek: val }).eq("id_sekolah", activeSession.profile.id_sekolah);
-      toast("Nama Kepala Sekolah tersimpan!");
-      refreshAllData(false);
-    }
-
-    function renderSubrayonTab() {
-      const sr = document.getElementById("srSelectFilter").value;
-      const kw = document.getElementById("srSearchInput").value.toLowerCase().trim();
-      const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
-      const isPanitia = activeSession && activeSession.role === "panitia";
-
-      document.getElementById("srCoordinatorLabel").textContent = ketua
-        ? `Ketua Sub Rayon ${sr}: ${ketua.nama_panitia}`
-        : `Wilayah Sub Rayon ${sr}`;
-
-      document.getElementById("btnMarkAllSr").classList.toggle("hidden", !isPanitia);
-
-      const allSr = sekolahList.filter(s => s.subrayon === sr);
-      const ikutSr = allSr.filter(s => s.status_ikut === "Ikut").length;
-      const pct = allSr.length > 0 ? Math.round((ikutSr / allSr.length) * 100) : 0;
-
-      document.getElementById("srProgressTitle").textContent = `Sub Rayon ${sr}`;
-      document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Sekolah Ikut (${pct}%)`;
-      document.getElementById("srProgressBar").style.width = pct + "%";
-
-      const filtered = allSr.filter(
-        s => s.nama_sekolah.toLowerCase().includes(kw) || String(s.npsn).includes(kw)
-      );
-
-      const box = document.getElementById("srSchoolCardsContainer");
-      box.innerHTML = "";
-
-      filtered.forEach((s, i) => {
-        const isIkut = s.status_ikut === "Ikut";
-        const isTidak = s.status_ikut === "Tidak Ikut";
-
-        const actionButtons = isPanitia
-          ? `<div class="flex items-center gap-1.5 shrink-0">
-               <button onclick="updateSchoolParticipation('${s.id_sekolah}', 'Ikut')" class="px-3 py-2 rounded-xl text-xs font-extrabold transition ${isIkut ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-600'}">
-                 Ikut
-               </button>
-               <button onclick="updateSchoolParticipation('${s.id_sekolah}', 'Tidak Ikut')" class="px-2.5 py-2 rounded-xl text-xs font-bold transition ${isTidak ? 'bg-rose-600 text-white shadow' : 'bg-slate-100 text-slate-500'}">
-                 Tidak
-               </button>
-             </div>`
-          : `<span class="text-[11px] font-extrabold px-2.5 py-1 rounded-xl shrink-0 ${isIkut ? 'bg-emerald-100 text-emerald-800' : isTidak ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500'}">
-               ${s.status_ikut}
-             </span>`;
-
-        box.innerHTML += `
-          <div class="bg-white rounded-2xl p-3.5 border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} shadow-xs flex items-center justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-1.5">
-                <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
-                <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
-                <span class="text-[10px] font-bold text-blue-700">${s.status_sekolah}</span>
-              </div>
-              <h4 class="font-extrabold text-xs text-slate-900 truncate mt-0.5">${s.nama_sekolah}</h4>
-              <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
-            </div>
-            ${actionButtons}
-          </div>
-        `;
-      });
-    }
-
-    async function updateSchoolParticipation(idSekolah, statusBaru) {
-      await sb.from("db_sekolah").update({
-        status_ikut: statusBaru,
-        waktu_registrasi: new Date().toLocaleString("id-ID")
-      }).eq("id_sekolah", idSekolah);
-      toast(`Status sekolah: ${statusBaru}`);
-      refreshAllData(false);
-    }
-
-    async function markAllSubrayonSchools() {
-      const sr = document.getElementById("srSelectFilter").value;
-      if (!confirm(`Tandai seluruh sekolah di Sub Rayon ${sr} sebagai IKUT?`)) return;
-      await sb.from("db_sekolah").update({
-        status_ikut: "Ikut",
-        waktu_registrasi: new Date().toLocaleString("id-ID")
-      }).eq("subrayon", sr);
-      toast(`Semua sekolah Sub Rayon ${sr} ditandai Ikut!`);
-      refreshAllData(false);
-    }
-
-    function renderKinerjaTab() {
-      const total = tugasList.length;
-      const done = tugasList.filter(t => t.status === "Selesai").length;
-      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-      document.getElementById("kinerjaBigPercent").textContent = pct + "%";
-      document.getElementById("kinerjaSubtitleCount").textContent = `${done} dari ${total} Tugas Selesai`;
-      document.getElementById("kinerjaBigBar").style.width = pct + "%";
-
-      const phases = ["Perencanaan", "Persiapan", "Pelaksanaan", "Pasca-Acara"];
-      const pGrid = document.getElementById("kinerjaPhaseGrid");
-      pGrid.innerHTML = "";
-      phases.forEach(ph => {
-        const allP = tugasList.filter(t => t.tahapan === ph);
-        const doneP = allP.filter(t => t.status === "Selesai").length;
-        const pctP = allP.length > 0 ? Math.round((doneP / allP.length) * 100) : 0;
-        pGrid.innerHTML += `
-          <div onclick="filterByPhaseClick('${ph}')" class="bg-white/10 hover:bg-white/20 rounded-2xl p-2 cursor-pointer">
-            <div class="text-xs font-extrabold text-amber-300">${pctP}%</div>
-            <div class="text-[9px] text-blue-100 font-bold truncate">${ph}</div>
-            <div class="text-[9px] text-blue-300">${doneP}/${allP.length}</div>
-          </div>
-        `;
-      });
-
-      const dBars = document.getElementById("kinerjaDivisiBars");
-      dBars.innerHTML = "";
-      DIVISI_LIST.forEach(div => {
-        const allD = tugasList.filter(t => t.divisi === div);
-        const doneD = allD.filter(t => t.status === "Selesai").length;
-        const pctD = allD.length > 0 ? Math.round((doneD / allD.length) * 100) : 0;
-        const color = pctD === 100 ? "bg-emerald-500" : pctD > 0 ? "bg-blue-600" : "bg-slate-300";
-
-        dBars.innerHTML += `
-          <div onclick="filterByDivisiClick('${div}')" class="p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 cursor-pointer transition">
-            <div class="flex justify-between items-center text-xs font-bold mb-1">
-              <span class="text-slate-800 truncate pr-2">${div}</span>
-              <span class="text-blue-900 font-extrabold shrink-0">${doneD}/${allD.length} (${pctD}%)</span>
-            </div>
-            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-              <div class="${color} h-full rounded-full transition-all duration-300" style="width:${pctD}%"></div>
-            </div>
-          </div>
-        `;
-      });
-
-      renderTaskList();
-    }
-
-    function filterByPhaseClick(ph) {
-      document.getElementById("taskFilterPhase").value = ph;
-      renderTaskList();
-    }
-
-    function filterByDivisiClick(div) {
-      document.getElementById("taskFilterDivisi").value = div;
-      renderTaskList();
-    }
-
-    function resetTaskFilters() {
-      document.getElementById("taskFilterPhase").value = "ALL";
-      document.getElementById("taskFilterDivisi").value = "ALL";
-      renderTaskList();
-    }
-
-    function renderTaskList() {
-      const ph = document.getElementById("taskFilterPhase").value;
-      const div = document.getElementById("taskFilterDivisi").value;
-      const isPanitia = activeSession && activeSession.role === "panitia";
-
-      document.getElementById("btnAddTaskTop").classList.toggle("hidden", !isPanitia);
-
-      let list = tugasList;
-      if (ph !== "ALL") list = list.filter(t => t.tahapan === ph);
-      if (div !== "ALL") list = list.filter(t => t.divisi === div);
-
-      const box = document.getElementById("taskCardsContainer");
-      if (list.length === 0) {
-        box.innerHTML = `
-          <div class="bg-white rounded-3xl p-6 text-center border border-slate-200">
-            <p class="text-xs text-slate-500 font-semibold">Belum ada rincian tugas untuk divisi/tahapan ini.</p>
-            ${isPanitia ? `<button onclick="openTaskModal()" class="mt-2 text-xs font-extrabold text-blue-800 underline">+ Tambah Tugas Sekarang</button>` : ''}
-          </div>
-        `;
-        return;
-      }
-
-      box.innerHTML = "";
-      list.forEach(t => {
-        const isDone = t.status === "Selesai";
-        const pillStyle = isDone
-          ? "bg-emerald-100 text-emerald-800"
-          : t.status === "Sedang Berjalan"
-          ? "bg-amber-100 text-amber-800"
-          : "bg-slate-100 text-slate-600";
-
-        box.innerHTML += `
-          <div class="bg-white rounded-2xl p-3.5 border ${isDone ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'} shadow-xs flex items-start gap-3">
-            <button onclick="toggleTaskDone('${t.id_tugas}', '${t.status}')" class="mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent'}">
-              <i class="fa-solid fa-check text-xs"></i>
-            </button>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${pillStyle}">${t.status}</span>
-                <span class="text-[10px] font-bold bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md">${t.tahapan}</span>
-              </div>
-              <h4 class="font-extrabold text-xs text-slate-900 mt-1 ${isDone ? 'line-through text-slate-400' : ''}">${t.nama_pekerjaan}</h4>
-              <p class="text-[10px] text-slate-500 mt-0.5">${t.divisi} • Deadline: ${t.deadline || '-'}</p>
-            </div>
-            ${isPanitia ? `
-              <div class="flex flex-col gap-1 shrink-0">
-                <button onclick="openTaskModal('${t.id_tugas}')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-600 text-xs flex items-center justify-center">
-                  <i class="fa-solid fa-pen"></i>
-                </button>
-                <button onclick="deleteTaskItem('${t.id_tugas}')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 text-xs flex items-center justify-center">
-                  <i class="fa-solid fa-trash"></i>
-                </button>
-              </div>
-            ` : ''}
-          </div>
-        `;
-      });
-    }
-
-    async function toggleTaskDone(idTugas, currentStatus) {
-      if (!activeSession || activeSession.role !== "panitia") {
-        return toast("Hanya Panitia yang dapat mengubah status tugas!");
-      }
-      const next = currentStatus === "Selesai" ? "Belum Mulai" : "Selesai";
-      await sb.from("manajemen_tugas").update({
-        status: next,
-        waktu_update: new Date().toLocaleString("id-ID")
-      }).eq("id_tugas", idTugas);
-      toast(`Status tugas: ${next}`);
-      refreshAllData(false);
-    }
-
-    function openTaskModal(idTugas = null) {
-      document.getElementById("taskModal").classList.remove("hidden");
-      if (idTugas) {
-        const t = tugasList.find(x => x.id_tugas === idTugas);
-        if (!t) return;
-        document.getElementById("modalTaskHeader").textContent = "Edit Tugas Kepanitiaan";
-        document.getElementById("modalTaskId").value = t.id_tugas;
-        document.getElementById("modalTaskName").value = t.nama_pekerjaan;
-        document.getElementById("modalTaskDivisi").value = t.divisi;
-        document.getElementById("modalTaskPhase").value = t.tahapan;
-        document.getElementById("modalTaskDeadline").value = t.deadline || "2026-09-23";
-        document.getElementById("modalTaskStatus").value = t.status;
-      } else {
-        document.getElementById("modalTaskHeader").textContent = "Tambah Tugas Kepanitiaan Baru";
-        document.getElementById("modalTaskId").value = "";
-        document.getElementById("modalTaskName").value = "";
-        const curDiv = document.getElementById("taskFilterDivisi").value;
-        if (curDiv !== "ALL") document.getElementById("modalTaskDivisi").value = curDiv;
-        document.getElementById("modalTaskStatus").value = "Belum Mulai";
-      }
-    }
-
-    function closeTaskModal() {
-      document.getElementById("taskModal").classList.add("hidden");
-    }
-
-    async function saveTaskModal() {
-      const id = document.getElementById("modalTaskId").value;
-      const nama_pekerjaan = document.getElementById("modalTaskName").value.trim();
-      const divisi = document.getElementById("modalTaskDivisi").value;
-      const tahapan = document.getElementById("modalTaskPhase").value;
-      const deadline = document.getElementById("modalTaskDeadline").value;
-      const status = document.getElementById("modalTaskStatus").value;
-      const waktu_update = new Date().toLocaleString("id-ID");
-
-      if (!nama_pekerjaan) return toast("Nama pekerjaan wajib diisi!");
-
-      if (id) {
-        await sb.from("manajemen_tugas")
-          .update({ nama_pekerjaan, divisi, tahapan, deadline, status, waktu_update })
-          .eq("id_tugas", id);
-        toast("Tugas berhasil diperbarui!");
-      } else {
-        const newId = "TGS-" + Math.floor(100000 + Math.random() * 900000);
-        await sb.from("manajemen_tugas")
-          .insert([{ id_tugas: newId, nama_pekerjaan, divisi, tahapan, pic: "PAN-ADMIN", deadline, status, waktu_update }]);
-        toast("Tugas baru ditambahkan!");
-      }
-      closeTaskModal();
-      refreshAllData(false);
-    }
-
-    async function deleteTaskItem(idTugas) {
-      if (!confirm("Hapus tugas ini dari daftar?")) return;
-      await sb.from("manajemen_tugas").delete().eq("id_tugas", idTugas);
-      toast("Tugas berhasil dihapus.");
-      refreshAllData(false);
-    }
-
-    function toast(msg) {
-      const el = document.getElementById("toastBanner");
-      document.getElementById("toastText").textContent = msg;
-      el.classList.remove("hidden");
-      setTimeout(() => el.classList.add("hidden"), 2600);
-    }
-  </script>
+  <div id="toastBanner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full flex items-center gap-2 shadow-2xl">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i> <span id="toastText">Berhasil</span>
+  </div>
+
+  <!-- LOAD MAIN SCRIPT MODUL -->
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
