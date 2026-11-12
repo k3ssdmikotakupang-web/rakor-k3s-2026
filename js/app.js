@@ -17,6 +17,7 @@ import {
   openInfoKeuanganModal
 } from './keuangan.js';
 import { renderStatistikSekolahWidget } from './statistik_sekolah.js';
+import { bindUserProfileTrigger } from './profil.js';
 
 // Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
@@ -294,16 +295,7 @@ function showTab(name) {
 
 function renderAllViews() {
   updateStaticEventDatesToNov2026();
-
-  // Panggil modul profil secara aman jika file profil.js sudah dibuat
-  import('./profil.js')
-    .then(mod => {
-      if (mod && typeof mod.bindUserProfileTrigger === "function") {
-        mod.bindUserProfileTrigger(activeUser, () => loadAllDatabase(false));
-      }
-    })
-    .catch(() => {});
-
+  bindUserProfileTrigger(activeUser, () => loadAllDatabase(false));
   renderBerandaView();
   renderLiveJadwal();
   renderQrView();
