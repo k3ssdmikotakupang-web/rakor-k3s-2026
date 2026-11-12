@@ -1,12 +1,11 @@
 // js/statistik_sekolah.js
 import { sb, toast } from './supabase.js';
 
-let activeStatTab = 'infografis'; // 'infografis' | 'database'
+let activeStatTab = 'infografis';
 let editingSchoolId = null;
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
-// Cek Wewenang Edit & Download Database: HANYA Sekretaris dan Seksi Kesekretariatan
 export function canManageSchoolDatabase(activeUser) {
   return Boolean(
     activeUser &&
@@ -16,7 +15,6 @@ export function canManageSchoolDatabase(activeUser) {
   );
 }
 
-// Deteksi otomatis Jenjang SD atau MI dari nama sekolah
 function detectJenjang(namaSekolah = '') {
   const upper = String(namaSekolah).toUpperCase().trim();
   if (upper.startsWith('MI ') || upper.startsWith('MIN ') || upper.startsWith('MIS ') || upper.includes('MADRASAH IBTIDAIYAH')) {
@@ -25,7 +23,6 @@ function detectJenjang(namaSekolah = '') {
   return 'SD';
 }
 
-// Menyuntikkan Kartu Menu "Infografis & Database Sekolah" di Beranda dan Tab Sub Rayon (Bisa Dilihat Peserta & Panitia)
 export function renderStatistikSekolahWidget(activeUser, sekolahList, reloadCallback) {
   injectHomeStatButton(activeUser, sekolahList, reloadCallback);
   injectSubrayonStatButton(activeUser, sekolahList, reloadCallback);
@@ -59,10 +56,10 @@ function injectHomeStatButton(activeUser, sekolahList, reloadCallback) {
       <div>
         <div class="flex items-center gap-1.5 flex-wrap">
           <span class="text-xs font-extrabold text-white">Infografis & Profil ${totalSek} Sekolah</span>
-          ${isAdminDb ? `<span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">Edit & Unduh DB</span>` : ''}
+          ${isAdminDb ? '<span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">Edit & Unduh DB</span>' : ''}
         </div>
         <div class="text-[10px] text-sky-200 mt-0.5">
-          Sub Rayon, Jenjang SD/MI, Status (${totalNegeri} Negeri • ${totalSwasta} Swasta), Kecamatan & Kelurahan
+          Sub Rayon, Jenjang SD/MI, Status (${totalNegeri} Negeri - ${totalSwasta} Swasta), Kecamatan & Kelurahan
         </div>
       </div>
     </div>
@@ -96,11 +93,7 @@ function injectSubrayonStatButton(activeUser, sekolahList, reloadCallback) {
       </div>
     </div>
     <div class="flex items-center gap-1.5 shrink-0">
-      ${isAdminDb ? `
-        <button id="btnQuickExportCsv" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white font-extrabold text-[10px] shadow-2xs" title="Download Excel/CSV">
-          <i class="fa-solid fa-file-csv mr-0.5"></i>Unduh
-        </button>
-      ` : ''}
+      ${isAdminDb ? '<button id="btnQuickExportCsv" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white font-extrabold text-[10px] shadow-2xs"><i class="fa-solid fa-file-csv mr-0.5"></i>Unduh</button>' : ''}
       <button id="btnOpenStatFromRayon" class="px-3 py-1.5 rounded-xl bg-blue-900 text-white font-extrabold text-[10px] shadow-2xs">
         Buka Grafik
       </button>
@@ -132,7 +125,6 @@ function renderStatistikModalContent(activeUser, sekolahList, bodyEl, reloadCall
   const isAdminDb = canManageSchoolDatabase(activeUser);
 
   bodyEl.innerHTML = `
-    <!-- Switcher Tab: 1. Infografis Visual (Semua Pengguna) vs 2. Kelola & Unduh Database -->
     <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl">
       <button id="tabBtnStatGrafik" class="py-2 rounded-xl text-xs font-extrabold ${activeStatTab === 'infografis' ? 'bg-blue-900 text-white shadow' : 'text-slate-600'}">
         <i class="fa-solid fa-chart-pie mr-1"></i> Infografis Sekolah
@@ -141,7 +133,6 @@ function renderStatistikModalContent(activeUser, sekolahList, bodyEl, reloadCall
         <i class="fa-solid fa-database mr-1"></i> ${isAdminDb ? 'Edit & Unduh DB' : 'Tabel Direktori'}
       </button>
     </div>
-
     <div id="statSubViewContainer" class="space-y-3.5 pt-1"></div>
   `;
 
@@ -163,25 +154,19 @@ function renderStatistikModalContent(activeUser, sekolahList, bodyEl, reloadCall
   }
 }
 
-// =========================================================================
-// SUB-TAB 1: INFOGRAFIS DATA SEKOLAH (SUB RAYON, JENJANG, STATUS, KECAMATAN, KELURAHAN)
-// =========================================================================
 function renderInfografisView(sekolahList, container) {
   const total = sekolahList.length || 1;
 
-  // 1. Hitung berdasarkan Jenjang (SD vs MI)
   const countSD = sekolahList.filter(s => detectJenjang(s.nama_sekolah) === 'SD').length;
   const countMI = total - countSD;
   const pctSD = Math.round((countSD / total) * 100);
   const pctMI = 100 - pctSD;
 
-  // 2. Hitung berdasarkan Status Sekolah (Negeri vs Swasta)
   const countNegeri = sekolahList.filter(s => String(s.status_sekolah || '').toLowerCase() === 'negeri').length;
   const countSwasta = total - countNegeri;
   const pctNegeri = Math.round((countNegeri / total) * 100);
   const pctSwasta = 100 - pctNegeri;
 
-  // 3. Hitung berdasarkan Sub Rayon & Kecamatan
   const subrayonStats = SUBRAYON_LIST.map(sr => {
     const items = sekolahList.filter(s => s.subrayon === sr);
     const neg = items.filter(s => String(s.status_sekolah || '').toLowerCase() === 'negeri').length;
@@ -190,7 +175,6 @@ function renderInfografisView(sekolahList, container) {
     return { sr, count: items.length, neg, swa, ikut, pct: Math.round((items.length / total) * 100) };
   });
 
-  // 4. Hitung berdasarkan Kelurahan (51 Kelurahan di Kota Kupang)
   const kelurahanMap = {};
   sekolahList.forEach(s => {
     const kel = (s.kelurahan || 'Lainnya').trim();
@@ -200,9 +184,7 @@ function renderInfografisView(sekolahList, container) {
   const kelurahanList = Object.values(kelurahanMap).sort((a, b) => b.total - a.total);
 
   container.innerHTML = `
-    <!-- KARTU 1: JENJANG (SD vs MI) & STATUS SEKOLAH (NEGERI vs SWASTA) -->
     <div class="grid grid-cols-2 gap-2.5">
-      <!-- Kotak Jenjang -->
       <div class="p-3.5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-white space-y-2 shadow">
         <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
           <i class="fa-solid fa-graduation-cap mr-1"></i>Berdasarkan Jenjang
@@ -220,7 +202,6 @@ function renderInfografisView(sekolahList, container) {
         </div>
       </div>
 
-      <!-- Kotak Status Sekolah -->
       <div class="p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 to-teal-950 text-white space-y-2 shadow">
         <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300">
           <i class="fa-solid fa-building-flag mr-1"></i>Status Sekolah
@@ -239,7 +220,6 @@ function renderInfografisView(sekolahList, container) {
       </div>
     </div>
 
-    <!-- KARTU 2: GRAFIK SEBARAN PER SUB RAYON & KECAMATAN -->
     <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
       <div class="flex items-center justify-between">
         <div>
@@ -252,26 +232,29 @@ function renderInfografisView(sekolahList, container) {
       </div>
 
       <div class="space-y-2.5">
-        ${subrayonStats.map(st => `
-          <div class="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1.5">
-            <div class="flex items-center justify-between text-xs font-extrabold">
-              <span class="text-slate-900">Kec. / Sub Rayon ${st.sr}</span>
-              <span class="text-blue-900">${st.count} Sekolah (${st.pct}%)</span>
+        ${subrayonStats.map(st => {
+          const negW = st.count > 0 ? Math.round((st.neg / st.count) * 100) : 0;
+          const swaW = st.count > 0 ? Math.round((st.swa / st.count) * 100) : 0;
+          return `
+            <div class="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1.5">
+              <div class="flex items-center justify-between text-xs font-extrabold">
+                <span class="text-slate-900">Kec. / Sub Rayon ${st.sr}</span>
+                <span class="text-blue-900">${st.count} Sekolah (${st.pct}%)</span>
+              </div>
+              <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+                <div class="bg-blue-700 h-full" style="width:${negW}%"></div>
+                <div class="bg-amber-400 h-full" style="width:${swaW}%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-semibold text-slate-500">
+                <span><b class="text-blue-800">Negeri: ${st.neg}</b> | <b class="text-amber-600">Swasta: ${st.swa}</b></span>
+                <span class="text-emerald-700 font-bold">Ikut Rakor: ${st.ikut}/${st.count}</span>
+              </div>
             </div>
-            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
-              <div class="bg-blue-700 h-full" style="width:${Math.round((st.neg / st.count) * 100)}\%" title="Negeri: ${st.neg}"></div>
-              <div class="bg-amber-400 h-full" style="width:${Math.round((st.swa / st.count) * 100)}\%" title="Swasta: ${st.swa}"></div>
-            </div>
-            <div class="flex items-center justify-between text-[10px] font-semibold text-slate-500">
-              <span><b class="text-blue-800">● ${st.neg} Negeri</b> &nbsp; <b class="text-amber-600">● ${st.swa} Swasta</b></span>
-              <span class="text-emerald-700 font-bold">Ikut Rakor: ${st.ikut}/${st.count}</span>
-            </div>
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     </div>
 
-    <!-- KARTU 3: INFOGRAFIS SEBARAN PER KELURAHAN (${kelurahanList.length} KELURAHAN) -->
     <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
       <div class="flex items-center justify-between">
         <div>
@@ -282,7 +265,6 @@ function renderInfografisView(sekolahList, container) {
         </div>
         <input id="statSearchKelurahan" type="text" placeholder="Cari kelurahan..." class="w-32 rounded-xl border bg-white px-2.5 py-1 text-[11px] font-semibold" />
       </div>
-
       <div id="statKelurahanBarsBox" class="space-y-1.5 max-h-60 overflow-y-auto pr-0.5"></div>
     </div>
   `;
@@ -319,16 +301,12 @@ function renderInfografisView(sekolahList, container) {
   document.getElementById("statSearchKelurahan")?.addEventListener("input", renderKelurahanRows);
 }
 
-// =========================================================================
-// SUB-TAB 2: DIREKTORI, EDIT & DOWNLOAD DATABASE SEKOLAH (SEKRETARIS & KESEKRETARIATAN)
-// =========================================================================
 function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container, bodyEl, reloadCallback) {
   const editingItem = editingSchoolId
     ? sekolahList.find(s => s.id_sekolah === editingSchoolId)
     : null;
 
   container.innerHTML = `
-    <!-- Banner Otoritas & Tombol Download Excel/CSV -->
     <div class="p-3.5 rounded-2xl ${isAdminDb ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-200'} border flex items-center justify-between gap-2">
       <div>
         <div class="text-[10px] font-bold uppercase ${isAdminDb ? 'text-emerald-700' : 'text-slate-500'}">
@@ -347,24 +325,19 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
       ` : ''}
     </div>
 
-    <!-- FORM EDIT / TAMBAH SEKOLAH (KHUSUS SEKRETARIS & SEKSI KESEKRETARIATAN) -->
     ${isAdminDb ? `
       <div class="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-300 space-y-2.5">
         <div class="flex items-center justify-between">
           <span class="font-extrabold text-xs text-blue-950">
             <i class="fa-solid fa-pen-to-square text-blue-700 mr-1"></i>
-            ${editingItem ? `Edit Data: ${editingItem.nama_sekolah}` : '+ Tambah / Edit Data Sekolah Peserta'}
+            ${editingItem ? 'Edit Data: ' + editingItem.nama_sekolah : '+ Tambah / Edit Data Sekolah Peserta'}
           </span>
-          ${editingItem ? `
-            <button id="btnCancelEditSchool" class="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md">
-              Batal Edit
-            </button>
-          ` : ''}
+          ${editingItem ? '<button id="btnCancelEditSchool" class="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md">Batal Edit</button>' : ''}
         </div>
 
         <div class="grid grid-cols-3 gap-2">
           <div>
-            <label class="block text-[10px] font-bold text-slate-700 mb-0.5">NPSN (Password):</label>
+            <label class="block text-[10px] font-bold text-slate-700 mb-0.5">NPSN:</label>
             <input id="dbInpNpsn" type="text" value="${editingItem?.npsn || ''}" placeholder="8 Digit NPSN" class="w-full rounded-xl border bg-white px-2.5 py-1.5 text-xs font-bold" />
           </div>
           <div class="col-span-2">
@@ -412,7 +385,6 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
       </div>
     ` : ''}
 
-    <!-- Filter Pencarian Direktori Sekolah -->
     <div class="grid grid-cols-3 gap-1.5">
       <select id="dbFilterRayon" class="rounded-xl border bg-slate-50 px-2 py-2 text-[11px] font-bold text-blue-950">
         <option value="ALL">Semua Rayon</option>
@@ -517,7 +489,7 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
               <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${String(s.status_sekolah).toLowerCase() === 'negeri' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-800'}">${s.status_sekolah}</span>
             </div>
             <h4 class="font-extrabold text-xs text-slate-900 mt-1">${s.nama_sekolah}</h4>
-            <p class="text-[10px] text-slate-500">Kel. ${s.kelurahan || '-'} • Kec./Rayon ${s.subrayon} • ${s.alamat || '-'}</p>
+            <p class="text-[10px] text-slate-500">Kel. ${s.kelurahan || '-'} | Kec./Rayon ${s.subrayon} | ${s.alamat || '-'}</p>
             <p class="text-[10px] font-semibold text-blue-900 mt-0.5"><i class="fa-solid fa-user-tie mr-1"></i>Kepsek: ${s.nama_kepsek || 'Belum Diisi'}</p>
           </div>
 
@@ -546,7 +518,59 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
   document.getElementById("dbSearchKeyword")?.addEventListener("input", renderRows);
 }
 
-// Fungsi Export & Download Database Lengkap ke File Excel CSV (Khusus Sekretaris & Seksi Kesekretariatan)
 export function exportDatabaseToCsv(activeUser, sekolahList) {
   if (!canManageSchoolDatabase(activeUser)) {
-    return toast("Akses Ditolak: Hanya Sekretaris & Seksi Kesekretariatan yang
+    return toast("Akses Ditolak: Hanya Sekretaris & Seksi Kesekretariatan yang dapat mengunduh database!");
+  }
+
+  const headers = [
+    "No", "ID Sekolah", "NPSN", "Nama Sekolah", "Jenjang", "Status Sekolah",
+    "Sub Rayon / Kecamatan", "Kelurahan", "Alamat", "Nama Kepala Sekolah",
+    "Status Ikut Rakor", "Status Kontribusi (Rp 2 Jt)", "Nomor Kamar",
+    "Hadir H1", "Hadir H2", "Hadir H3", "Ambil Rakor Kit", "Terima Transpor",
+    "Status Izin", "Alasan Izin"
+  ];
+
+  const escapeCsv = (val) => {
+    const str = String(val ?? "").replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const rows = sekolahList.map((s, idx) => [
+    idx + 1,
+    s.id_sekolah || "",
+    s.npsn || "",
+    s.nama_sekolah || "",
+    detectJenjang(s.nama_sekolah),
+    s.status_sekolah || "",
+    s.subrayon || "",
+    s.kelurahan || "",
+    s.alamat || "",
+    s.nama_kepsek || "",
+    s.status_ikut || "Belum Konfirmasi",
+    s.status_bayar || "Belum Bayar",
+    s.nomor_kamar || "Belum Ditentukan",
+    s.hadir_h1 ? "Hadir" : "Belum",
+    s.hadir_h2 ? "Hadir" : "Belum",
+    s.hadir_h3 ? "Hadir" : "Belum",
+    s.ambil_kit ? "Sudah" : "Belum",
+    s.terima_transport ? "Sudah" : "Belum",
+    s.status_izin || "",
+    s.alasan_izin || ""
+  ].map(escapeCsv).join(","));
+
+  const csvBody = [headers.map(escapeCsv).join(","), ...rows].join("\r\n");
+  const bomBytes = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  const blob = new Blob([bomBytes, csvBody], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "Database_158_Sekolah_Rakor_K3S_Kupang.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  toast("Database 158 Sekolah (.CSV/Excel) berhasil diunduh!");
+}
