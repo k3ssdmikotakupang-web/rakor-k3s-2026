@@ -5,6 +5,14 @@ import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from
 import { openRoomManagerModal } from './kamar.js';
 import { openLayananDocumentModal, DEFAULT_LAYANAN } from './layanan.js';
 
+// Hilangkan error favicon.ico 404 di Console secara otomatis
+if (!document.querySelector("link[rel*='icon']")) {
+  const link = document.createElement("link");
+  link.rel = "icon";
+  link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>";
+  document.head.appendChild(link);
+}
+
 let activeUser = null;
 let panitiaList = [];
 let sekolahList = [];
@@ -25,19 +33,9 @@ const DIVISI_LIST = [
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
-const DEFAULT_LAYANAN = [
-  { kode_menu: "panduan", judul: "Buku Panduan Rakor 2026", deskripsi: "Panduan pelaksanaan, tata tertib, dan komisi Rakor K3S.", url_link: "", status_tersedia: "Siap Diunduh" },
-  { kode_menu: "dokumentasi", judul: "Galeri & Dokumentasi", deskripsi: "Kumpulan foto dan video kegiatan Rakor K3S secara real-time.", url_link: "", status_tersedia: "Live Update" },
-  { kode_menu: "sertifikat", judul: "E-Sertifikat Rakor", deskripsi: "Unduh E-Sertifikat resmi bagi Peserta dan Panitia Rakor 2026.", url_link: "", status_tersedia: "Terbit H+3" },
-  { kode_menu: "laporan", judul: "Laporan & Hasil Rakor", deskripsi: "Rumusan hasil rapat koordinasi dan Laporan Pertanggungjawaban (LPJ).", url_link: "", status_tersedia: "Pasca-Acara" },
-  { kode_menu: "materi", judul: "Materi Narasumber", deskripsi: "Bahan paparan Plt. Kadis P&K Kota Kupang dan pemateri Rakor.", url_link: "", status_tersedia: "Tersedia" }
-];
-
 initApp();
 
 async function initApp() {
-  await loadAllDatabase(false);
-
   initLogin(session => {
     activeUser = session;
     onLoginSuccess();
@@ -45,6 +43,7 @@ async function initApp() {
 
   initJadwal();
   bindNavigationAndActions();
+  await loadAllDatabase(false);
   setupRealtimeListeners();
 }
 
@@ -77,7 +76,6 @@ async function loadAllDatabase(showNotif = false) {
     if (badge) badge.textContent = `Online • ${sekolahList.length} Sekolah`;
 
     if (activeUser) {
-      // Perbarui profil sekolah aktif jika login sebagai peserta
       if (activeUser.role === "peserta") {
         const updatedSchool = sekolahList.find(s => s.id_sekolah === activeUser.profile.id_sekolah);
         if (updatedSchool) activeUser.profile = updatedSchool;
@@ -99,7 +97,6 @@ function bindNavigationAndActions() {
   document.getElementById("footerBtnQr")?.addEventListener("click", () => showTab("qr"));
   document.getElementById("footerBtnSubrayon")?.addEventListener("click", () => showTab("subrayon"));
 
-  // Tombol ke-5 Dinamis: Jika Peserta -> buka "absensi", jika Panitia -> buka "kinerja"
   document.getElementById("footerBtnFifth")?.addEventListener("click", () => {
     if (activeUser && activeUser.role === "panitia") {
       showTab("kinerja");
@@ -108,7 +105,6 @@ function bindNavigationAndActions() {
     }
   });
 
-  // 6 Tombol Menu Layanan di Beranda
   document.querySelectorAll(".service-menu-btn").forEach(btn => {
     btn.addEventListener("click", () => openServiceModal(btn.dataset.service));
   });
@@ -116,7 +112,6 @@ function bindNavigationAndActions() {
     document.getElementById("serviceModal")?.classList.add("hidden");
   });
 
-  // Sub-Tab di dalam Menu Absensi Peserta (Daftar Hadir vs Perijinan)
   document.getElementById("subTabBtnHadir")?.addEventListener("click", () => switchAbsensiSubTab("hadir"));
   document.getElementById("subTabBtnIzin")?.addEventListener("click", () => switchAbsensiSubTab("izin"));
   document.getElementById("btnSubmitIzin")?.addEventListener("click", submitPerijinanPeserta);
@@ -174,7 +169,6 @@ async function onLoginSuccess() {
     if (nameEl) nameEl.textContent = p.nama_panitia;
     if (roleBadge) roleBadge.textContent = p.divisi;
 
-    // Tombol ke-5 untuk Panitia adalah "Kinerja"
     if (fifthIcon) fifthIcon.className = "fa-solid fa-chart-pie";
     if (fifthLabel) fifthLabel.textContent = "Kinerja";
 
@@ -196,7 +190,6 @@ async function onLoginSuccess() {
     if (nameEl) nameEl.textContent = s.nama_sekolah;
     if (roleBadge) roleBadge.textContent = "KEPSEK";
 
-    // Tombol ke-5 untuk Peserta adalah "Absensi" (Kinerja disembunyikan total dari Peserta)
     if (fifthIcon) fifthIcon.className = "fa-solid fa-user-check";
     if (fifthLabel) fifthLabel.textContent = "Absensi";
 
@@ -214,7 +207,6 @@ async function onLoginSuccess() {
 }
 
 function showTab(name) {
-  // Cegah peserta membuka tab kinerja
   if (name === "kinerja" && (!activeUser || activeUser.role !== "panitia")) {
     name = "absensi";
   }
@@ -278,15 +270,14 @@ function renderAllViews() {
   }
 }
 
-// =========================================================================
-// 1. BERANDA & 6 MENU LAYANAN
-// =========================================================================
 function renderBerandaView() {
   const totalSek = sekolahList.length || 158;
   const ikutSek = sekolahList.filter(s => s.status_ikut === "Ikut").length;
 
-  document.getElementById("homeMetricTotalSekolah").textContent = totalSek;
-  document.getElementById("homeMetricIkut").textContent = ikutSek;
+  const elTot = document.getElementById("homeMetricTotalSekolah");
+  const elIkut = document.getElementById("homeMetricIkut");
+  if (elTot) elTot.textContent = totalSek;
+  if (elIkut) elIkut.textContent = ikutSek;
 
   const thirdVal = document.getElementById("homeMetricThirdVal");
   const thirdLbl = document.getElementById("homeMetricThirdLabel");
@@ -337,7 +328,6 @@ function renderBerandaView() {
   });
 }
 
-// Modal untuk 6 Menu Layanan (Kamar, Buku Panduan, Dokumentasi, Sertifikat, Materi, Laporan)
 function openServiceModal(serviceCode) {
   if (serviceCode === "kamar") {
     openRoomManagerModal(activeUser, sekolahList, () => loadAllDatabase(false));
@@ -346,9 +336,6 @@ function openServiceModal(serviceCode) {
   openLayananDocumentModal(serviceCode, activeUser, layananList, () => loadAllDatabase(false));
 }
 
-// =========================================================================
-// 2. TAB ABSENSI & PERIJINAN (KHUSUS PESERTA)
-// =========================================================================
 function switchAbsensiSubTab(mode) {
   const isHadir = mode === "hadir";
   document.getElementById("subViewHadirBox")?.classList.toggle("hidden", !isHadir);
@@ -415,7 +402,6 @@ function renderAbsensiPesertaView() {
     });
   }
 
-  // Render Status Perijinan Saat Ini
   const izinBanner = document.getElementById("currentIzinStatusBanner");
   if (s.status_izin && s.status_izin !== "Hadir Penuh (Tanpa Izin)") {
     izinBanner?.classList.remove("hidden");
@@ -450,9 +436,6 @@ async function submitPerijinanPeserta() {
   await loadAllDatabase(false);
 }
 
-// =========================================================================
-// 3. ID & QR CODE
-// =========================================================================
 function renderQrView() {
   if (!activeUser) return;
   const qrBox = document.getElementById("qrCodeCanvas");
@@ -532,9 +515,6 @@ async function saveNamaKepsek() {
   await loadAllDatabase(false);
 }
 
-// =========================================================================
-// 4. SUB RAYON (158 SEKOLAH)
-// =========================================================================
 function renderSubrayonView() {
   const srSelect = document.getElementById("srSelectFilter");
   const sr = srSelect?.value || "Maulafa";
@@ -621,9 +601,6 @@ async function markAllSubrayonIkut() {
   await loadAllDatabase(false);
 }
 
-// =========================================================================
-// 5. KINERJA & PANTAUAN ABSENSI/IZIN (KHUSUS INTERNAL PANITIA)
-// =========================================================================
 function renderKinerjaView() {
   const total = tugasList.length;
   const done = tugasList.filter(t => t.status === "Selesai").length;
@@ -633,7 +610,6 @@ function renderKinerjaView() {
   document.getElementById("kinerjaSubtitleCount").textContent = `${done} dari ${total} Tugas Selesai`;
   document.getElementById("kinerjaBigBar").style.width = pct + "%";
 
-  // Rekap Kehadiran H1, H2, H3 & Daftar Izin Peserta untuk Panitia
   const h1Count = sekolahList.filter(s => s.hadir_h1).length;
   const h2Count = sekolahList.filter(s => s.hadir_h2).length;
   const h3Count = sekolahList.filter(s => s.hadir_h3).length;
