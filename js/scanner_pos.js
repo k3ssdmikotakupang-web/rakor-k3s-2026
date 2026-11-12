@@ -374,39 +374,8 @@ function injectHomeScannerCard(activeUser, sekolahList, reloadCallback) {
 }
 
 function injectPesertaAbsensiKitCard(activeUser, sekolahList) {
-  if (!activeUser || activeUser.role !== 'peserta') return;
-  const subViewHadir = document.getElementById("subViewHadirBox");
-  if (!subViewHadir) return;
-
-  const s = sekolahList.find(x => x.id_sekolah === activeUser.profile.id_sekolah) || activeUser.profile;
-
-  let kitBox = document.getElementById("pesertaKitTransportStatusBox");
-  if (!kitBox) {
-    kitBox = document.createElement("div");
-    kitBox.id = "pesertaKitTransportStatusBox";
-    subViewHadir.appendChild(kitBox);
-  }
-
-  kitBox.className = "space-y-2 pt-2 border-t border-slate-100";
-  kitBox.innerHTML = `
-    <div class="text-[11px] font-extrabold text-slate-800 uppercase">Bukti Penerimaan Rakor Kit & Transpor:</div>
-    <div class="grid grid-cols-2 gap-2">
-      <div class="p-3 rounded-2xl border ${s.ambil_kit ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-200'}">
-        <div class="text-[10px] font-bold text-slate-500">Tas Rakor Kit & ATK</div>
-        <div class="text-xs font-extrabold mt-0.5 ${s.ambil_kit ? 'text-emerald-800' : 'text-slate-700'}">
-          ${s.ambil_kit ? '✓ SUDAH DITERIMA' : 'Belum Diambil'}
-        </div>
-        <div class="text-[9px] text-slate-400 mt-0.5">${s.waktu_ambil_kit || 'Tunjukkan QR di Meja Kit'}</div>
-      </div>
-      <div class="p-3 rounded-2xl border ${s.terima_transport ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200'}">
-        <div class="text-[10px] font-bold text-slate-500">Uang Transpor Peserta</div>
-        <div class="text-xs font-extrabold mt-0.5 ${s.terima_transport ? 'text-blue-900' : 'text-slate-700'}">
-          ${s.terima_transport ? '✓ SUDAH DITERIMA' : 'Belum Diterima'}
-        </div>
-        <div class="text-[9px] text-slate-400 mt-0.5">${s.waktu_terima_transport || 'Tunjukkan QR di Bendahara'}</div>
-      </div>
-    </div>
-  `;
+  const existing = document.getElementById("pesertaKitTransportStatusBox");
+  if (existing) existing.remove();
 }
 
 // =========================================================================
