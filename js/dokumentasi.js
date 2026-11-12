@@ -1,7 +1,7 @@
 // js/dokumentasi.js
 import { sb, toast } from './supabase.js';
 
-let activeDokTab = 'twibbon'; // 'twibbon' | 'galeri'
+let activeDokTab = 'twibbon'; // 'twibbon' | 'galeri' | 'internal_panitia'
 let galeriCache = [];
 let userPhotoImg = null;
 let framePhotoImg = null;
@@ -9,7 +9,6 @@ let photoScale = 1;
 let photoOffsetX = 0;
 let photoOffsetY = 0;
 
-// Cek apakah pengguna yang login adalah anggota Seksi Perlengkapan, Dokumentasi, dan Publikasi
 export function isUserSeksiDokumentasi(activeUser) {
   return Boolean(
     activeUser &&
@@ -32,14 +31,19 @@ export async function openDokumentasiModal(activeUser, reloadCallback) {
   const { data } = await sb.from("galeri_dokumentasi").select("*").order("id_dok", { ascending: false });
   galeriCache = data || [];
 
+  // Jika peserta mencoba membuka tab internal panitia, kembalikan ke tab twibbon
+  if ((!activeUser || activeUser.role !== 'panitia') && activeDokTab === 'internal_panitia') {
+    activeDokTab = 'twibbon';
+  }
+
   renderDokumentasiMain(activeUser, bodyEl, reloadCallback);
 }
 
 function renderDokumentasiMain(activeUser, bodyEl, reloadCallback) {
   const isSeksiDok = isUserSeksiDokumentasi(activeUser);
+  const isPanitia = Boolean(activeUser && activeUser.role === 'panitia');
 
   bodyEl.innerHTML = `
-    <!-- Info Penanggung Jawab -->
     <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-between">
       <div>
         <div class="text-[10px] font-bold uppercase text-rose-600">Penanggung Jawab Dokumentasi</div>
@@ -48,14 +52,19 @@ function renderDokumentasiMain(activeUser, bodyEl, reloadCallback) {
       ${isSeksiDok ? `<span class="text-[9px] font-extrabold bg-rose-600 text-white px-2 py-0.5 rounded-md">Mode Admin</span>` : ''}
     </div>
 
-    <!-- Switcher Sub-Tab: 1. Studio Twibbon Peserta vs 2. Galeri Foto & Video -->
-    <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl">
-      <button id="tabBtnTwibbon" class="py-2 rounded-xl text-xs font-extrabold ${activeDokTab === 'twibbon' ? 'bg-blue-900 text-white shadow' : 'text-slate-600'}">
-        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Twibbon Peserta
+    <!-- Switcher Sub-Tab: 2 Tab untuk Peserta, 3 Tab untuk Panitia (Ada Tab Internal Panitia!) -->
+    <div class="grid ${isPanitia ? 'grid-cols-3' : 'grid-cols-2'} gap-1 bg-slate-100 p-1 rounded-2xl">
+      <button id="tabBtnTwibbon" class="py-2 rounded-xl text-[11px] font-extrabold ${activeDokTab === 'twibbon' ? 'bg-blue-900 text-white shadow' : 'text-slate-600'}">
+        <i class="fa-solid fa-wand-magic-sparkles mr-0.5"></i> Twibbon
       </button>
-      <button id="tabBtnGaleri" class="py-2 rounded-xl text-xs font-extrabold ${activeDokTab === 'galeri' ? 'bg-blue-900 text-white shadow' : 'text-slate-600'}">
-        <i class="fa-solid fa-photo-film mr-1"></i> Foto & Video Acara
+      <button id="tabBtnGaleri" class="py-2 rounded-xl text-[11px] font-extrabold ${activeDokTab === 'galeri' ? 'bg-blue-900 text-white shadow' : 'text-slate-600'}">
+        <i class="fa-solid fa-photo-film mr-0.5"></i> Acara Umum
       </button>
+      ${isPanitia ? `
+        <button id="tabBtnInternalPanitia" class="py-2 rounded-xl text-[11px] font-extrabold ${activeDokTab === 'internal_panitia' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-600'}">
+          <i class="fa-solid fa-user-shield mr-0.5"></i> Internal Panitia
+        </button>
+      ` : ''}
     </div>
 
     <div id="dokSubContent" class="space-y-3 pt-1"></div>
@@ -71,16 +80,24 @@ function renderDokumentasiMain(activeUser, bodyEl, reloadCallback) {
     renderDokumentasiMain(activeUser, bodyEl, reloadCallback);
   });
 
+  document.getElementById("tabBtnInternalPanitia")?.addEventListener("click", () => {
+    if (!isPanitia) return;
+    activeDokTab = 'internal_panitia';
+    renderDokumentasiMain(activeUser, bodyEl, reloadCallback);
+  });
+
   const subBox = document.getElementById("dokSubContent");
   if (activeDokTab === 'twibbon') {
     renderTwibbonStudio(activeUser, isSeksiDok, subBox, bodyEl, reloadCallback);
-  } else {
+  } else if (activeDokTab === 'galeri') {
     renderMediaGallery(activeUser, isSeksiDok, subBox, bodyEl, reloadCallback);
+  } else if (activeDokTab === 'internal_panitia' && isPanitia) {
+    renderInternalPanitiaGallery(activeUser, isSeksiDok, subBox, bodyEl, reloadCallback);
   }
 }
 
 // =========================================================================
-// SUB-TAB 1: STUDIO TWIBBON INTERAKTIF + DINDING TWIBBON PESERTA
+// SUB-TAB 1: STUDIO TWIBBON INTERAKTIF
 // =========================================================================
 function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCallback) {
   const activeFrameItem = galeriCache.find(x => x.kategori === 'twibbon_frame');
@@ -95,14 +112,12 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
     : `${activeUser?.profile?.divisi || 'Panitia Rakor K3S Kota Kupang'}`;
 
   container.innerHTML = `
-    <!-- KHUSUS SEKSI PERLENGKAPAN, DOKUMENTASI & PUBLIKASI: UPLOAD MASTER FRAME TWIBBON PNG -->
     ${isSeksiDok ? `
       <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 space-y-2">
         <div class="flex items-center justify-between">
           <span class="font-extrabold text-xs text-amber-950"><i class="fa-solid fa-crown text-amber-600 mr-1"></i> Upload Bingkai Twibbon Resmi (PNG)</span>
           <span class="text-[9px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">Khusus Seksi Dok.</span>
         </div>
-        <p class="text-[10px] text-amber-800">Unggah file gambar bingkai Twibbon berformat <b>.PNG transparan</b> (ukuran disarankan 1080x1080 px).</p>
         <div class="flex gap-2">
           <input id="inputMasterFramePng" type="file" accept="image/png" class="flex-1 rounded-xl border border-amber-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold" />
           <button id="btnUploadMasterFrame" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-3 py-1.5 rounded-xl text-xs shrink-0 shadow">
@@ -112,19 +127,16 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
       </div>
     ` : ''}
 
-    <!-- AREA CANVAS PEMBUAT TWIBBON PESERTA -->
     <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
       <div class="text-center">
         <div class="font-extrabold text-xs text-slate-900">Buat & Unduh Foto Twibbon Anda</div>
         <p class="text-[10px] text-slate-500">Pilih foto terbaik Anda, atur posisi, lalu klik Unduh atau Posting</p>
       </div>
 
-      <!-- Canvas Pratinjau Twibbon 1:1 -->
       <div class="flex justify-center">
         <canvas id="twibbonCanvas" width="800" height="800" class="w-64 h-64 rounded-2xl border-2 border-slate-300 shadow-md bg-white"></canvas>
       </div>
 
-      <!-- Input Pilih Foto Diri Peserta -->
       <div>
         <label class="w-full py-2.5 px-4 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow">
           <i class="fa-solid fa-camera"></i>
@@ -133,7 +145,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
         </label>
       </div>
 
-      <!-- Pengatur Zoom & Geser Posisi Foto -->
       <div class="grid grid-cols-3 gap-2 bg-white p-2.5 rounded-xl border border-slate-200 text-[10px] font-bold text-slate-600">
         <div>
           <label class="block mb-1">Perbesar (Zoom)</label>
@@ -149,7 +160,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
         </div>
       </div>
 
-      <!-- Tombol Unduh ke HP & Posting ke Dinding Rakor -->
       <div class="grid grid-cols-2 gap-2">
         <button id="btnDownloadTwibbon" class="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow flex items-center justify-center gap-1.5">
           <i class="fa-solid fa-download"></i>
@@ -162,16 +172,13 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
       </div>
     </div>
 
-    <!-- DINDING TWIBBON PESERTA & KEPALA SEKOLAH -->
     <div class="space-y-2">
-      <div class="flex items-center justify-between">
-        <h4 class="font-extrabold text-xs text-slate-800 uppercase">
-          <i class="fa-solid fa-images text-indigo-600 mr-1"></i> Dinding Twibbon Peserta (${pesertaTwibbons.length})
-        </h4>
-      </div>
+      <h4 class="font-extrabold text-xs text-slate-800 uppercase">
+        <i class="fa-solid fa-images text-indigo-600 mr-1"></i> Dinding Twibbon Peserta (${pesertaTwibbons.length})
+      </h4>
       ${pesertaTwibbons.length === 0 ? `
         <div class="p-4 rounded-2xl bg-slate-50 border text-center text-[11px] text-slate-400">
-          Belum ada foto Twibbon yang diposting. Jadilah yang pertama!
+          Belum ada foto Twibbon yang diposting.
         </div>
       ` : `
         <div class="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-0.5">
@@ -198,7 +205,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
     </div>
   `;
 
-  // Siapkan gambar bingkai Twibbon (jika sudah diupload oleh Seksi Dokumentasi)
   framePhotoImg = null;
   if (activeFrameItem && activeFrameItem.url_media) {
     const fImg = new Image();
@@ -212,7 +218,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
 
   drawTwibbonCanvas(namaSekolah, subTitleBadge);
 
-  // Event Pilih Foto Diri Peserta
   document.getElementById("inputUserPhotoTwibbon")?.addEventListener("change", (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -234,7 +239,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
     reader.readAsDataURL(file);
   });
 
-  // Event Slider Zoom & Geser
   ["sliderZoom", "sliderPosX", "sliderPosY"].forEach(id => {
     document.getElementById(id)?.addEventListener("input", () => {
       photoScale = parseFloat(document.getElementById("sliderZoom").value || 1);
@@ -244,7 +248,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
     });
   });
 
-  // Event Unduh Twibbon ke HP
   document.getElementById("btnDownloadTwibbon")?.addEventListener("click", () => {
     const canvas = document.getElementById("twibbonCanvas");
     if (!canvas) return;
@@ -255,7 +258,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
     toast("Twibbon berhasil diunduh ke HP Anda!");
   });
 
-  // Event Posting Twibbon Peserta ke Dinding Galeri Rakor
   document.getElementById("btnShareTwibbonWall")?.addEventListener("click", async () => {
     if (!userPhotoImg) return toast("Pilih foto diri Anda terlebih dahulu (Langkah 1)!");
     const canvas = document.getElementById("twibbonCanvas");
@@ -275,7 +277,7 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
       if (upErr) {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-share-nodes"></i> 3. Posting ke Galeri`;
-        return toast("Gagal memposting! Pastikan SQL Langkah 1 sudah dijalankan.");
+        return toast("Gagal memposting.");
       }
 
       const { data: pubData } = sb.storage.from("dokumen_rakor").getPublicUrl(fileName);
@@ -288,14 +290,13 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
         waktu_upload: new Date().toLocaleString("id-ID")
       }]);
 
-      toast("Twibbon Anda berhasil tampil di Dinding Galeri Rakor!");
+      toast("Twibbon Anda berhasil tampil di Dinding Galeri!");
       openDokumentasiModal(activeUser, reloadCallback);
     }, "image/png");
   });
 
-  // Event Upload Bingkai Master Twibbon (Khusus Seksi Dokumentasi)
   document.getElementById("btnUploadMasterFrame")?.addEventListener("click", async () => {
-    if (!isSeksiDok) return toast("Hanya Seksi Perlengkapan, Dokumentasi & Publikasi yang berwenang!");
+    if (!isSeksiDok) return;
     const file = document.getElementById("inputMasterFramePng")?.files?.[0];
     if (!file) return toast("Pilih file bingkai .PNG terlebih dahulu!");
 
@@ -315,8 +316,6 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
     }
 
     const { data: pubData } = sb.storage.from("dokumen_rakor").getPublicUrl(fileName);
-
-    // Hapus frame lama dan simpan frame baru
     await sb.from("galeri_dokumentasi").delete().eq("kategori", "twibbon_frame");
     await sb.from("galeri_dokumentasi").insert([{
       kategori: "twibbon_frame",
@@ -326,14 +325,13 @@ function renderTwibbonStudio(activeUser, isSeksiDok, container, bodyEl, reloadCa
       waktu_upload: new Date().toLocaleString("id-ID")
     }]);
 
-    toast("Bingkai Twibbon resmi berhasil diperbarui!");
+    toast("Bingkai Twibbon resmi diperbarui!");
     openDokumentasiModal(activeUser, reloadCallback);
   });
 
   bindDeleteDokButtons(isSeksiDok, activeUser, reloadCallback);
 }
 
-// Mesin Penggambar Twibbon Otomatis (Foto Peserta + Bingkai PNG + Stamp Nama Sekolah)
 function drawTwibbonCanvas(namaSekolah, subTitleBadge) {
   const canvas = document.getElementById("twibbonCanvas");
   if (!canvas) return;
@@ -342,12 +340,9 @@ function drawTwibbonCanvas(namaSekolah, subTitleBadge) {
   const H = canvas.height;
 
   ctx.clearRect(0, 0, W, H);
-
-  // 1. Latar Belakang Dasar
   ctx.fillStyle = "#0f172a";
   ctx.fillRect(0, 0, W, H);
 
-  // 2. Gambar Foto Diri Peserta (Dapat Di-Zoom & Digeser)
   if (userPhotoImg) {
     const baseScale = Math.max(W / userPhotoImg.width, H / userPhotoImg.height);
     const finalScale = baseScale * photoScale;
@@ -367,11 +362,9 @@ function drawTwibbonCanvas(namaSekolah, subTitleBadge) {
     ctx.fillText("(Klik Tombol Biru di Bawah)", W / 2, H / 2 + 28);
   }
 
-  // 3. Jika Seksi Dokumentasi Sudah Upload Bingkai PNG, Tumpuk di Atas Foto
   if (framePhotoImg) {
     ctx.drawImage(framePhotoImg, 0, 0, W, H);
   } else {
-    // Bingkai Twibbon Default Elegan K3S Kota Kupang (Jika PNG belum diupload)
     const gradTop = ctx.createLinearGradient(0, 0, W, 130);
     gradTop.addColorStop(0, "#1e3a8a");
     gradTop.addColorStop(1, "#0f172a");
@@ -389,13 +382,11 @@ function drawTwibbonCanvas(namaSekolah, subTitleBadge) {
     ctx.font = "bold 22px 'Plus Jakarta Sans', sans-serif";
     ctx.fillText("K3S SD/MI KOTA KUPANG • PROVINSI NTT", W / 2, 88);
 
-    // Garis Bingkai Emas Keliling
     ctx.strokeStyle = "#fbbf24";
     ctx.lineWidth = 16;
     ctx.strokeRect(8, 8, W - 16, H - 16);
   }
 
-  // 4. Pita Identitas Otomatis di Bagian Bawah (Nama Sekolah & Sub Rayon)
   const bannerGrad = ctx.createLinearGradient(0, H - 140, 0, H);
   bannerGrad.addColorStop(0, "rgba(15, 23, 42, 0.85)");
   bannerGrad.addColorStop(1, "rgba(15, 23, 42, 0.98)");
@@ -417,7 +408,7 @@ function drawTwibbonCanvas(namaSekolah, subTitleBadge) {
 }
 
 // =========================================================================
-// SUB-TAB 2: GALERI FOTO & VIDEO KEGIATAN (DIKELOLA SEKSI DOKUMENTASI)
+// SUB-TAB 2: GALERI FOTO & VIDEO ACARA UMUM (UNTUK PESERTA & PANITIA)
 // =========================================================================
 function renderMediaGallery(activeUser, isSeksiDok, container, bodyEl, reloadCallback) {
   const mediaItems = galeriCache.filter(x => x.kategori === 'foto' || x.kategori === 'video');
@@ -426,7 +417,7 @@ function renderMediaGallery(activeUser, isSeksiDok, container, bodyEl, reloadCal
     ${isSeksiDok ? `
       <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 space-y-2.5">
         <div class="font-extrabold text-xs text-emerald-950">
-          <i class="fa-solid fa-cloud-arrow-up text-emerald-600 mr-1"></i> Panel Upload Dokumentasi Foto & Video
+          <i class="fa-solid fa-cloud-arrow-up text-emerald-600 mr-1"></i> Upload Dokumentasi Umum (Tampil ke Peserta)
         </div>
         <div class="grid grid-cols-3 gap-2">
           <select id="dokInputType" class="rounded-xl border bg-white px-2.5 py-2 text-xs font-bold">
@@ -435,10 +426,7 @@ function renderMediaGallery(activeUser, isSeksiDok, container, bodyEl, reloadCal
           </select>
           <input id="dokInputTitle" type="text" placeholder="Judul Sesi / Momen Kegiatan..." class="col-span-2 rounded-xl border bg-white px-3 py-2 text-xs font-semibold" />
         </div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-700 mb-1">Upload File Foto dari HP (atau masukkan Link Google Drive/YouTube di bawah):</label>
-          <input id="dokInputFile" type="file" accept="image/*,video/*" class="w-full rounded-xl border bg-white px-2.5 py-1.5 text-[11px]" />
-        </div>
+        <input id="dokInputFile" type="file" accept="image/*,video/*" class="w-full rounded-xl border bg-white px-2.5 py-1.5 text-[11px]" />
         <div class="flex gap-2">
           <input id="dokInputExternalUrl" type="url" placeholder="Atau tempel Link Folder Drive / Video..." class="flex-1 rounded-xl border bg-white px-3 py-2 text-xs" />
           <button id="btnSubmitMediaDok" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow shrink-0">
@@ -451,7 +439,7 @@ function renderMediaGallery(activeUser, isSeksiDok, container, bodyEl, reloadCal
     <div class="space-y-2.5 max-h-96 overflow-y-auto pr-0.5">
       ${mediaItems.length === 0 ? `
         <div class="p-6 rounded-2xl bg-slate-50 border text-center text-xs text-slate-400">
-          Belum ada foto atau video dokumentasi yang diunggah oleh Seksi Dokumentasi & Publikasi.
+          Belum ada foto atau video dokumentasi acara umum.
         </div>
       ` : mediaItems.map(item => `
         <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
@@ -517,11 +505,137 @@ function renderMediaGallery(activeUser, isSeksiDok, container, bodyEl, reloadCal
       waktu_upload: new Date().toLocaleString("id-ID")
     }]);
 
-    toast("Dokumentasi berhasil diterbitkan!");
+    toast("Dokumentasi acara berhasil diterbitkan!");
     openDokumentasiModal(activeUser, reloadCallback);
   });
 
   bindDeleteDokButtons(isSeksiDok, activeUser, reloadCallback);
+}
+
+// =========================================================================
+// SUB-TAB 3: DOKUMENTASI INTERNAL KEPANITIAAN (HANYA DIAKSES PANITIA!)
+// =========================================================================
+function renderInternalPanitiaGallery(activeUser, isSeksiDok, container, bodyEl, reloadCallback) {
+  const internalItems = galeriCache.filter(x => x.kategori === 'panitia_foto' || x.kategori === 'panitia_video');
+
+  container.innerHTML = `
+    <div class="p-3 rounded-2xl bg-slate-900 text-white flex items-center justify-between">
+      <div>
+        <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded">Akses Terbatas Panitia</span>
+        <h4 class="text-xs font-extrabold mt-1">Arsip & Dokumentasi Internal Kepanitiaan</h4>
+        <p class="text-[10px] text-slate-300">Dokumentasi rapat persiapan, koordinasi seksi & evaluasi internal.</p>
+      </div>
+      <i class="fa-solid fa-lock text-amber-300 text-lg"></i>
+    </div>
+
+    <!-- Seluruh Panitia atau Seksi Dokumentasi dapat mengunggah dokumentasi kerja seksi masing-masing -->
+    <div class="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 space-y-2.5">
+      <div class="font-extrabold text-xs text-amber-950">
+        <i class="fa-solid fa-camera text-amber-600 mr-1"></i> Upload Dokumentasi Kerja Kepanitiaan (${activeUser.profile?.divisi})
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <select id="panDokType" class="rounded-xl border bg-white px-2.5 py-2 text-xs font-bold">
+          <option value="panitia_foto">📸 Foto Panitia</option>
+          <option value="panitia_video">🎬 Video / Drive</option>
+        </select>
+        <input id="panDokTitle" type="text" placeholder="Contoh: Rapat Persiapan Seksi..." class="col-span-2 rounded-xl border bg-white px-3 py-2 text-xs font-semibold" />
+      </div>
+      <input id="panDokFile" type="file" accept="image/*,video/*" class="w-full rounded-xl border bg-white px-2.5 py-1.5 text-[11px]" />
+      <div class="flex gap-2">
+        <input id="panDokUrl" type="url" placeholder="Atau tempel Link Folder Drive Internal Panitia..." class="flex-1 rounded-xl border bg-white px-3 py-2 text-xs" />
+        <button id="btnSubmitPanDok" class="bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold px-4 py-2 rounded-xl text-xs shadow shrink-0">
+          Simpan
+        </button>
+      </div>
+    </div>
+
+    <div class="space-y-2.5 max-h-96 overflow-y-auto pr-0.5">
+      ${internalItems.length === 0 ? `
+        <div class="p-6 rounded-2xl bg-slate-50 border text-center text-xs text-slate-400">
+          Belum ada dokumentasi internal kepanitiaan yang diunggah.
+        </div>
+      ` : internalItems.map(item => {
+        const canDel = isSeksiDok || item.pengunggah === activeUser.profile?.nama_panitia;
+        return `
+          <div class="bg-white rounded-2xl border border-amber-200 overflow-hidden shadow-2xs">
+            ${item.kategori === 'panitia_foto' ? `
+              <img src="${item.url_media}" alt="${item.judul}" class="w-full max-h-56 object-cover" />
+            ` : ''}
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                    🔒 Internal • ${item.subrayon || 'Panitia'}
+                  </span>
+                  <span class="text-[9px] text-slate-400">${item.waktu_upload || ''}</span>
+                </div>
+                <h4 class="font-extrabold text-xs text-slate-900 mt-1">${item.judul}</h4>
+                <p class="text-[10px] text-slate-500">Diunggah oleh: ${item.pengunggah || 'Panitia'}</p>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <a href="${item.url_media}" target="_blank" rel="noopener noreferrer" download class="px-3 py-1.5 rounded-xl bg-slate-900 text-amber-300 font-extrabold text-[11px]">
+                  Buka / Unduh
+                </a>
+                ${canDel ? `
+                  <button class="btn-del-dok w-7 h-7 rounded-lg bg-rose-50 text-rose-600 text-xs" data-id="${item.id_dok}">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  document.getElementById("btnSubmitPanDok")?.addEventListener("click", async () => {
+    const kategori = document.getElementById("panDokType").value;
+    const judul = document.getElementById("panDokTitle").value.trim();
+    const file = document.getElementById("panDokFile")?.files?.[0];
+    let url_media = document.getElementById("panDokUrl").value.trim();
+
+    if (!judul) return toast("Masukkan judul dokumentasi kepanitiaan!");
+    if (!file && !url_media) return toast("Pilih file foto/video atau tempelkan link Drive!");
+
+    const btn = document.getElementById("btnSubmitPanDok");
+    btn.disabled = true;
+    btn.textContent = "Menyimpan...";
+
+    if (file) {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `internal_panitia_${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage.from("dokumen_rakor").upload(fileName, file, { upsert: true });
+      if (upErr) {
+        btn.disabled = false;
+        btn.textContent = "Simpan";
+        return toast("Gagal mengunggah file.");
+      }
+      const { data: pubData } = sb.storage.from("dokumen_rakor").getPublicUrl(fileName);
+      url_media = pubData.publicUrl;
+    }
+
+    await sb.from("galeri_dokumentasi").insert([{
+      kategori,
+      judul,
+      pengunggah: activeUser.profile.nama_panitia,
+      subrayon: activeUser.profile.divisi,
+      url_media,
+      waktu_upload: new Date().toLocaleString("id-ID")
+    }]);
+
+    toast("Dokumentasi internal panitia berhasil disimpan!");
+    openDokumentasiModal(activeUser, reloadCallback);
+  });
+
+  document.querySelectorAll(".btn-del-dok").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Hapus dokumentasi internal ini?")) return;
+      await sb.from("galeri_dokumentasi").delete().eq("id_dok", Number(btn.dataset.id));
+      toast("Dokumentasi dihapus.");
+      openDokumentasiModal(activeUser, reloadCallback);
+    });
+  });
 }
 
 function bindDeleteDokButtons(isSeksiDok, activeUser, reloadCallback) {
