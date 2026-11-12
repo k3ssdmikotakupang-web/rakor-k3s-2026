@@ -403,48 +403,181 @@ function renderAbsensiPesertaView() {
   const s = sekolahList.find(x => x.id_sekolah === activeUser.profile.id_sekolah) || activeUser.profile;
 
   const subEl = document.getElementById("absensiSchoolSubtitle");
-  if (subEl) subEl.textContent = `${s.nama_sekolah} • Sub Rayon ${s.subrayon}`;
+  if (subEl) subEl.textContent = `${s.nama_sekolah} (NPSN: ${s.npsn}) • Sub Rayon ${s.subrayon}`;
+
+  // Hitung total & persentase kehadiran 3 hari
+  const h1 = Boolean(s.hadir_h1);
+  const h2 = Boolean(s.hadir_h2);
+  const h3 = Boolean(s.hadir_h3);
+  const hadirCount = [h1, h2, h3].filter(Boolean).length;
+  const pctHadir = Math.round((hadirCount / 3) * 100);
 
   const days = [
-    { key: "hadir_h1", label: "Hari Ke-1 • Kamis, 19 Nov 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
-    { key: "hadir_h2", label: "Hari Ke-2 • Jumat, 20 Nov 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
-    { key: "hadir_h3", label: "Hari Ke-3 • Sabtu, 21 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
+    { key: "hadir_h1", isHadir: h1, dayNum: 1, label: "Hari Ke-1 • Kamis, 19 Nov 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
+    { key: "hadir_h2", isHadir: h2, dayNum: 2, label: "Hari Ke-2 • Jumat, 20 Nov 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
+    { key: "hadir_h3", isHadir: h3, dayNum: 3, label: "Hari Ke-3 • Sabtu, 21 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
   ];
+
+  // Sembunyikan teks petunjuk lama di bawah container dan ganti dengan Kartu Kontrol Lengkap
+  const subViewHadir = document.getElementById("subViewHadirBox");
+  if (subViewHadir && subViewHadir.children.length > 1) {
+    const oldInfoBox = subViewHadir.children[1];
+    if (oldInfoBox && oldInfoBox.id !== "pesertaKitTransportStatusBox") {
+      oldInfoBox.className = "hidden";
+    }
+  }
 
   const box = document.getElementById("absensiDaysContainer");
   if (box) {
-    box.innerHTML = "";
-    days.forEach((d, idx) => {
-      const isHadir = Boolean(s[d.key]);
-      const card = document.createElement("div");
-      card.className = `p-3.5 rounded-2xl border ${isHadir ? 'bg-emerald-50/50 border-emerald-300' : 'bg-slate-50 border-slate-200'} flex items-center justify-between gap-3`;
-      card.innerHTML = `
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${isHadir ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}">
-              ${isHadir ? 'HADIR TERCATAT' : 'BELUM PRESENSI'}
+    const statusBayar = s.status_bayar || "Belum Bayar";
+    const bayarColor = statusBayar === "Lunas"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+      : statusBayar === "Dalam Proses"
+      ? "bg-amber-100 text-amber-800 border-amber-300"
+      : "bg-rose-50 text-rose-700 border-rose-200";
+
+    box.innerHTML = `
+      <!-- 1. RINGKASAN PROGRES PRESENSI SCANNER & TOMBOL BUKA QR -->
+      <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white space-y-3 shadow-md">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
+              Sistem Presensi QR Scanner
             </span>
+            <h4 class="text-xs font-extrabold mt-1.5">Rekap Kehadiran Anda: ${hadirCount} dari 3 Hari</h4>
           </div>
-          <h4 class="font-extrabold text-xs text-slate-900 mt-1">${d.label}</h4>
-          <p class="text-[10px] text-slate-500 mt-0.5">${d.desc}</p>
+          <div class="text-right">
+            <div class="text-xl font-extrabold text-emerald-300">${pctHadir}%</div>
+            <div class="text-[9px] text-blue-200">Pola 32 JP</div>
+          </div>
         </div>
-        <button class="btn-checkin px-3.5 py-2.5 rounded-xl text-xs font-extrabold shrink-0 transition ${
-          isHadir
-            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-            : 'bg-blue-900 text-white shadow'
-        }">
-          ${isHadir ? 'Tercatat' : 'Konfirmasi Hadir'}
-        </button>
-      `;
 
-      card.querySelector(".btn-checkin").addEventListener("click", async () => {
-        const nextVal = !isHadir;
-        await sb.from("db_sekolah").update({ [d.key]: nextVal }).eq("id_sekolah", s.id_sekolah);
-        toast(nextVal ? `Presensi Hari Ke-${idx + 1} berhasil dicatat!` : `Presensi Hari Ke-${idx + 1} dibatalkan.`);
-        await loadAllDatabase(false);
-      });
+        <div class="w-full bg-white/15 h-2.5 rounded-full overflow-hidden">
+          <div class="bg-gradient-to-r from-amber-400 to-emerald-400 h-full rounded-full transition-all duration-300" style="width:${pctHadir}%"></div>
+        </div>
 
-      box.appendChild(card);
+        <div class="pt-1 flex items-center justify-between gap-2 border-t border-white/10">
+          <span class="text-[10px] text-blue-200 leading-snug">
+            <i class="fa-solid fa-qrcode text-amber-300 mr-1"></i> Kehadiran dicatat melalui pemindaian QR oleh Panitia.
+          </span>
+          <button type="button" id="btnShortcutToQrFromAbsen" class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] shrink-0 shadow">
+            Buka QR Saya
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. DAFTAR REKAP HARIAN (H1 - H3) MURNI HASIL SCAN PANITIA (READ-ONLY) -->
+      <div class="space-y-2 pt-1">
+        <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 px-1">
+          Status Verifikasi Kehadiran Harian (H1–H3)
+        </div>
+        ${days.map(d => `
+          <div class="p-3.5 rounded-2xl border ${d.isHadir ? 'bg-emerald-50/60 border-emerald-300' : 'bg-slate-50 border-slate-200'} flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5">
+                <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-md ${d.isHadir ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">
+                  ${d.isHadir ? '✓ TERVERIFIKASI HADIR' : '⏳ BELUM TERCATAT SCAN'}
+                </span>
+              </div>
+              <h4 class="font-extrabold text-xs text-slate-900 mt-1">${d.label}</h4>
+              <p class="text-[10px] text-slate-500 mt-0.5">${d.desc}</p>
+            </div>
+            <div class="shrink-0 text-right">
+              <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-extrabold ${
+                d.isHadir
+                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                  : 'bg-slate-200/70 text-slate-400 border border-slate-300'
+              }">
+                <i class="fa-solid ${d.isHadir ? 'fa-user-check' : 'fa-qrcode'}"></i>
+              </div>
+              <div class="text-[9px] font-bold mt-1 ${d.isHadir ? 'text-emerald-700' : 'text-slate-400'}">
+                ${d.isHadir ? 'Sah (Scan)' : 'Scan di Pos'}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- 3. KARTU KONTROL DATA TERKAIT (REGISTRASI, KAMAR, KONTRIBUSI, RAKOR KIT & TRANSPOR) -->
+      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+        <div class="font-extrabold text-xs text-slate-800 uppercase flex items-center gap-1.5">
+          <i class="fa-solid fa-clipboard-check text-blue-800"></i>
+          <span>Rekapitulasi Administrasi & Logistik Anda</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <!-- Status Registrasi -->
+          <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+            <div class="text-[10px] text-slate-500 font-semibold">Status Registrasi</div>
+            <div class="text-xs font-extrabold mt-0.5 ${s.status_ikut === 'Ikut' ? 'text-emerald-700' : 'text-amber-700'}">
+              ${s.status_ikut === 'Ikut' ? '✓ Terdaftar Ikut' : (s.status_ikut || 'Belum Konfirmasi')}
+            </div>
+            <div class="text-[9px] text-slate-400 mt-0.5 truncate">${s.waktu_registrasi || 'Via Sub Rayon / Pos 1'}</div>
+          </div>
+
+          <!-- Nomor Kamar Hotel -->
+          <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+            <div class="text-[10px] text-slate-500 font-semibold">Kamar Penginapan</div>
+            <div class="text-xs font-extrabold text-indigo-900 mt-0.5">
+              <i class="fa-solid fa-bed mr-1 text-indigo-600"></i>${s.nomor_kamar || 'Belum Ditentukan'}
+            </div>
+            <div class="text-[9px] text-slate-400 mt-0.5">Sesuai kuota kamar</div>
+          </div>
+
+          <!-- Status Kontribusi Kegiatan -->
+          <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+            <div class="text-[10px] text-slate-500 font-semibold">Kontribusi (Rp 2 Jt)</div>
+            <div class="mt-1">
+              <span class="text-[10px] font-extrabold px-2 py-0.5 rounded border ${bayarColor}">
+                ${statusBayar}
+              </span>
+            </div>
+            <div class="text-[9px] text-slate-400 mt-1 truncate">${s.waktu_bayar ? 'Update: ' + s.waktu_bayar.split(',')[0] : 'Bendahara / Rayon'}</div>
+          </div>
+
+          <!-- Status Perijinan -->
+          <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+            <div class="text-[10px] text-slate-500 font-semibold">Catatan Perijinan</div>
+            <div class="text-xs font-extrabold mt-0.5 ${s.status_izin && s.status_izin !== 'Hadir Penuh (Tanpa Izin)' ? 'text-amber-700' : 'text-slate-700'} truncate">
+              ${s.status_izin && s.status_izin !== 'Hadir Penuh (Tanpa Izin)' ? s.status_izin : 'Hadir Penuh (Normal)'}
+            </div>
+            <div class="text-[9px] text-slate-400 mt-0.5">Tab Perijinan di atas</div>
+          </div>
+        </div>
+
+        <!-- Bukti Serah Terima Rakor Kit & Uang Transpor (Hasil Scan Pos 5 & Pos 6) -->
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <div class="p-3 rounded-xl border ${s.ambil_kit ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-200'}">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-slate-600">Tas Rakor Kit & ATK</span>
+              <i class="fa-solid fa-briefcase text-xs ${s.ambil_kit ? 'text-emerald-600' : 'text-slate-400'}"></i>
+            </div>
+            <div class="text-xs font-extrabold mt-1 ${s.ambil_kit ? 'text-emerald-800' : 'text-slate-500'}">
+              ${s.ambil_kit ? '✓ SUDAH DITERIMA' : 'Belum Diambil'}
+            </div>
+            <div class="text-[9px] text-slate-400 mt-0.5 truncate">
+              ${s.ambil_kit ? `${s.waktu_ambil_kit || ''} (${s.petugas_kit || 'Panitia'})` : 'Scan QR di Meja Kit'}
+            </div>
+          </div>
+
+          <div class="p-3 rounded-xl border ${s.terima_transport ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-200'}">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold text-slate-600">Transpor Peserta</span>
+              <i class="fa-solid fa-wallet text-xs ${s.terima_transport ? 'text-blue-700' : 'text-slate-400'}"></i>
+            </div>
+            <div class="text-xs font-extrabold mt-1 ${s.terima_transport ? 'text-blue-900' : 'text-slate-500'}">
+              ${s.terima_transport ? '✓ SUDAH DITERIMA' : 'Belum Diterima'}
+            </div>
+            <div class="text-[9px] text-slate-400 mt-0.5 truncate">
+              ${s.terima_transport ? `${s.waktu_terima_transport || ''} (${s.petugas_transport || 'Bendahara'})` : 'Scan QR di Bendahara'}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById("btnShortcutToQrFromAbsen")?.addEventListener("click", () => {
+      showTab("qr");
     });
   }
 
