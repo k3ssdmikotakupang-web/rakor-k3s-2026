@@ -311,6 +311,7 @@ function renderAllViews() {
   renderCatatanPanitiaWidget(activeUser);
   renderStatistikSekolahWidget(activeUser, sekolahList, () => loadAllDatabase(false));
   renderK3sMusicPlayerWidget(activeUser, layananList, () => loadAllDatabase(false));
+  renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
   if (activeUser && activeUser.role === "panitia") {
     renderKinerjaView();
   }
