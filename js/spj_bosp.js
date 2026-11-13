@@ -392,10 +392,10 @@ async function generatePdfDaftarHadirIndividu(school) {
   });
 
   const dayRows = [
-    ["Hari Ke-1 (Kamis, 19 Nov 2026)", "Registrasi, Pembukaan & Kebijakan Dinas P&K", school.hadir_h1 ? "HADIR TERVERIFIKASI" : "BELUM TERCATAT", school.hadir_h1 ? "SAH (QR)" : "-"],
-    ["Hari Ke-2 (Jumat, 20 Nov 2026)", "Sidang Komisi & Penyusunan Program K3S", school.hadir_h2 ? "HADIR TERVERIFIKASI" : "BELUM TERCATAT", school.hadir_h2 ? "SAH (QR)" : "-"],
-    ["Hari Ke-3 (Sabtu, 21 Nov 2026)", "Perumusan Hasil Rakor & Penutupan Resmi", school.hadir_h3 ? "HADIR TERVERIFIKASI" : "BELUM TERCATAT", school.hadir_h3 ? "SAH (QR)" : "-"]
-  ];
+  ["Hari Ke-1 (Kamis, 26 Nov 2026)", "Registrasi, Pembukaan & Kebijakan Dinas P&K", school.hadir_h1 ? "HADIR TERVERIFIKASI" : "BELUM TERCATAT", school.hadir_h1 ? "SAH (QR)" : "-"],
+  ["Hari Ke-2 (Jumat, 27 Nov 2026)", "Sidang Komisi & Penyusunan Program K3S", school.hadir_h2 ? "HADIR TERVERIFIKASI" : "BELUM TERCATAT", school.hadir_h2 ? "SAH (QR)" : "-"],
+  ["Hari Ke-3 (Sabtu, 28 Nov 2026)", "Perumusan Hasil Rakor & Penutupan Resmi", school.hadir_h3 ? "HADIR TERVERIFIKASI" : "BELUM TERCATAT", school.hadir_h3 ? "SAH (QR)" : "-"]
+];
 
   let rowY = tableTop + 38;
   dayRows.forEach((r, idx) => {
@@ -474,7 +474,7 @@ async function generatePdfDaftarHadirKolektif(subrayon, srSchools, ketuaRayon) {
   const startX = 40;
   let y = 242;
   const colW = [34, 220, 185, 65, 65, 65, 80];
-  const headers = ["No", "Nama Sekolah (SD/MI)", "Nama Kepala Sekolah", "H1 (19/11)", "H2 (20/11)", "H3 (21/11)", "Ket. / Sah"];
+  const headers = ["No", "Nama Sekolah (SD/MI)", "Nama Kepala Sekolah", "H1 (26/11)", "H2 (27/11)", "H3 (28/11)", "Ket. / Sah"];
 
   ctx.fillStyle = "#0f172a";
   ctx.fillRect(startX, y, 714, 28);
