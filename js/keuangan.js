@@ -40,6 +40,7 @@ export function renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, t
   const gridContainer = firstServiceBtn ? firstServiceBtn.parentElement : null;
   if (!gridContainer) return;
 
+  const totalSekolah = sekolahList.length || 160;
   const nominalPerSekolah = Number(tarifAktif || TARIF_KONTRIBUSI_DEFAULT);
   const totalLunas = sekolahList.filter(s => s.status_bayar === "Lunas").length;
   const totalKasMasuk = totalLunas * nominalPerSekolah;
@@ -65,7 +66,7 @@ export function renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, t
             <span class="text-[9px] font-extrabold uppercase bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 px-1.5 py-0.5 rounded">Akses Khusus</span>
           </div>
           <div class="text-[11px] font-extrabold text-amber-300 mt-0.5">
-            Terkumpul: ${formatRupiah(totalKasMasuk)} <span class="text-[10px] font-normal text-emerald-200">(${totalLunas}/158 Lunas)</span>
+            Terkumpul: ${formatRupiah(totalKasMasuk)} <span class="text-[10px] font-normal text-emerald-200">(${totalLunas}/${totalSekolah} Lunas)</span>
           </div>
         </div>
       </div>
@@ -98,7 +99,7 @@ export function openInfoKeuanganModal(activeUser, sekolahList, panitiaList, nomi
 }
 
 function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bodyEl, reloadCallback) {
-  const totalSekolah = sekolahList.length || 158;
+  const totalSekolah = sekolahList.length || 160;
   const totalIkut = sekolahList.filter(s => s.status_ikut === "Ikut").length;
   const totalLunas = sekolahList.filter(s => s.status_bayar === "Lunas").length;
   const totalProses = sekolahList.filter(s => s.status_bayar === "Dalam Proses").length;
@@ -123,7 +124,7 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
         <div class="text-[10px] uppercase tracking-wider text-slate-300 font-bold">Total Dana Terkumpul di Bendahara (Lunas)</div>
         <div class="text-2xl font-extrabold text-amber-300 mt-0.5">${formatRupiah(kasTerkumpul)}</div>
         <div class="text-[10px] text-emerald-200 mt-0.5">
-          Target 158 Sekolah: <b>${formatRupiah(targetPenuh)}</b> | Target Ikut (${totalIkut}): <b>${formatRupiah(targetPesertaIkut)}</b>
+          Target ${totalSekolah} Sekolah: <b>${formatRupiah(targetPenuh)}</b> | Target Ikut (${totalIkut}): <b>${formatRupiah(targetPesertaIkut)}</b>
         </div>
       </div>
 
@@ -215,7 +216,7 @@ function renderKeuanganModalBody(activeUser, sekolahList, panitiaList, tarif, bo
 
       <div class="grid grid-cols-2 gap-2">
         <select id="keuFilterRayon" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-blue-950">
-          <option value="ALL" ${selectedDetailRayon === 'ALL' ? 'selected' : ''}>Semua Sub Rayon (158)</option>
+          <option value="ALL" ${selectedDetailRayon === 'ALL' ? 'selected' : ''}>Semua Sub Rayon (${totalSekolah})</option>
           ${SUBRAYON_ORDER.map(sr => `<option value="${sr}" ${selectedDetailRayon === sr ? 'selected' : ''}>Sub Rayon ${sr}</option>`).join('')}
         </select>
 
@@ -280,7 +281,7 @@ function renderFilteredSchoolFinanceRows(activeUser, sekolahList, tarif, bodyEl,
   }
 
   box.innerHTML = "";
-  list.slice(0, 80).forEach((s, idx) => {
+  list.slice(0, 165).forEach((s, idx) => {
     const statusBayar = s.status_bayar || "Belum Bayar";
     const canEdit = canEditPaymentAndParticipation(activeUser, s.subrayon);
 
