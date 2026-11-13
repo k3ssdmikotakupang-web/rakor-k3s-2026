@@ -44,7 +44,7 @@ function injectHomeStatButton(activeUser, sekolahList, reloadCallback) {
     gridContainer.appendChild(btn);
   }
 
-  const totalSek = sekolahList.length || 158;
+  const totalSek = sekolahList.length || 160;
   const totalNegeri = sekolahList.filter(s => String(s.status_sekolah).toLowerCase() === 'negeri').length;
   const totalSwasta = totalSek - totalNegeri;
 
