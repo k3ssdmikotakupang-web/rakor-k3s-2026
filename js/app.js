@@ -73,12 +73,18 @@ async function initApp() {
 }
 
 function updateStaticEventDatesToNov2026() {
-  document.querySelectorAll("span, p, div").forEach(el => {
+  document.querySelectorAll("span, p, div, h4, button").forEach(el => {
     if (el.children.length === 0 && el.textContent) {
-      if (el.textContent.includes("24–26 Sept") || el.textContent.includes("24-26 Sept")) {
-        el.textContent = el.textContent
-          .replace("24–26 September 2026", "19–21 November 2026")
-          .replace("24–26 Sept", "19–21 Nov");
+      const t = el.textContent;
+      if (t.includes("24–26") || t.includes("24-26") || t.includes("19–21") || t.includes("19-21") || t.includes("19 Nov") || t.includes("20 Nov") || t.includes("21 Nov")) {
+        el.textContent = t
+          .replace(/24[–-]26 September 2026/g, "26–28 November 2026")
+          .replace(/24[–-]26 Sept/g, "26–28 Nov")
+          .replace(/19[–-]21 November 2026/g, "26–28 November 2026")
+          .replace(/19[–-]21 Nov/g, "26–28 Nov")
+          .replace(/19 Nov/g, "26 Nov")
+          .replace(/20 Nov/g, "27 Nov")
+          .replace(/21 Nov/g, "28 Nov");
       }
     }
   });
@@ -422,10 +428,10 @@ function renderAbsensiPesertaView() {
   const pctHadir = Math.round((hadirCount / 3) * 100);
 
   const days = [
-    { key: "hadir_h1", isHadir: h1, dayNum: 1, label: "Hari Ke-1 • Kamis, 19 Nov 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
-    { key: "hadir_h2", isHadir: h2, dayNum: 2, label: "Hari Ke-2 • Jumat, 20 Nov 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
-    { key: "hadir_h3", isHadir: h3, dayNum: 3, label: "Hari Ke-3 • Sabtu, 21 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
-  ];
+  { key: "hadir_h1", isHadir: h1, dayNum: 1, label: "Hari Ke-1 • Kamis, 26 Nov 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
+  { key: "hadir_h2", isHadir: h2, dayNum: 2, label: "Hari Ke-2 • Jumat, 27 Nov 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
+  { key: "hadir_h3", isHadir: h3, dayNum: 3, label: "Hari Ke-3 • Sabtu, 28 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
+];
 
   const subViewHadir = document.getElementById("subViewHadirBox");
   if (subViewHadir && subViewHadir.children.length > 1) {
@@ -1140,13 +1146,13 @@ function openTaskModal(idTugas = null) {
     document.getElementById("modalTaskName").value = t.nama_pekerjaan;
     document.getElementById("modalTaskDivisi").value = t.divisi;
     document.getElementById("modalTaskPhase").value = t.tahapan;
-    document.getElementById("modalTaskDeadline").value = t.deadline || "2026-11-18";
+    document.getElementById("modalTaskDeadline").value = t.deadline || "2026-11-25";
     document.getElementById("modalTaskStatus").value = t.status;
   } else {
     document.getElementById("modalTaskHeader").textContent = "Tambah Tugas Baru";
     document.getElementById("modalTaskId").value = "";
     document.getElementById("modalTaskName").value = "";
-    document.getElementById("modalTaskDeadline").value = "2026-11-18";
+    document.getElementById("modalTaskDeadline").value = "2026-11-25";
     document.getElementById("modalTaskStatus").value = "Belum Mulai";
   }
 }
