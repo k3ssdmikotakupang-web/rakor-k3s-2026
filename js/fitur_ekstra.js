@@ -368,7 +368,7 @@ function renderLiveRunningTextBanner(activeUser, layananList, reloadCallback) {
   const broadcastItem = (layananList || []).find(x => x.kode_menu === 'pengumuman_live') || {
     kode_menu: 'pengumuman_live',
     judul: 'Info Penting Panitia',
-    deskripsi: 'Selamat datang Peserta Rakor Kepala SD/MI Kota Kupang (19–21 November 2026). Pastikan menunjukkan QR Code saat registrasi & pengambilan Rakor Kit.',
+    deskripsi: 'Selamat datang Peserta Rakor Kepala SD/MI Kota Kupang (26–28 November 2026). Pastikan menunjukkan QR Code saat registrasi & pengambilan Rakor Kit.',
     url_link: '35',
     status_tersedia: 'AKTIF'
   };
@@ -855,7 +855,7 @@ async function drawModernElegantIdBadge(ctx, x, y, w, h, item, mode, logoImg) {
 
   ctx.fillStyle = "#d97706";
   ctx.font = "800 10px 'Plus Jakarta Sans', Arial, sans-serif";
-  ctx.fillText("KOTA KUPANG • 19 – 21 NOVEMBER 2026", x + w / 2, y + 146);
+  ctx.fillText("KOTA KUPANG • 26 – 28 NOVEMBER 2026", x + w / 2, y + 146);
 
   const pillW = w - 48;
   const pillX = x + 24;
