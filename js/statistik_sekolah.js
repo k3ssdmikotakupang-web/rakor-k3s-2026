@@ -313,7 +313,7 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
           ${isAdminDb ? 'Mode Editor Database Aktif' : 'Direktori Database Sekolah'}
         </div>
         <div class="text-xs font-extrabold text-slate-900">
-          ${isAdminDb ? 'Sekretaris & Seksi Kesekretariatan' : 'Data Master 158 SD/MI Kota Kupang'}
+          ${isAdminDb ? 'Sekretaris & Seksi Kesekretariatan' : 'Data Master ' + (sekolahList.length || 160) + ' SD/MI Kota Kupang'}
         </div>
       </div>
 
@@ -477,7 +477,7 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
       );
     }
 
-    listBox.innerHTML = filtered.slice(0, 80).map((s, idx) => {
+    listBox.innerHTML = filtered.slice(0, 200).map((s, idx) => {
       const jenjang = detectJenjang(s.nama_sekolah);
       return `
         <div class="p-3 rounded-xl bg-white border border-slate-200 flex items-start justify-between gap-2">
@@ -566,11 +566,11 @@ export function exportDatabaseToCsv(activeUser, sekolahList) {
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = "Database_158_Sekolah_Rakor_K3S_Kupang.csv";
+  link.download = "Database_160_Sekolah_Rakor_K3S_Kupang.csv";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 
-  toast("Database 158 Sekolah (.CSV/Excel) berhasil diunduh!");
+  toast("Database 160 Sekolah (.CSV/Excel) berhasil diunduh!");
 }
