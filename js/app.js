@@ -73,11 +73,14 @@ async function initApp() {
 }
 
 function updateStaticEventDatesToNov2026() {
-  document.querySelectorAll("span, p, div, h4, button").forEach(el => {
+  const totalCount = (sekolahList && sekolahList.length > 0) ? sekolahList.length : 160;
+  document.querySelectorAll("span, p, div, h3, h4, button, option").forEach(el => {
     if (el.children.length === 0 && el.textContent) {
-      const t = el.textContent;
+      let t = el.textContent;
+      let changed = false;
+
       if (t.includes("24–26") || t.includes("24-26") || t.includes("19–21") || t.includes("19-21") || t.includes("19 Nov") || t.includes("20 Nov") || t.includes("21 Nov")) {
-        el.textContent = t
+        t = t
           .replace(/24[–-]26 September 2026/g, "26–28 November 2026")
           .replace(/24[–-]26 Sept/g, "26–28 Nov")
           .replace(/19[–-]21 November 2026/g, "26–28 November 2026")
@@ -85,7 +88,15 @@ function updateStaticEventDatesToNov2026() {
           .replace(/19 Nov/g, "26 Nov")
           .replace(/20 Nov/g, "27 Nov")
           .replace(/21 Nov/g, "28 Nov");
+        changed = true;
       }
+
+      if (t.includes("158")) {
+        t = t.replace(/158/g, String(totalCount));
+        changed = true;
+      }
+
+      if (changed) el.textContent = t;
     }
   });
 }
@@ -327,7 +338,7 @@ function renderAllViews() {
 }
 
 function renderBerandaView() {
-  const totalSek = sekolahList.length || 158;
+  const totalSek = sekolahList.length || 160;
   const ikutSek = sekolahList.filter(s => s.status_ikut === "Ikut").length;
 
   const elTot = document.getElementById("homeMetricTotalSekolah");
