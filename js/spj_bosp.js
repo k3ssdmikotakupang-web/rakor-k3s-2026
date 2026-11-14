@@ -472,113 +472,194 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
 
 // =========================================================================
 // 3. UPGRADE CARD "MEJA LAYANAN & OTORISASI POS" DI AKUN PANITIA:
-// Tampilkan Hadir H1, Hadir H2, Hadir H3, Rakor Kit & Transpor + Lacak Siapa yang Belum Absen
+// Deteksi Otomatis Kartu Meja Layanan + Tampilkan Hadir H1, H2, H3, Rakor Kit, Transpor & Lacak Belum Absen
 // =========================================================================
-function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
-  if (!activeUser || activeUser.role !== "panitia") return;
+let mejaPosObserver = null;
 
-  const box = document.getElementById("berandaPosLayananBox");
-  if (!box) return;
+function findMejaLayananCardElement() {
+  // 1. Cek berdasarkan daftar kemungkinan ID yang digunakan di scanner_pos.js / index.html
+  const candidateIds = [
+    "berandaPosLayananBox",
+    "posScannerHomeWidget",
+    "mejaLayananCard",
+    "panitiaPosControlCard",
+    "posLayananContainer"
+  ];
+  for (const id of candidateIds) {
+    const el = document.getElementById(id);
+    if (el) return el;
+  }
 
-  const totalSek = sekolahList.length || 160;
-  const h1Count = sekolahList.filter(s => s.hadir_h1).length;
-  const h2Count = sekolahList.filter(s => s.hadir_h2).length;
-  const h3Count = sekolahList.filter(s => s.hadir_h3).length;
-  const kitCount = sekolahList.filter(s => s.ambil_kit).length;
-  const transCount = sekolahList.filter(s => s.terima_transport).length;
-
-  const canUploadManual = canUploadManualAbsen(activeUser);
-  const hasManualFile = Boolean(manualAbsenRecord.url_link && manualAbsenRecord.url_link.trim() !== "");
-
-  // Cari grid 3 kolom lama (Hadir H1, Rakor Kit, Transpor) di dalam berandaPosLayananBox dan ganti dengan 5 indikator lengkap
-  let statsGrid = document.getElementById("upgradedMejaLayananStatsGrid");
-  if (!statsGrid) {
-    const oldThreeGrid = box.querySelector(".grid.grid-cols-3");
-    if (oldThreeGrid) {
-      oldThreeGrid.id = "upgradedMejaLayananStatsGrid";
-      statsGrid = oldThreeGrid;
-    } else {
-      statsGrid = document.createElement("div");
-      statsGrid.id = "upgradedMejaLayananStatsGrid";
-      box.insertBefore(statsGrid, box.firstChild);
+  // 2. Jika ID berbeda, cari langsung di dalam tabContentBeranda berdasarkan teks judul kartu ("Meja Layanan" / "Otorisasi Pos")
+  const tabBeranda = document.getElementById("tabContentBeranda") || document.body;
+  const headings = tabBeranda.querySelectorAll("h2, h3, h4, span, div");
+  for (const h of headings) {
+    if (h.children.length <= 2 && h.textContent) {
+      const txt = h.textContent.toLowerCase();
+      if (
+        (txt.includes("meja layanan") && txt.includes("otorisasi")) ||
+        txt.includes("meja layanan & otorisasi pos")
+      ) {
+        const card = h.closest(".bg-white, .rounded-3xl, .rounded-2xl");
+        if (card) return card;
+      }
     }
   }
 
-  statsGrid.className = "space-y-2";
-  statsGrid.innerHTML = `
-    <!-- Baris 1: Rekap Kehadiran 3 Hari (H1, H2, H3) -->
-    <div class="grid grid-cols-3 gap-2 text-center">
-      <div data-trackday="H1" class="btn-quick-track-day bg-blue-50 hover:bg-blue-100 rounded-2xl p-2 border border-blue-200 cursor-pointer transition">
-        <div class="text-sm font-extrabold text-blue-900">${h1Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-        <div class="text-[9px] font-extrabold text-blue-800 uppercase">Hadir H1 (26/11)</div>
-        <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h1Count}</div>
-      </div>
-      <div data-trackday="H2" class="btn-quick-track-day bg-indigo-50 hover:bg-indigo-100 rounded-2xl p-2 border border-indigo-200 cursor-pointer transition">
-        <div class="text-sm font-extrabold text-indigo-900">${h2Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-        <div class="text-[9px] font-extrabold text-indigo-800 uppercase">Hadir H2 (27/11)</div>
-        <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h2Count}</div>
-      </div>
-      <div data-trackday="H3" class="btn-quick-track-day bg-violet-50 hover:bg-violet-100 rounded-2xl p-2 border border-violet-200 cursor-pointer transition">
-        <div class="text-sm font-extrabold text-violet-900">${h3Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-        <div class="text-[9px] font-extrabold text-violet-800 uppercase">Hadir H3 (28/11)</div>
-        <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h3Count}</div>
-      </div>
-    </div>
+  // 3. Fallback: Cari grid 3 kolom di Beranda yang berisi teks "Hadir H1" dan "Rakor Kit"
+  const grids = tabBeranda.querySelectorAll(".grid.grid-cols-3");
+  for (const g of grids) {
+    const t = (g.textContent || "").toLowerCase();
+    if (t.includes("hadir h1") && t.includes("rakor kit")) {
+      return g.closest(".bg-white, .rounded-3xl, .rounded-2xl") || g.parentElement;
+    }
+  }
 
-    <!-- Baris 2: Rakor Kit & Uang Transpor -->
-    <div class="grid grid-cols-2 gap-2 text-center">
-      <div data-trackday="KIT" class="btn-quick-track-day bg-amber-50 hover:bg-amber-100 rounded-2xl p-2 border border-amber-200 flex items-center justify-between px-3 cursor-pointer transition">
-        <div class="text-left">
-          <div class="text-[9px] font-extrabold text-amber-900 uppercase">Ambil Rakor Kit</div>
-          <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - kitCount} Sekolah</div>
-        </div>
-        <div class="text-sm font-extrabold text-amber-800">${kitCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
-      </div>
-      <div data-trackday="TRANS" class="btn-quick-track-day bg-emerald-50 hover:bg-emerald-100 rounded-2xl p-2 border border-emerald-200 flex items-center justify-between px-3 cursor-pointer transition">
-        <div class="text-left">
-          <div class="text-[9px] font-extrabold text-emerald-900 uppercase">Terima Transpor</div>
-          <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - transCount} Sekolah</div>
-        </div>
-        <div class="text-sm font-extrabold text-emerald-800">${transCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
-      </div>
-    </div>
+  return null;
+}
 
-    <!-- Tombol Pelacak Kehadiran Peserta (Siapa yang Belum Absen) & Upload Absensi Manual -->
-    <div class="pt-1 space-y-1.5">
-      <button type="button" id="btnOpenAttendanceTrackerModal" class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 hover:from-slate-800 hover:to-blue-900 text-white font-extrabold text-xs shadow flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-user-clock text-amber-300"></i>
-          <span>Rekap Kehadiran & Lacak Peserta Belum Absen</span>
-        </div>
-        <span class="text-[9px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-extrabold">Lacak</span>
-      </button>
+function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
+  if (!activeUser || activeUser.role !== "panitia") return;
 
-      ${canUploadManual ? `
-        <button type="button" id="btnQuickUploadManualFromMeja" class="w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 font-extrabold text-[11px] flex items-center justify-between transition">
-          <span><i class="fa-solid fa-file-signature text-amber-700 mr-1.5"></i>Upload Scan Absensi Manual (SPJ BOSP)</span>
-          <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${hasManualFile ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'}">
-            ${hasManualFile ? '✓ Terunggah' : 'Upload PDF'}
-          </span>
+  const applyUpgradeToDom = () => {
+    const box = findMejaLayananCardElement();
+    if (!box) return;
+
+    const totalSek = sekolahList.length || 160;
+    const h1Count = sekolahList.filter(s => s.hadir_h1).length;
+    const h2Count = sekolahList.filter(s => s.hadir_h2).length;
+    const h3Count = sekolahList.filter(s => s.hadir_h3).length;
+    const kitCount = sekolahList.filter(s => s.ambil_kit).length;
+    const transCount = sekolahList.filter(s => s.terima_transport).length;
+
+    const canUploadManual = canUploadManualAbsen(activeUser);
+    const hasManualFile = Boolean(manualAbsenRecord.url_link && manualAbsenRecord.url_link.trim() !== "");
+
+    // Cegah re-render berulang jika konten kita sudah terpasang dan angkanya masih sama
+    const currentSig = `${totalSek}|${h1Count}|${h2Count}|${h3Count}|${kitCount}|${transCount}|${canUploadManual}|${hasManualFile}`;
+    const existingUpgraded = box.querySelector("#upgradedMejaLayananStatsGrid");
+    if (existingUpgraded && existingUpgraded.dataset.sig === currentSig) {
+      return;
+    }
+
+    // Cari grid 3 kolom lama (Hadir H1, Rakor Kit, Transport) di dalam kartu Meja Layanan
+    let targetSlot = existingUpgraded;
+    if (!targetSlot) {
+      const allThreeGrids = box.querySelectorAll(".grid.grid-cols-3");
+      for (const g of allThreeGrids) {
+        const txt = (g.textContent || "").toLowerCase();
+        if (txt.includes("hadir") || txt.includes("rakor kit") || txt.includes("transport") || txt.includes("transpor")) {
+          targetSlot = g;
+          break;
+        }
+      }
+    }
+
+    if (!targetSlot) {
+      targetSlot = document.createElement("div");
+      const firstBtnOrGrid = box.querySelector("button, .grid");
+      if (firstBtnOrGrid && firstBtnOrGrid.parentElement === box) {
+        box.insertBefore(targetSlot, firstBtnOrGrid);
+      } else {
+        box.appendChild(targetSlot);
+      }
+    }
+
+    targetSlot.id = "upgradedMejaLayananStatsGrid";
+    targetSlot.dataset.sig = currentSig;
+    targetSlot.className = "space-y-2 my-2";
+    targetSlot.innerHTML = `
+      <!-- Baris 1: Rekap Kehadiran 3 Hari (H1, H2, H3) -->
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div data-trackday="H1" class="btn-quick-track-day bg-blue-50 hover:bg-blue-100 rounded-2xl p-2 border border-blue-200 cursor-pointer transition shadow-2xs">
+          <div class="text-sm font-extrabold text-blue-900">${h1Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
+          <div class="text-[9px] font-extrabold text-blue-800 uppercase">Hadir H1 (26/11)</div>
+          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h1Count}</div>
+        </div>
+        <div data-trackday="H2" class="btn-quick-track-day bg-indigo-50 hover:bg-indigo-100 rounded-2xl p-2 border border-indigo-200 cursor-pointer transition shadow-2xs">
+          <div class="text-sm font-extrabold text-indigo-900">${h2Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
+          <div class="text-[9px] font-extrabold text-indigo-800 uppercase">Hadir H2 (27/11)</div>
+          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h2Count}</div>
+        </div>
+        <div data-trackday="H3" class="btn-quick-track-day bg-violet-50 hover:bg-violet-100 rounded-2xl p-2 border border-violet-200 cursor-pointer transition shadow-2xs">
+          <div class="text-sm font-extrabold text-violet-900">${h3Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
+          <div class="text-[9px] font-extrabold text-violet-800 uppercase">Hadir H3 (28/11)</div>
+          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h3Count}</div>
+        </div>
+      </div>
+
+      <!-- Baris 2: Rakor Kit & Uang Transpor -->
+      <div class="grid grid-cols-2 gap-2 text-center">
+        <div data-trackday="KIT" class="btn-quick-track-day bg-amber-50 hover:bg-amber-100 rounded-2xl p-2 border border-amber-200 flex items-center justify-between px-3 cursor-pointer transition shadow-2xs">
+          <div class="text-left">
+            <div class="text-[9px] font-extrabold text-amber-900 uppercase">Ambil Rakor Kit</div>
+            <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - kitCount} Sekolah</div>
+          </div>
+          <div class="text-sm font-extrabold text-amber-800">${kitCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
+        </div>
+        <div data-trackday="TRANS" class="btn-quick-track-day bg-emerald-50 hover:bg-emerald-100 rounded-2xl p-2 border border-emerald-200 flex items-center justify-between px-3 cursor-pointer transition shadow-2xs">
+          <div class="text-left">
+            <div class="text-[9px] font-extrabold text-emerald-900 uppercase">Terima Transpor</div>
+            <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - transCount} Sekolah</div>
+          </div>
+          <div class="text-sm font-extrabold text-emerald-800">${transCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
+        </div>
+      </div>
+
+      <!-- Tombol Pelacak Kehadiran Peserta (Siapa yang Belum Absen) & Upload Absensi Manual -->
+      <div class="pt-1 space-y-1.5">
+        <button type="button" id="btnOpenAttendanceTrackerModal" class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 hover:from-slate-800 hover:to-blue-900 text-white font-extrabold text-xs shadow flex items-center justify-between active:scale-[0.99] transition">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-user-clock text-amber-300"></i>
+            <span>Rekap Kehadiran & Lacak Peserta Belum Absen</span>
+          </div>
+          <span class="text-[9px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-extrabold">Lacak</span>
         </button>
-      ` : ''}
-    </div>
-  `;
 
-  statsGrid.querySelectorAll(".btn-quick-track-day").forEach(card => {
-    card.addEventListener("click", () => {
-      selectedRekapDay = card.dataset.trackday || "H1";
-      selectedRekapStatus = "BELUM";
+        ${canUploadManual ? `
+          <button type="button" id="btnQuickUploadManualFromMeja" class="w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 font-extrabold text-[11px] flex items-center justify-between transition">
+            <span><i class="fa-solid fa-file-signature text-amber-700 mr-1.5"></i>Upload Scan Absensi Manual (SPJ BOSP)</span>
+            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${hasManualFile ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'}">
+              ${hasManualFile ? '✓ Terunggah' : 'Upload PDF'}
+            </span>
+          </button>
+        ` : ''}
+      </div>
+    `;
+
+    targetSlot.querySelectorAll(".btn-quick-track-day").forEach(card => {
+      card.addEventListener("click", () => {
+        selectedRekapDay = card.dataset.trackday || "H1";
+        selectedRekapStatus = "BELUM";
+        openAttendanceTrackerModal(activeUser, sekolahList);
+      });
+    });
+
+    targetSlot.querySelector("#btnOpenAttendanceTrackerModal")?.addEventListener("click", () => {
       openAttendanceTrackerModal(activeUser, sekolahList);
     });
-  });
 
-  document.getElementById("btnOpenAttendanceTrackerModal")?.addEventListener("click", () => {
-    openAttendanceTrackerModal(activeUser, sekolahList);
-  });
+    targetSlot.querySelector("#btnQuickUploadManualFromMeja")?.addEventListener("click", () => {
+      openUploadManualAbsenModal(activeUser, sekolahList, []);
+    });
+  };
 
-  document.getElementById("btnQuickUploadManualFromMeja")?.addEventListener("click", () => {
-    openUploadManualAbsenModal(activeUser, sekolahList, []);
-  });
+  // Jalankan langsung & jadwalkan ulang untuk mengantisipasi render async dari scanner_pos.js
+  applyUpgradeToDom();
+  setTimeout(applyUpgradeToDom, 200);
+  setTimeout(applyUpgradeToDom, 650);
+
+  // Pasang pemantau pada tabContentBeranda agar jika scanner_pos.js merender ulang kartu Meja Layanan, upgrade kita otomatis dipasang kembali
+  const tabBeranda = document.getElementById("tabContentBeranda");
+  if (tabBeranda && !mejaPosObserver) {
+    mejaPosObserver = new MutationObserver(() => {
+      const box = findMejaLayananCardElement();
+      if (box && !box.querySelector("#upgradedMejaLayananStatsGrid")) {
+        applyUpgradeToDom();
+      }
+    });
+    mejaPosObserver.observe(tabBeranda, { childList: true, subtree: true });
+  }
 }
 
 // =========================================================================
