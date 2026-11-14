@@ -81,9 +81,25 @@ function ensureJsPdfLoaded() {
 }
 
 // =========================================================================
-// 1. PENATAAN GRID 9 MENU LAYANAN (3x3) & PEMINDAHAN SELURUH CARD PANITIA
+// 1. PENATAAN GRID 9 MENU LAYANAN (3x3) & SECTION "KHUSUS PANITIA & AKSES KHUSUS"
 // =========================================================================
 let gridObserverAttached = false;
+
+// Wewenang Merilis Running Text Info Khusus Panitia:
+// HANYA Penanggung Jawab, Ketua Panitia, Sekretaris, dan Seksi Konsumsi
+function canManagePanitiaTicker(activeUser) {
+  return Boolean(
+    activeUser &&
+    activeUser.role === "panitia" &&
+    activeUser.profile &&
+    [
+      "Penanggung Jawab",
+      "Ketua Panitia",
+      "Sekretaris",
+      "Seksi Konsumsi"
+    ].includes(activeUser.profile.divisi)
+  );
+}
 
 export function renderProdukRakorAndUniformCards(activeUser, layananList, reloadCallback) {
   const undanganBtn = document.querySelector('.service-menu-btn[data-service="undangan"]');
@@ -169,7 +185,7 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
 
   orderedNineButtons.forEach(btn => gridContainer.appendChild(btn));
 
-  // Fungsi penarik keluar seluruh Card Panitia & Infografis agar ditaruh di luar Grid 9 Menu
+  // Penataan Section "KHUSUS PANITIA & AKSES KHUSUS" serta Card Infografis
   const relocateExternalCards = () => {
     const layananSectionCard = gridContainer.closest(".bg-white") || gridContainer.parentElement;
     const subrayonBarsEl = document.getElementById("homeSubrayonBars");
@@ -182,7 +198,7 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
     if (!middleSlot) {
       middleSlot = document.createElement("div");
       middleSlot.id = "berandaMiddleSlotContainer";
-      middleSlot.className = "space-y-3";
+      middleSlot.className = "space-y-3.5";
     }
 
     if (subrayonSectionCard && subrayonSectionCard.parentElement === parentBeranda) {
@@ -191,42 +207,80 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
       layananSectionCard.insertAdjacentElement("afterend", middleSlot);
     }
 
-    // Urutan penempatan di luar Menu Layanan:
-    // Card Catatan & Evaluasi serta Card Rekap Profil Kepsek berada DI ATAS Card Infografis & Profil 160 Sekolah
-    const orderedExternalIds = [
-      "panitiaSpjControlWidget",      // Panel Otoritas Sekretaris/Bendahara (Jika ada)
-      "btnServiceInfoKeuangan",       // Card Info Keuangan (Khusus Panitia Inti/Rayon)
-      "btnServiceBulkIdCards",        // Card Cetak ID Card Kalung (Khusus Kesekretariatan)
-      "btnServiceCatatanPanitia",     // 1. Card Catatan & Evaluasi Kegiatan (DI ATAS INFOGRAFIS)
-      "btnServiceRekapProfilKepsek",  // 2. Card Rekap Profil Kepsek per Sub Rayon (DI ATAS INFOGRAFIS)
-      "btnServiceStatistikSekolah"    // 3. Card Infografis & Profil 160 Sekolah
-    ];
+    const isPanitia = Boolean(activeUser && activeUser.role === "panitia");
+    let panitiaSpecialCard = document.getElementById("panitiaSpecialAccessSection");
 
-    orderedExternalIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.classList.remove("col-span-3");
-        el.classList.add("w-full");
-        middleSlot.appendChild(el);
+    if (isPanitia) {
+      if (!panitiaSpecialCard) {
+        panitiaSpecialCard = document.createElement("div");
+        panitiaSpecialCard.id = "panitiaSpecialAccessSection";
+        panitiaSpecialCard.className = "bg-white rounded-3xl p-4 border-2 border-indigo-100 shadow-sm space-y-3";
+        panitiaSpecialCard.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-slate-900 text-amber-300 flex items-center justify-center text-xs shadow-2xs">
+                <i class="fa-solid fa-user-shield"></i>
+              </div>
+              <div>
+                <h3 class="font-extrabold text-xs text-slate-900 uppercase tracking-tight">Khusus Panitia & Akses Khusus</h3>
+                <p class="text-[10px] text-slate-500">Manajemen Keuangan, Rekap Profil, Evaluasi & Koordinasi</p>
+              </div>
+            </div>
+            <span class="text-[9px] font-extrabold uppercase bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full">
+              Internal Panitia
+            </span>
+          </div>
+          <div id="panitiaInternalTickerSlot"></div>
+          <div id="panitiaSpecialCardsBox" class="space-y-2.5"></div>
+        `;
       }
-    });
+      middleSlot.appendChild(panitiaSpecialCard);
 
-    // Sapu bersih jika masih ada elemen non-9-menu yang tidak sengaja masuk ke gridContainer
-    Array.from(gridContainer.children).forEach(child => {
-      if (!orderedNineButtons.includes(child)) {
-        child.classList.remove("col-span-3");
-        child.classList.add("w-full");
-        const statCard = document.getElementById("btnServiceStatistikSekolah");
-        if (statCard && statCard.parentElement === middleSlot) {
-          middleSlot.insertBefore(child, statCard);
-        } else {
-          middleSlot.appendChild(child);
-        }
+      // Render Running Text Khusus Panitia di dalam Card Khusus Panitia
+      renderPanitiaInternalTicker(activeUser, layananList, reloadCallback);
+
+      const cardsBox = document.getElementById("panitiaSpecialCardsBox");
+      if (cardsBox) {
+        // Urutan utama: 1. Info Keuangan & Kontribusi, 2. Rekap Profil Kepsek, 3. Catatan & Evaluasi (plus Otoritas SPJ & ID Card jika berwenang)
+        const panitiaCardIds = [
+          "btnServiceInfoKeuangan",
+          "btnServiceRekapProfilKepsek",
+          "btnServiceCatatanPanitia",
+          "panitiaSpjControlWidget",
+          "btnServiceBulkIdCards"
+        ];
+
+        panitiaCardIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.classList.remove("col-span-3");
+            el.classList.add("w-full");
+            cardsBox.appendChild(el);
+          }
+        });
+
+        // Jika ada elemen non-9-menu lain yang terselip di gridContainer, masukkan juga ke cardsBox
+        Array.from(gridContainer.children).forEach(child => {
+          if (!orderedNineButtons.includes(child) && child.id !== "btnServiceStatistikSekolah") {
+            child.classList.remove("col-span-3");
+            child.classList.add("w-full");
+            cardsBox.appendChild(child);
+          }
+        });
       }
-    });
+    } else {
+      if (panitiaSpecialCard) panitiaSpecialCard.remove();
+    }
+
+    // Tempatkan Card Infografis & Profil 160 Sekolah berdiri sendiri tepat di bawah Card Khusus Panitia (dan di atas Card Progres 6 Sub Rayon)
+    const statCard = document.getElementById("btnServiceStatistikSekolah");
+    if (statCard) {
+      statCard.classList.remove("col-span-3");
+      statCard.classList.add("w-full");
+      middleSlot.appendChild(statCard);
+    }
   };
 
-  // Jalankan instan & pasang pemantau otomatis jika ada card async (seperti Rekap Profil / SPJ) yang baru selesai dimuat
   relocateExternalCards();
   setTimeout(relocateExternalCards, 180);
   setTimeout(relocateExternalCards, 600);
@@ -239,6 +293,209 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
     });
     obs.observe(gridContainer, { childList: true });
   }
+}
+
+// Running Text Khusus Internal Panitia (Hanya bisa dirilis oleh PJ, Ketua, Sekretaris, dan Seksi Konsumsi)
+function renderPanitiaInternalTicker(activeUser, layananList, reloadCallback) {
+  const slot = document.getElementById("panitiaInternalTickerSlot");
+  if (!slot) return;
+
+  if (!document.getElementById("runningTextStyleTag")) {
+    const st = document.createElement("style");
+    st.id = "runningTextStyleTag";
+    st.textContent = `
+      @keyframes k3sSeamlessMarquee {
+        0% { transform: translate3d(0%, 0, 0); }
+        100% { transform: translate3d(-50%, 0, 0); }
+      }
+      .k3s-marquee-track {
+        display: flex;
+        width: max-content;
+        will-change: transform;
+        animation-name: k3sSeamlessMarquee;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+      }
+      .k3s-marquee-track:hover,
+      .k3s-marquee-track:active {
+        animation-play-state: paused;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  const item = (layananList || []).find(x => x.kode_menu === "pengumuman_panitia") || {
+    kode_menu: "pengumuman_panitia",
+    judul: "Koordinasi Internal Panitia",
+    deskripsi: "Semangat rekan-rekan Panitia Rakor K3S 2026! Pastikan seluruh kesiapan seksi dimonitor melalui tab Kinerja menjelang pelaksanaan 26–28 November 2026.",
+    url_link: "35",
+    status_tersedia: "AKTIF"
+  };
+
+  const rawSpeed = parseInt(item.url_link, 10);
+  const speedSec = (!isNaN(rawSpeed) && rawSpeed >= 15 && rawSpeed <= 90) ? rawSpeed : 35;
+  const isActive = item.status_tersedia !== "NONAKTIF";
+  const canEdit = canManagePanitiaTicker(activeUser);
+
+  if (!isActive && !canEdit) {
+    slot.innerHTML = "";
+    slot.dataset.sig = "";
+    return;
+  }
+
+  const sig = `${isActive}|${canEdit}|${speedSec}|${item.judul}|${item.deskripsi}`;
+  if (slot.dataset.sig === sig) {
+    const barEl = slot.firstElementChild;
+    if (barEl) barEl.onclick = () => openPanitiaTickerEditorModal(activeUser, item, speedSec, reloadCallback);
+    return;
+  }
+  slot.dataset.sig = sig;
+
+  const segmentHtml = `
+    <span class="inline-flex items-center pr-12">
+      <b class="text-amber-300 mr-1.5">[${item.judul}]:</b>
+      <span>${item.deskripsi}</span>
+      <span class="mx-6 text-indigo-400">•</span>
+      <b class="text-amber-300 mr-1.5">[${item.judul}]:</b>
+      <span>${item.deskripsi}</span>
+      <span class="mx-6 text-indigo-400">•</span>
+    </span>
+  `;
+
+  slot.innerHTML = `
+    <div class="rounded-2xl p-2.5 border shadow-2xs flex items-center justify-between gap-2 cursor-pointer ${
+      isActive
+        ? 'bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-indigo-500/40 text-white'
+        : 'bg-slate-100 border-slate-300 text-slate-500'
+    }">
+      <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+        <span class="px-2 py-1 rounded-xl ${isActive ? 'bg-amber-400 text-slate-950' : 'bg-slate-400 text-white'} font-extrabold text-[9px] uppercase tracking-wider shrink-0 flex items-center gap-1 shadow-2xs">
+          <i class="fa-solid fa-walkie-talkie"></i>
+          <span>${isActive ? 'INFO PANITIA' : 'OFF'}</span>
+        </span>
+        <div class="overflow-hidden flex-1 relative">
+          ${isActive ? `
+            <div class="k3s-marquee-track text-xs font-bold text-slate-100" style="animation-duration: ${speedSec}s;">
+              ${segmentHtml}
+              ${segmentHtml}
+            </div>
+          ` : `
+            <div class="text-xs font-bold text-slate-500 truncate">
+              [Info Panitia Nonaktif] ${item.deskripsi}
+            </div>
+          `}
+        </div>
+      </div>
+      ${canEdit ? `
+        <button type="button" class="px-2.5 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-amber-300 border border-amber-400/30 font-extrabold text-[10px] shrink-0 flex items-center gap-1">
+          <i class="fa-solid fa-pen"></i>
+          <span>Siarkan</span>
+        </button>
+      ` : ''}
+    </div>
+  `;
+
+  if (slot.firstElementChild) {
+    slot.firstElementChild.onclick = () => openPanitiaTickerEditorModal(activeUser, item, speedSec, reloadCallback);
+  }
+}
+
+function openPanitiaTickerEditorModal(activeUser, item, currentSpeedSec, reloadCallback) {
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  const canEdit = canManagePanitiaTicker(activeUser);
+  const isActive = item.status_tersedia !== "NONAKTIF";
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-walkie-talkie text-indigo-700 mr-1.5"></i> Info & Instruksi Khusus Panitia`;
+
+  bodyEl.innerHTML = `
+    <div class="p-4 rounded-2xl bg-slate-900 text-white border border-indigo-400/40 space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+          ${item.judul || 'Koordinasi Internal Panitia'}
+        </span>
+        <span class="text-[10px] font-bold text-indigo-300">Khusus Internal Panitia</span>
+      </div>
+      <p class="text-xs font-bold text-slate-100 leading-relaxed pt-1">
+        "${item.deskripsi}"
+      </p>
+    </div>
+
+    ${canEdit ? `
+      <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+          <span class="font-extrabold text-xs text-slate-900">
+            <i class="fa-solid fa-sliders text-indigo-800 mr-1"></i> Rilis Running Text Khusus Panitia
+          </span>
+          <span class="text-[9px] font-extrabold uppercase bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded">
+            ${activeUser.profile?.divisi}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Sumber / Topik Instruksi:</label>
+            <input id="inpPanTickerTitle" type="text" value="${item.judul || 'Koordinasi Internal Panitia'}" placeholder="Contoh: Instruksi Ketua / Seksi Konsumsi" class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-bold" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Kecepatan Jalan Teks:</label>
+            <select id="inpPanTickerSpeed" class="w-full rounded-xl border bg-white px-2.5 py-2 text-xs font-extrabold text-indigo-950">
+              <option value="55" ${currentSpeedSec >= 50 ? 'selected' : ''}>Santai (Lambat)</option>
+              <option value="35" ${currentSpeedSec >= 30 && currentSpeedSec < 50 ? 'selected' : ''}>Normal Nyaman (Default)</option>
+              <option value="24" ${currentSpeedSec < 30 ? 'selected' : ''}>Sedang / Cepat</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-700 mb-1">Isi Pesan / Koordinasi Khusus Panitia:</label>
+          <textarea id="inpPanTickerDesc" rows="3" placeholder="Ketik pesan koordinasi untuk seluruh panitia..." class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-semibold">${item.deskripsi || ''}</textarea>
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <label class="flex items-center gap-2 text-xs font-extrabold text-slate-800 cursor-pointer">
+            <input id="chkPanTickerActive" type="checkbox" ${isActive ? 'checked' : ''} class="w-4 h-4 rounded accent-emerald-600" />
+            <span>Tampilkan Running Text di Box Khusus Panitia</span>
+          </label>
+        </div>
+
+        <button type="button" id="btnSavePanTickerNow" class="w-full py-3 rounded-xl bg-indigo-900 hover:bg-indigo-800 text-white font-extrabold text-xs shadow flex items-center justify-center gap-2">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Simpan & Siarkan ke Seluruh Panitia</span>
+        </button>
+      </div>
+    ` : `
+      <div class="text-[10px] text-center text-slate-400 font-semibold">
+        Running text internal ini hanya dapat dirilis oleh Penanggung Jawab, Ketua Panitia, Sekretaris & Seksi Konsumsi.
+      </div>
+    `}
+  `;
+
+  document.getElementById("btnSavePanTickerNow")?.addEventListener("click", async () => {
+    if (!canEdit) return;
+    const judul = document.getElementById("inpPanTickerTitle")?.value.trim() || "Koordinasi Internal Panitia";
+    const deskripsi = document.getElementById("inpPanTickerDesc")?.value.trim() || "";
+    const speedVal = document.getElementById("inpPanTickerSpeed")?.value || "35";
+    const active = document.getElementById("chkPanTickerActive")?.checked;
+
+    if (!deskripsi) return toast("Isi pesan khusus panitia tidak boleh kosong!");
+
+    await sb.from("info_layanan").upsert([{
+      kode_menu: "pengumuman_panitia",
+      judul,
+      deskripsi,
+      url_link: String(speedVal),
+      status_tersedia: active ? "AKTIF" : "NONAKTIF"
+    }]);
+
+    toast(active ? "Info Khusus Panitia berhasil disiarkan!" : "Running Text Panitia disembunyikan.");
+    modal.classList.add("hidden");
+    if (reloadCallback) await reloadCallback();
+  });
 }
 
 // =========================================================================
