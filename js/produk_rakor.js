@@ -1,7 +1,4 @@
 // js/produk_rakor.js
-// Mencakup:
-// 1. Penyeragaman Card Surat Undangan & Tentang Aplikasi menjadi Grid Kompak 1 Kolom
-// 2. Menu "Produk Rakor 2027" (Draft Proker, Proker Disepakati, Kalender Bulanan, Kegiatan Dana BOSP, & PDF Rekomendasi)
 import { sb, toast } from './supabase.js';
 import { openTentangAplikasiModal } from './fitur_ekstra.js';
 
@@ -30,20 +27,37 @@ export const SUMBER_DANA_LIST = [
 ];
 
 let prokerList = [];
-let activeProdukTab = "disepakati"; // 'draft' | 'disepakati' | 'jadwal' | 'bosp' | 'rekomendasi'
+let activeProdukTab = "disepakati";
 let filterBidang = "ALL";
 let filterBulan = "ALL";
 let editingProkerId = null;
 let showInputForm = false;
 let logoImgCache = null;
 
-// Hak Akses Input, Edit, Hapus & Upload: HANYA Sekretaris dan Seksi Kesekretariatan
+let cachedMainGridContainer = null;
+let cachedLayananSectionCard = null;
+let isEnforcingLayout = false;
+
 export function canManageProdukRakor(activeUser) {
   return Boolean(
     activeUser &&
     activeUser.role === "panitia" &&
     activeUser.profile &&
     ["Sekretaris", "Seksi Kesekretariatan"].includes(activeUser.profile.divisi)
+  );
+}
+
+function canManagePanitiaTicker(activeUser) {
+  return Boolean(
+    activeUser &&
+    activeUser.role === "panitia" &&
+    activeUser.profile &&
+    [
+      "Penanggung Jawab",
+      "Ketua Panitia",
+      "Sekretaris",
+      "Seksi Konsumsi"
+    ].includes(activeUser.profile.divisi)
   );
 }
 
@@ -82,26 +96,7 @@ function ensureJsPdfLoaded() {
 
 // =========================================================================
 // 1. PENATAAN GRID 9 MENU LAYANAN (3x3) & SECTION "KHUSUS PANITIA & AKSES KHUSUS"
-// (PENJAGA OTOMATIS AGAR 9 MENU SELALU UTUH & TIDAK PERNAH HILANG/BERANTAKAN)
 // =========================================================================
-let cachedMainGridContainer = null;
-let cachedLayananSectionCard = null;
-let isEnforcingLayout = false;
-
-function canManagePanitiaTicker(activeUser) {
-  return Boolean(
-    activeUser &&
-    activeUser.role === "panitia" &&
-    activeUser.profile &&
-    [
-      "Penanggung Jawab",
-      "Ketua Panitia",
-      "Sekretaris",
-      "Seksi Konsumsi"
-    ].includes(activeUser.profile.divisi)
-  );
-}
-
 export function renderProdukRakorAndUniformCards(activeUser, layananList, reloadCallback) {
   if (!cachedMainGridContainer || !document.body.contains(cachedMainGridContainer)) {
     const anyBtn = document.querySelector('[data-service="undangan"], [data-service="panduan"], [data-service="kamar"], .service-menu-btn');
@@ -117,7 +112,6 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   gridContainer.id = "k3sUniformNineGrid";
   gridContainer.className = "grid grid-cols-3 gap-2.5";
 
-  // Helper untuk mengambil atau membuat tombol layanan jika sempat hilang dari DOM
   const getOrCreateServiceBtn = (serviceCode, fallbackSelector = "") => {
     let btn = document.querySelector(`[data-service="${serviceCode}"]`);
     if (!btn && fallbackSelector) {
@@ -144,7 +138,6 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
     `;
   };
 
-  // Pastikan ke-9 tombol selalu tersedia (tidak mungkin ada yang hilang)
   const btnUndangan = getOrCreateServiceBtn("undangan");
   const btnPanduan = getOrCreateServiceBtn("panduan");
   const btnDokumentasi = getOrCreateServiceBtn("dokumentasi");
@@ -323,7 +316,6 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
         }
       }
 
-      // Masukkan kembali tepat 9 tombol sesuai urutan Baris 1, Baris 2, Baris 3
       orderedNineButtons.forEach(btn => {
         if (btn) gridContainer.appendChild(btn);
       });
@@ -335,6 +327,209 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   enforceCleanLayout();
   setTimeout(enforceCleanLayout, 180);
   setTimeout(enforceCleanLayout, 550);
+}
+
+// Running Text Khusus Internal Panitia
+function renderPanitiaInternalTicker(activeUser, layananList, reloadCallback) {
+  const slot = document.getElementById("panitiaInternalTickerSlot");
+  if (!slot) return;
+
+  if (!document.getElementById("runningTextStyleTag")) {
+    const st = document.createElement("style");
+    st.id = "runningTextStyleTag";
+    st.textContent = `
+      @keyframes k3sSeamlessMarquee {
+        0% { transform: translate3d(0%, 0, 0); }
+        100% { transform: translate3d(-50%, 0, 0); }
+      }
+      .k3s-marquee-track {
+        display: flex;
+        width: max-content;
+        will-change: transform;
+        animation-name: k3sSeamlessMarquee;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+      }
+      .k3s-marquee-track:hover,
+      .k3s-marquee-track:active {
+        animation-play-state: paused;
+      }
+    `;
+    document.head.appendChild(st);
+  }
+
+  const item = (layananList || []).find(x => x.kode_menu === "pengumuman_panitia") || {
+    kode_menu: "pengumuman_panitia",
+    judul: "Koordinasi Internal Panitia",
+    deskripsi: "Semangat rekan-rekan Panitia Rakor K3S 2026! Pastikan seluruh kesiapan seksi dimonitor melalui tab Kinerja menjelang pelaksanaan 26–28 November 2026.",
+    url_link: "35",
+    status_tersedia: "AKTIF"
+  };
+
+  const rawSpeed = parseInt(item.url_link, 10);
+  const speedSec = (!isNaN(rawSpeed) && rawSpeed >= 15 && rawSpeed <= 90) ? rawSpeed : 35;
+  const isActive = item.status_tersedia !== "NONAKTIF";
+  const canEdit = canManagePanitiaTicker(activeUser);
+
+  if (!isActive && !canEdit) {
+    slot.innerHTML = "";
+    slot.dataset.sig = "";
+    return;
+  }
+
+  const sig = `${activeUser?.profile?.id_panitia || ''}|${isActive}|${canEdit}|${speedSec}|${item.judul}|${item.deskripsi}`;
+  if (slot.dataset.sig === sig) {
+    const barEl = slot.firstElementChild;
+    if (barEl) barEl.onclick = () => openPanitiaTickerEditorModal(activeUser, item, speedSec, reloadCallback);
+    return;
+  }
+  slot.dataset.sig = sig;
+
+  const segmentHtml = `
+    <span class="inline-flex items-center pr-12">
+      <b class="text-amber-300 mr-1.5">[${item.judul}]:</b>
+      <span>${item.deskripsi}</span>
+      <span class="mx-6 text-indigo-400">•</span>
+      <b class="text-amber-300 mr-1.5">[${item.judul}]:</b>
+      <span>${item.deskripsi}</span>
+      <span class="mx-6 text-indigo-400">•</span>
+    </span>
+  `;
+
+  slot.innerHTML = `
+    <div class="rounded-2xl p-2.5 border shadow-2xs flex items-center justify-between gap-2 cursor-pointer ${
+      isActive
+        ? 'bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-indigo-500/40 text-white'
+        : 'bg-slate-100 border-slate-300 text-slate-500'
+    }">
+      <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+        <span class="px-2 py-1 rounded-xl ${isActive ? 'bg-amber-400 text-slate-950' : 'bg-slate-400 text-white'} font-extrabold text-[9px] uppercase tracking-wider shrink-0 flex items-center gap-1 shadow-2xs">
+          <i class="fa-solid fa-walkie-talkie"></i>
+          <span>${isActive ? 'INFO PANITIA' : 'OFF'}</span>
+        </span>
+        <div class="overflow-hidden flex-1 relative">
+          ${isActive ? `
+            <div class="k3s-marquee-track text-xs font-bold text-slate-100" style="animation-duration: ${speedSec}s;">
+              ${segmentHtml}
+              ${segmentHtml}
+            </div>
+          ` : `
+            <div class="text-xs font-bold text-slate-500 truncate">
+              [Info Panitia Nonaktif] ${item.deskripsi}
+            </div>
+          `}
+        </div>
+      </div>
+      ${canEdit ? `
+        <button type="button" class="px-2.5 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-amber-300 border border-amber-400/30 font-extrabold text-[10px] shrink-0 flex items-center gap-1">
+          <i class="fa-solid fa-pen"></i>
+          <span>Siarkan</span>
+        </button>
+      ` : ''}
+    </div>
+  `;
+
+  if (slot.firstElementChild) {
+    slot.firstElementChild.onclick = () => openPanitiaTickerEditorModal(activeUser, item, speedSec, reloadCallback);
+  }
+}
+
+function openPanitiaTickerEditorModal(activeUser, item, currentSpeedSec, reloadCallback) {
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  const canEdit = canManagePanitiaTicker(activeUser);
+  const isActive = item.status_tersedia !== "NONAKTIF";
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-walkie-talkie text-indigo-700 mr-1.5"></i> Info & Instruksi Khusus Panitia`;
+
+  bodyEl.innerHTML = `
+    <div class="p-4 rounded-2xl bg-slate-900 text-white border border-indigo-400/40 space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+          ${item.judul || 'Koordinasi Internal Panitia'}
+        </span>
+        <span class="text-[10px] font-bold text-indigo-300">Khusus Internal Panitia</span>
+      </div>
+      <p class="text-xs font-bold text-slate-100 leading-relaxed pt-1">
+        "${item.deskripsi}"
+      </p>
+    </div>
+
+    ${canEdit ? `
+      <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+          <span class="font-extrabold text-xs text-slate-900">
+            <i class="fa-solid fa-sliders text-indigo-800 mr-1"></i> Rilis Running Text Khusus Panitia
+          </span>
+          <span class="text-[9px] font-extrabold uppercase bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded">
+            ${activeUser.profile?.divisi}
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Sumber / Topik Instruksi:</label>
+            <input id="inpPanTickerTitle" type="text" value="${item.judul || 'Koordinasi Internal Panitia'}" placeholder="Contoh: Instruksi Ketua / Seksi Konsumsi" class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-bold" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-700 mb-1">Kecepatan Jalan Teks:</label>
+            <select id="inpPanTickerSpeed" class="w-full rounded-xl border bg-white px-2.5 py-2 text-xs font-extrabold text-indigo-950">
+              <option value="55" ${currentSpeedSec >= 50 ? 'selected' : ''}>Santai (Lambat)</option>
+              <option value="35" ${currentSpeedSec >= 30 && currentSpeedSec < 50 ? 'selected' : ''}>Normal Nyaman (Default)</option>
+              <option value="24" ${currentSpeedSec < 30 ? 'selected' : ''}>Sedang / Cepat</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-700 mb-1">Isi Pesan / Koordinasi Khusus Panitia:</label>
+          <textarea id="inpPanTickerDesc" rows="3" placeholder="Ketik pesan koordinasi untuk seluruh panitia..." class="w-full rounded-xl border bg-white px-3 py-2 text-xs font-semibold">${item.deskripsi || ''}</textarea>
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <label class="flex items-center gap-2 text-xs font-extrabold text-slate-800 cursor-pointer">
+            <input id="chkPanTickerActive" type="checkbox" ${isActive ? 'checked' : ''} class="w-4 h-4 rounded accent-emerald-600" />
+            <span>Tampilkan Running Text di Box Khusus Panitia</span>
+          </label>
+        </div>
+
+        <button type="button" id="btnSavePanTickerNow" class="w-full py-3 rounded-xl bg-indigo-900 hover:bg-indigo-800 text-white font-extrabold text-xs shadow flex items-center justify-center gap-2">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Simpan & Siarkan ke Seluruh Panitia</span>
+        </button>
+      </div>
+    ` : `
+      <div class="text-[10px] text-center text-slate-400 font-semibold">
+        Running text internal ini hanya dapat dirilis oleh Penanggung Jawab, Ketua Panitia, Sekretaris & Seksi Konsumsi.
+      </div>
+    `}
+  `;
+
+  document.getElementById("btnSavePanTickerNow")?.addEventListener("click", async () => {
+    if (!canEdit) return;
+    const judul = document.getElementById("inpPanTickerTitle")?.value.trim() || "Koordinasi Internal Panitia";
+    const deskripsi = document.getElementById("inpPanTickerDesc")?.value.trim() || "";
+    const speedVal = document.getElementById("inpPanTickerSpeed")?.value || "35";
+    const active = document.getElementById("chkPanTickerActive")?.checked;
+
+    if (!deskripsi) return toast("Isi pesan khusus panitia tidak boleh kosong!");
+
+    await sb.from("info_layanan").upsert([{
+      kode_menu: "pengumuman_panitia",
+      judul,
+      deskripsi,
+      url_link: String(speedVal),
+      status_tersedia: active ? "AKTIF" : "NONAKTIF"
+    }]);
+
+    toast(active ? "Info Khusus Panitia berhasil disiarkan!" : "Running Text Panitia disembunyikan.");
+    modal.classList.add("hidden");
+    if (reloadCallback) await reloadCallback();
+  });
 }
 
 // =========================================================================
@@ -382,7 +577,6 @@ function renderProdukModalContent(activeUser, layananList, bodyEl, reloadCallbac
   const countBosp = listDisepakati.filter(p => isBospFunded(p.sumber_dana)).length;
 
   bodyEl.innerHTML = `
-    <!-- Header Ringkasan Produk Rakor 2027 -->
     <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white space-y-2.5 shadow-lg border border-emerald-500/30">
       <div class="flex items-center justify-between">
         <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
@@ -397,7 +591,6 @@ function renderProdukModalContent(activeUser, layananList, bodyEl, reloadCallbac
         </p>
       </div>
 
-      <!-- Navigasi 5 Sub-Menu Produk Rakor -->
       <div class="grid grid-cols-3 gap-1.5 pt-1">
         <button type="button" data-ptab="draft" class="produk-tab-btn py-2 px-2 rounded-xl text-[10px] font-extrabold transition flex items-center justify-center gap-1 ${activeProdukTab === 'draft' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-white/10 text-slate-200 hover:bg-white/15'}">
           <i class="fa-solid fa-file-pen"></i>
@@ -424,7 +617,6 @@ function renderProdukModalContent(activeUser, layananList, bodyEl, reloadCallbac
       </div>
     </div>
 
-    <!-- Kontainer Isi Tab Aktif -->
     <div id="produkSubTabContainer" class="space-y-3 pt-1"></div>
   `;
 
@@ -453,9 +645,6 @@ function renderProdukModalContent(activeUser, layananList, bodyEl, reloadCallbac
   }
 }
 
-// =========================================================================
-// TAB 1 & 2: DRAFT PROGRAM KERJA 2027 & PROGRAM KERJA DISEPAKATI 2027
-// =========================================================================
 function renderProkerListTab(activeUser, kategoriTarget, container, layananList, bodyEl, reloadCallback) {
   const isEditor = canManageProdukRakor(activeUser);
   const itemsInCategory = prokerList.filter(p => p.kategori_dokumen === kategoriTarget);
@@ -466,7 +655,6 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
     : null;
 
   container.innerHTML = `
-    <!-- Bar Info & Tombol Aksi (Tambah Proker / Unduh PDF) -->
     <div class="p-3.5 rounded-2xl ${kategoriTarget === 'Disepakati' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'} border flex items-center justify-between gap-2">
       <div>
         <div class="text-[10px] font-extrabold uppercase ${kategoriTarget === 'Disepakati' ? 'text-emerald-800' : 'text-amber-800'}">
@@ -491,7 +679,6 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
       </div>
     </div>
 
-    <!-- FORM INPUT / EDIT 9 KOLOM PROGRAM KERJA (KHUSUS SEKRETARIS & KESEKRETARIATAN) -->
     ${isEditor && (showInputForm || editingItem) ? `
       <div class="p-4 rounded-2xl bg-blue-50/90 border-2 border-blue-300 space-y-2.5 shadow-sm">
         <div class="flex items-center justify-between border-b border-blue-200 pb-2">
@@ -590,7 +777,6 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
       </div>
     ` : ''}
 
-    <!-- Filter Bidang -->
     <div class="grid grid-cols-2 gap-2">
       <select id="prkFilterBidang" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-blue-950">
         <option value="ALL" ${filterBidang === 'ALL' ? 'selected' : ''}>Semua 6 Bidang K3S</option>
@@ -599,7 +785,6 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
       <input id="prkSearchKeyword" type="text" placeholder="Cari kegiatan / sumber dana..." class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold" />
     </div>
 
-    <!-- Daftar Kartu Program Kerja Per Bidang -->
     <div id="prkCardsListBox" class="space-y-2.5 max-h-96 overflow-y-auto pr-0.5"></div>
   `;
 
@@ -656,7 +841,7 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
 
     const { error } = await sb.from("produk_proker_2027").upsert([payload]);
     if (error) {
-      return toast("Pastikan SQL Langkah 1 (tabel produk_proker_2027) sudah dijalankan di Supabase!");
+      return toast("Pastikan SQL tabel produk_proker_2027 sudah dijalankan di Supabase!");
     }
 
     toast(editingItem ? "Program Kerja berhasil diperbarui!" : "Program Kerja baru berhasil disimpan!");
@@ -715,7 +900,6 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
           </div>
         </div>
 
-        <!-- Rincian Lengkap 9 Komponen Program Kegiatan -->
         <div class="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2.5 rounded-xl border border-slate-200/70">
           <div>
             <span class="text-slate-400 font-bold block">Tujuan Kegiatan:</span>
@@ -797,9 +981,6 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
   document.getElementById("prkSearchKeyword")?.addEventListener("input", renderFilteredCards);
 }
 
-// =========================================================================
-// TAB 3: INFO JADWAL KEGIATAN PER BULAN (JANUARI - DESEMBER 2027)
-// =========================================================================
 function renderJadwalBulananTab(listDisepakati, container) {
   container.innerHTML = `
     <div class="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-between gap-2">
@@ -888,9 +1069,6 @@ function renderJadwalBulananTab(listDisepakati, container) {
   });
 }
 
-// =========================================================================
-// TAB 4: FILTER KHUSUS KEGIATAN YANG DIBIAYAI DANA BOSP (ACUAN RKAS/ARKAS 2027)
-// =========================================================================
 function renderKegiatanBospTab(listDisepakati, container) {
   const bospItems = listDisepakati.filter(p => isBospFunded(p.sumber_dana));
   const totalDanaBosp = bospItems.reduce((acc, c) => acc + Number(c.besaran_dana || 0), 0);
@@ -959,9 +1137,6 @@ function renderKegiatanBospTab(listDisepakati, container) {
   });
 }
 
-// =========================================================================
-// TAB 5: REKOMENDASI RAKOR 2027 (DOKUMEN PDF RESMI)
-// =========================================================================
 function renderRekomendasiPdfTab(activeUser, layananList, container, bodyEl, reloadCallback) {
   const isEditor = canManageProdukRakor(activeUser);
   const rekomItem = (layananList || []).find(x => x.kode_menu === "rekomendasi_2027") || {
@@ -1098,23 +1273,19 @@ function renderRekomendasiPdfTab(activeUser, layananList, container, bodyEl, rel
   });
 }
 
-// =========================================================================
-// GENERATOR PDF MATRIKS PROGRAM KERJA & REKOMENDASI K3S 2027 BER-KOP RESMI
-// =========================================================================
 async function generatePdfMatriksProker(judulKategori, listItems, catatanRekomendasi = "") {
   toast("Menyiapkan dokumen PDF resmi ber-Kop K3S...");
   await ensureJsPdfLoaded();
   const logoImg = await preloadLogo();
 
   const canvas = document.createElement("canvas");
-  canvas.width = 1123; // A4 Landscape agar 9 kolom muat lebar & jelas
+  canvas.width = 1123;
   canvas.height = 794;
   const ctx = canvas.getContext("2d");
 
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Kop Surat Resmi K3S Kota Kupang
   if (logoImg) {
     ctx.drawImage(logoImg, 55, 22, 105, 95);
   }
@@ -1140,7 +1311,6 @@ async function generatePdfMatriksProker(judulKategori, listItems, catatanRekomen
   ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(40, 118); ctx.lineTo(canvas.width - 40, 118); ctx.stroke();
 
-  // Judul Tabel
   ctx.fillStyle = "#0f172a";
   ctx.font = "800 15px 'Plus Jakarta Sans', Arial, sans-serif";
   const docHeader = judulKategori.includes("BOSP")
@@ -1158,7 +1328,6 @@ async function generatePdfMatriksProker(judulKategori, listItems, catatanRekomen
     startY = 172;
   }
 
-  // Tabel 9 Kolom Utama
   const startX = 35;
   const colW = [28, 130, 185, 135, 95, 110, 95, 90, 105, 80];
   const headers = ["No", "Bidang K3S", "Uraian Kegiatan", "Tujuan & Sasaran", "Sumber Dana", "Besaran Dana", "Waktu", "PJ", "Hasil Diharapkan", "Ket."];
@@ -1207,7 +1376,6 @@ async function generatePdfMatriksProker(judulKategori, listItems, catatanRekomen
     y += rowH;
   });
 
-  // Blok Pengesahan di Bawah
   const signY = Math.min(y + 30, 680);
   ctx.fillStyle = "#0f172a";
   ctx.font = "bold 11px 'Plus Jakarta Sans', Arial, sans-serif";
