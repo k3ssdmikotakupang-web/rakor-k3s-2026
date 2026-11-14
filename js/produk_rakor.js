@@ -81,17 +81,17 @@ function ensureJsPdfLoaded() {
 }
 
 // =========================================================================
-// 1. PENATAAN GRID 9 MENU LAYANAN (3x3) & PEMINDAHAN CARD INFOGRAFIS
+// 1. PENATAAN GRID 9 MENU LAYANAN (3x3) & PEMINDAHAN SELURUH CARD PANITIA
 // =========================================================================
+let gridObserverAttached = false;
+
 export function renderProdukRakorAndUniformCards(activeUser, layananList, reloadCallback) {
   const undanganBtn = document.querySelector('.service-menu-btn[data-service="undangan"]');
   const gridContainer = undanganBtn ? undanganBtn.parentElement : document.querySelector(".service-menu-btn")?.parentElement;
   if (!gridContainer) return;
 
-  // Pastikan container utama memiliki class grid 3 kolom yang rapi
   gridContainer.className = "grid grid-cols-3 gap-2.5";
 
-  // Helper untuk menyeragamkan desain ke-9 tombol menu agar 100% identik & simetris
   const styleGridTile = (btn, bgBoxClass, iconClass, titleText, badgeText, badgeClass) => {
     if (!btn) return;
     btn.className = "service-grid-tile p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/90 flex flex-col items-center justify-between text-center gap-1.5 active:scale-95 transition shadow-2xs";
@@ -104,7 +104,6 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
     `;
   };
 
-  // Ambil elemen ke-9 menu
   const btnUndangan = document.querySelector('.service-menu-btn[data-service="undangan"]');
   const btnPanduan = document.querySelector('.service-menu-btn[data-service="panduan"]');
   const btnDokumentasi = document.querySelector('.service-menu-btn[data-service="dokumentasi"]');
@@ -113,7 +112,6 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   const btnSertifikat = document.querySelector('.service-menu-btn[data-service="sertifikat"]');
   const btnLaporan = document.querySelector('.service-menu-btn[data-service="lpj"], .service-menu-btn[data-service="laporan"], .service-menu-btn[data-service="lph"]');
 
-  // Buat atau ambil tombol Produk Rakor
   let btnProduk = document.getElementById("btnServiceProdukRakor");
   if (!btnProduk) {
     btnProduk = document.createElement("button");
@@ -122,7 +120,6 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   }
   btnProduk.onclick = () => openProdukRakorModal(activeUser, layananList, reloadCallback);
 
-  // Buat atau ambil tombol Tentang Aplikasi
   let btnTentang = document.getElementById("btnServiceTentangAplikasi");
   if (!btnTentang) {
     btnTentang = document.createElement("button");
@@ -131,11 +128,9 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   }
   btnTentang.onclick = () => openTentangAplikasiModal();
 
-  // Pertahankan teks badge kamar dinamis (Nomor Kamar / Atur Kamar)
   const currentKamarText = document.getElementById("badgeHomeKamar")?.textContent ||
     (activeUser?.role === "panitia" ? "Atur Kamar" : (activeUser?.profile?.nomor_kamar || "Cek Kamar"));
 
-  // Seragamkan tampilan visual ke-9 menu sesuai barisnya:
   // BARIS 1: Surat Undangan, Buku Panduan, Dokumentasi
   styleGridTile(btnUndangan, "bg-blue-900 text-amber-300", "fa-envelope-open-text", "Surat Undangan", "Resmi PDF", "bg-blue-100 text-blue-900");
   styleGridTile(btnPanduan, "bg-indigo-700 text-white", "fa-book-open", "Buku Panduan", "Pedoman", "bg-indigo-100 text-indigo-900");
@@ -160,17 +155,13 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   styleGridTile(btnLaporan, "bg-rose-700 text-white", "fa-file-contract", "Laporan/LPH", "Dokumen", "bg-rose-100 text-rose-900");
   styleGridTile(btnTentang, "bg-slate-900 text-amber-300", "fa-mobile-screen-button", "Tentang Aplikasi", "Install & Paten", "bg-slate-200 text-slate-800");
 
-  // Susun tepat 9 tombol sesuai urutan Baris 1, Baris 2, dan Baris 3
   const orderedNineButtons = [
-    // Baris 1
     btnUndangan,
     btnPanduan,
     btnDokumentasi,
-    // Baris 2
     btnKamar,
     btnMateri,
     btnProduk,
-    // Baris 3
     btnSertifikat,
     btnLaporan,
     btnTentang
@@ -178,16 +169,15 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
 
   orderedNineButtons.forEach(btn => gridContainer.appendChild(btn));
 
-  // =========================================================================
-  // PINDAHKAN CARD INFOGRAFIS & PANEL KHUSUS PANITIA KE DI ANTARA
-  // CARD MENU LAYANAN DAN CARD PROGRES PENDAFTARAN 6 SUB RAYON
-  // =========================================================================
-  const layananSectionCard = gridContainer.closest(".bg-white") || gridContainer.parentElement;
-  const subrayonBarsEl = document.getElementById("homeSubrayonBars");
-  const subrayonSectionCard = subrayonBarsEl ? (subrayonBarsEl.closest(".bg-white") || subrayonBarsEl.parentElement) : null;
+  // Fungsi penarik keluar seluruh Card Panitia & Infografis agar ditaruh di luar Grid 9 Menu
+  const relocateExternalCards = () => {
+    const layananSectionCard = gridContainer.closest(".bg-white") || gridContainer.parentElement;
+    const subrayonBarsEl = document.getElementById("homeSubrayonBars");
+    const subrayonSectionCard = subrayonBarsEl ? (subrayonBarsEl.closest(".bg-white") || subrayonBarsEl.parentElement) : null;
 
-  if (layananSectionCard && layananSectionCard.parentElement) {
+    if (!layananSectionCard || !layananSectionCard.parentElement) return;
     const parentBeranda = layananSectionCard.parentElement;
+
     let middleSlot = document.getElementById("berandaMiddleSlotContainer");
     if (!middleSlot) {
       middleSlot = document.createElement("div");
@@ -195,27 +185,59 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
       middleSlot.className = "space-y-3";
     }
 
-    // Tempatkan middleSlot persis sebelum Card Progres Pendaftaran 6 Sub Rayon (atau tepat setelah Card Menu Layanan)
     if (subrayonSectionCard && subrayonSectionCard.parentElement === parentBeranda) {
       parentBeranda.insertBefore(middleSlot, subrayonSectionCard);
     } else {
       layananSectionCard.insertAdjacentElement("afterend", middleSlot);
     }
 
-    // Pindahkan Card Infografis & Profil 160 Sekolah (beserta banner akses khusus panitia) keluar dari grid 9 menu ke middleSlot
-    const fullWidthCardsToMove = [
-      document.getElementById("btnServiceStatistikSekolah"),
-      document.getElementById("panitiaSpjControlWidget"),
-      document.getElementById("btnServiceInfoKeuangan"),
-      document.getElementById("btnServiceRekapProfilKepsek"),
-      document.getElementById("btnServiceBulkIdCards")
-    ].filter(Boolean);
+    // Urutan penempatan di luar Menu Layanan:
+    // Card Catatan & Evaluasi serta Card Rekap Profil Kepsek berada DI ATAS Card Infografis & Profil 160 Sekolah
+    const orderedExternalIds = [
+      "panitiaSpjControlWidget",      // Panel Otoritas Sekretaris/Bendahara (Jika ada)
+      "btnServiceInfoKeuangan",       // Card Info Keuangan (Khusus Panitia Inti/Rayon)
+      "btnServiceBulkIdCards",        // Card Cetak ID Card Kalung (Khusus Kesekretariatan)
+      "btnServiceCatatanPanitia",     // 1. Card Catatan & Evaluasi Kegiatan (DI ATAS INFOGRAFIS)
+      "btnServiceRekapProfilKepsek",  // 2. Card Rekap Profil Kepsek per Sub Rayon (DI ATAS INFOGRAFIS)
+      "btnServiceStatistikSekolah"    // 3. Card Infografis & Profil 160 Sekolah
+    ];
 
-    fullWidthCardsToMove.forEach(cardEl => {
-      cardEl.classList.remove("col-span-3");
-      cardEl.classList.add("w-full");
-      middleSlot.appendChild(cardEl);
+    orderedExternalIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.remove("col-span-3");
+        el.classList.add("w-full");
+        middleSlot.appendChild(el);
+      }
     });
+
+    // Sapu bersih jika masih ada elemen non-9-menu yang tidak sengaja masuk ke gridContainer
+    Array.from(gridContainer.children).forEach(child => {
+      if (!orderedNineButtons.includes(child)) {
+        child.classList.remove("col-span-3");
+        child.classList.add("w-full");
+        const statCard = document.getElementById("btnServiceStatistikSekolah");
+        if (statCard && statCard.parentElement === middleSlot) {
+          middleSlot.insertBefore(child, statCard);
+        } else {
+          middleSlot.appendChild(child);
+        }
+      }
+    });
+  };
+
+  // Jalankan instan & pasang pemantau otomatis jika ada card async (seperti Rekap Profil / SPJ) yang baru selesai dimuat
+  relocateExternalCards();
+  setTimeout(relocateExternalCards, 180);
+  setTimeout(relocateExternalCards, 600);
+
+  if (!gridObserverAttached) {
+    gridObserverAttached = true;
+    const obs = new MutationObserver(() => {
+      const hasIntruder = Array.from(gridContainer.children).some(ch => !ch.classList.contains("service-grid-tile"));
+      if (hasIntruder) relocateExternalCards();
+    });
+    obs.observe(gridContainer, { childList: true });
   }
 }
 
