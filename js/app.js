@@ -22,6 +22,7 @@ import { initModernDropdowns } from './dropdown_ui.js';
 import { applyK3sLogoBranding, renderK3sMusicPlayerWidget } from './branding_audio.js';
 import { renderSpjBospWidgets } from './spj_bosp.js';
 import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
+import { renderProdukRakorAndUniformCards } from './produk_rakor.js';
 
 // Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
@@ -332,6 +333,7 @@ function renderAllViews() {
   renderK3sMusicPlayerWidget(activeUser, layananList, () => loadAllDatabase(false));
   renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
   renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, () => loadAllDatabase(false));
+  renderProdukRakorAndUniformCards(activeUser, layananList, () => loadAllDatabase(false));
   if (activeUser && activeUser.role === "panitia") {
     renderKinerjaView();
   }
