@@ -639,6 +639,9 @@ async function submitPerijinanPeserta() {
   await loadAllDatabase(false);
 }
 
+// =========================================================================
+// RENDER QR CODE PESERTA & PANITIA + FITUR KLIK UNTUK MEMPERBESAR (ZOOM)
+// =========================================================================
 function renderQrView() {
   if (!activeUser) return;
   const qrBox = document.getElementById("qrCodeCanvas");
@@ -648,6 +651,8 @@ function renderQrView() {
   if (oldKepsekForm) oldKepsekForm.classList.add("hidden");
 
   let qrPayloadText = "";
+  let zoomTitle = "";
+  let zoomSub = "";
   const roomPill = document.getElementById("qrRoomPill");
   let missingFields = [];
 
@@ -655,8 +660,11 @@ function renderQrView() {
     const s = sekolahList.find(x => x.id_sekolah === activeUser.profile?.id_sekolah) || activeUser.profile || {};
     const titleEl = document.getElementById("qrCardTitle");
     const subEl = document.getElementById("qrCardSubtitle");
-    if (titleEl) titleEl.textContent = s.nama_sekolah || "Sekolah Peserta";
-    if (subEl) subEl.textContent = (s.nama_kepsek ? s.nama_kepsek + " • " : "") + "NPSN: " + (s.npsn || "-") + " • Sub Rayon " + (s.subrayon || "-");
+    zoomTitle = s.nama_sekolah || "Sekolah Peserta";
+    zoomSub = (s.nama_kepsek ? s.nama_kepsek + " • " : "") + "NPSN: " + (s.npsn || "-") + " • Sub Rayon " + (s.subrayon || "-");
+
+    if (titleEl) titleEl.textContent = zoomTitle;
+    if (subEl) subEl.textContent = zoomSub;
 
     if (!s.nama_kepsek || String(s.nama_kepsek).trim() === "") missingFields.push("Nama & Gelar Kepala Sekolah");
     if (!s.nip_kepsek || String(s.nip_kepsek).trim() === "") missingFields.push("NIP");
@@ -686,8 +694,11 @@ function renderQrView() {
     const p = panitiaList.find(x => x.id_panitia === activeUser.profile?.id_panitia) || activeUser.profile || {};
     const titleEl = document.getElementById("qrCardTitle");
     const subEl = document.getElementById("qrCardSubtitle");
-    if (titleEl) titleEl.textContent = p.nama_panitia || "Panitia Rakor";
-    if (subEl) subEl.textContent = (p.divisi || "Panitia") + " (" + (p.jabatan || "Anggota") + ")";
+    zoomTitle = p.nama_panitia || "Panitia Rakor";
+    zoomSub = (p.divisi || "Panitia") + " (" + (p.jabatan || "Anggota") + ")";
+
+    if (titleEl) titleEl.textContent = zoomTitle;
+    if (subEl) subEl.textContent = zoomSub;
     roomPill?.classList.add("hidden");
 
     if (!p.no_hp || String(p.no_hp).trim() === "") missingFields.push("No. WhatsApp Aktif");
@@ -746,12 +757,115 @@ function renderQrView() {
     }
   }
 
-  const encoded = encodeURIComponent(qrPayloadText);
-  const apiPrimary = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=" + encoded;
-  const apiBackup = "https://quickchart.io/qr?size=220&margin=1&text=" + encoded;
+  qrBox.innerHTML = "";
+  qrBox.className = "w-[190px] h-[190px] mx-auto bg-white p-2.5 rounded-2xl border-2 border-slate-200 flex flex-col items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition relative";
+  qrBox.title = "Ketuk untuk memperbesar QR Code";
 
-  qrBox.className = "w-[185px] h-[185px] mx-auto bg-white p-2 rounded-2xl border-2 border-slate-200 flex items-center justify-center shadow-inner relative";
-  qrBox.innerHTML = '<img src="' + apiPrimary + '" alt="QR Code Resmi" class="w-[165px] h-[165px] object-contain mx-auto rounded-lg" onerror="this.onerror=null; this.src=\'' + apiBackup + '\';" />';
+  const innerQrHolder = document.createElement("div");
+  innerQrHolder.className = "w-[165px] h-[165px] flex items-center justify-center";
+  qrBox.appendChild(innerQrHolder);
+
+  const encoded = encodeURIComponent(qrPayloadText);
+  const fallbackImgUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=6&data=" + encoded;
+  const backupImgUrl = "https://quickchart.io/qr?size=300&margin=1&text=" + encoded;
+
+  let localSuccess = false;
+  if (typeof window.QRCode === "function") {
+    try {
+      new window.QRCode(innerQrHolder, {
+        text: qrPayloadText,
+        width: 165,
+        height: 165,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff"
+      });
+      setTimeout(() => {
+        const hasCanvasOrImg = innerQrHolder.querySelector("canvas, img");
+        if (!hasCanvasOrImg) {
+          innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[165px] h-[165px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
+        }
+      }, 80);
+      localSuccess = true;
+    } catch (e) {
+      localSuccess = false;
+    }
+  }
+
+  if (!localSuccess) {
+    innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[165px] h-[165px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
+  }
+
+  let zoomHint = document.getElementById("qrClickZoomHint");
+  if (!zoomHint && qrBox.parentElement) {
+    zoomHint = document.createElement("div");
+    zoomHint.id = "qrClickZoomHint";
+    qrBox.insertAdjacentElement("afterend", zoomHint);
+  }
+  if (zoomHint) {
+    zoomHint.className = "mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-extrabold cursor-pointer hover:bg-blue-100 transition";
+    zoomHint.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus text-blue-700"></i> <span>Ketuk QR Code untuk Memperbesar (Mode Scan Cepat)</span>';
+    zoomHint.onclick = () => openFullscreenQrZoomModal(qrPayloadText, zoomTitle, zoomSub);
+  }
+
+  qrBox.onclick = () => openFullscreenQrZoomModal(qrPayloadText, zoomTitle, zoomSub);
+}
+
+function openFullscreenQrZoomModal(qrPayloadText, titleText, subText) {
+  let zoomOverlay = document.getElementById("fullscreenQrZoomOverlay");
+  if (!zoomOverlay) {
+    zoomOverlay = document.createElement("div");
+    zoomOverlay.id = "fullscreenQrZoomOverlay";
+    document.body.appendChild(zoomOverlay);
+  }
+
+  const encoded = encodeURIComponent(qrPayloadText);
+  const bigQrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=10&data=" + encoded;
+  const backupBigUrl = "https://quickchart.io/qr?size=420&margin=2&text=" + encoded;
+
+  zoomOverlay.className = "fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-5";
+  zoomOverlay.innerHTML =
+    '<div class="w-full max-w-sm bg-white rounded-3xl p-6 text-center space-y-4 shadow-2xl border-4 border-amber-400">' +
+      '<div class="space-y-1">' +
+        '<span class="text-[10px] font-extrabold uppercase tracking-widest bg-blue-900 text-amber-300 px-3 py-1 rounded-full">Mode Pemindaian Cepat</span>' +
+        '<h3 class="text-base font-extrabold text-slate-900 pt-1">' + titleText + '</h3>' +
+        '<p class="text-xs font-bold text-slate-500">' + subText + '</p>' +
+      '</div>' +
+      '<div id="zoomBigQrBox" class="w-[270px] h-[270px] mx-auto bg-white p-3 rounded-3xl border-4 border-slate-900 flex items-center justify-center shadow-lg"></div>' +
+      '<p class="text-[11px] font-bold text-emerald-800 bg-emerald-50 py-2 px-3 rounded-xl border border-emerald-200">' +
+        '<i class="fa-solid fa-sun text-amber-500 mr-1"></i> Arahkan layar ini ke kamera petugas meja layanan' +
+      '</p>' +
+      '<button type="button" id="btnCloseBigQrZoom" class="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-xs shadow-lg">' +
+        '<i class="fa-solid fa-compress mr-1.5"></i> Tutup Mode Layar Penuh' +
+      '</button>' +
+    '</div>';
+
+  const bigBox = document.getElementById("zoomBigQrBox");
+  if (bigBox) {
+    let drawn = false;
+    if (typeof window.QRCode === "function") {
+      try {
+        new window.QRCode(bigBox, {
+          text: qrPayloadText,
+          width: 240,
+          height: 240,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff"
+        });
+        drawn = true;
+      } catch (e) {
+        drawn = false;
+      }
+    }
+    if (!drawn) {
+      bigBox.innerHTML = '<img src="' + bigQrUrl + '" alt="QR Besar" class="w-[240px] h-[240px] object-contain" onerror="this.onerror=null;this.src=\'' + backupBigUrl + '\';" />';
+    }
+  }
+
+  zoomOverlay.onclick = (e) => {
+    if (e.target === zoomOverlay || e.target.closest("#btnCloseBigQrZoom")) {
+      zoomOverlay.classList.add("hidden");
+    }
+  };
 }
 
 async function saveNamaKepsek() {
@@ -1100,7 +1214,6 @@ function renderKinerjaView() {
   renderTaskListView();
 }
 
-// Cek Otoritas Kelola Master Tugas: HANYA Ketua Panitia dan Sekretaris
 function canManageMasterTasks(user) {
   return Boolean(
     user &&
@@ -1110,8 +1223,6 @@ function canManageMasterTasks(user) {
   );
 }
 
-// Cek apakah panitia berhak mencentang tugas pada divisi tertentu:
-// HANYA anggota divisi yang bersangkutan, ditambah Ketua Panitia & Sekretaris
 function canToggleDivisionTask(user, targetDivisi) {
   if (!user || user.role !== "panitia" || !user.profile) return false;
   const userDivisi = user.profile.divisi;
