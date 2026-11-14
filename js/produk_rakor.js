@@ -81,74 +81,142 @@ function ensureJsPdfLoaded() {
 }
 
 // =========================================================================
-// 1. PENYERAGAMAN CARD MENU LAYANAN (UNDANGAN, TENTANG APLIKASI, & PRODUK RAKOR)
+// 1. PENATAAN GRID 9 MENU LAYANAN (3x3) & PEMINDAHAN CARD INFOGRAFIS
 // =========================================================================
 export function renderProdukRakorAndUniformCards(activeUser, layananList, reloadCallback) {
   const undanganBtn = document.querySelector('.service-menu-btn[data-service="undangan"]');
   const gridContainer = undanganBtn ? undanganBtn.parentElement : document.querySelector(".service-menu-btn")?.parentElement;
   if (!gridContainer) return;
 
-  // A. Ubah Card "Surat Undangan Rakor 2026" menjadi Card Kompak (Sejajar dengan Info Kamar, Buku Panduan, dll.)
-  if (undanganBtn) {
-    undanganBtn.className = "service-menu-btn p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 flex flex-col items-center text-center gap-1.5 active:scale-95 transition";
-    undanganBtn.innerHTML = `
-      <div class="w-10 h-10 rounded-2xl bg-blue-900 text-amber-300 flex items-center justify-center text-base shadow-sm">
-        <i class="fa-solid fa-envelope-open-text"></i>
+  // Pastikan container utama memiliki class grid 3 kolom yang rapi
+  gridContainer.className = "grid grid-cols-3 gap-2.5";
+
+  // Helper untuk menyeragamkan desain ke-9 tombol menu agar 100% identik & simetris
+  const styleGridTile = (btn, bgBoxClass, iconClass, titleText, badgeText, badgeClass) => {
+    if (!btn) return;
+    btn.className = "service-grid-tile p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/90 flex flex-col items-center justify-between text-center gap-1.5 active:scale-95 transition shadow-2xs";
+    btn.innerHTML = `
+      <div class="w-10 h-10 rounded-2xl ${bgBoxClass} flex items-center justify-center text-base shadow-xs shrink-0">
+        <i class="fa-solid ${iconClass}"></i>
       </div>
-      <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Surat Undangan</span>
-      <span class="text-[9px] font-bold bg-blue-200/80 text-blue-950 px-2 py-0.5 rounded-full">Resmi PDF</span>
+      <span class="text-[11px] font-extrabold text-slate-800 leading-tight line-clamp-1">${titleText}</span>
+      <span class="text-[9px] font-bold ${badgeClass} px-2 py-0.5 rounded-full truncate max-w-full">${badgeText}</span>
+    `;
+  };
+
+  // Ambil elemen ke-9 menu
+  const btnUndangan = document.querySelector('.service-menu-btn[data-service="undangan"]');
+  const btnPanduan = document.querySelector('.service-menu-btn[data-service="panduan"]');
+  const btnDokumentasi = document.querySelector('.service-menu-btn[data-service="dokumentasi"]');
+  const btnKamar = document.querySelector('.service-menu-btn[data-service="kamar"]');
+  const btnMateri = document.querySelector('.service-menu-btn[data-service="materi"]');
+  const btnSertifikat = document.querySelector('.service-menu-btn[data-service="sertifikat"]');
+  const btnLaporan = document.querySelector('.service-menu-btn[data-service="lpj"], .service-menu-btn[data-service="laporan"], .service-menu-btn[data-service="lph"]');
+
+  // Buat atau ambil tombol Produk Rakor
+  let btnProduk = document.getElementById("btnServiceProdukRakor");
+  if (!btnProduk) {
+    btnProduk = document.createElement("button");
+    btnProduk.id = "btnServiceProdukRakor";
+    btnProduk.type = "button";
+  }
+  btnProduk.onclick = () => openProdukRakorModal(activeUser, layananList, reloadCallback);
+
+  // Buat atau ambil tombol Tentang Aplikasi
+  let btnTentang = document.getElementById("btnServiceTentangAplikasi");
+  if (!btnTentang) {
+    btnTentang = document.createElement("button");
+    btnTentang.id = "btnServiceTentangAplikasi";
+    btnTentang.type = "button";
+  }
+  btnTentang.onclick = () => openTentangAplikasiModal();
+
+  // Pertahankan teks badge kamar dinamis (Nomor Kamar / Atur Kamar)
+  const currentKamarText = document.getElementById("badgeHomeKamar")?.textContent ||
+    (activeUser?.role === "panitia" ? "Atur Kamar" : (activeUser?.profile?.nomor_kamar || "Cek Kamar"));
+
+  // Seragamkan tampilan visual ke-9 menu sesuai barisnya:
+  // BARIS 1: Surat Undangan, Buku Panduan, Dokumentasi
+  styleGridTile(btnUndangan, "bg-blue-900 text-amber-300", "fa-envelope-open-text", "Surat Undangan", "Resmi PDF", "bg-blue-100 text-blue-900");
+  styleGridTile(btnPanduan, "bg-indigo-700 text-white", "fa-book-open", "Buku Panduan", "Pedoman", "bg-indigo-100 text-indigo-900");
+  styleGridTile(btnDokumentasi, "bg-sky-600 text-white", "fa-camera-retro", "Dokumentasi", "Galeri Foto", "bg-sky-100 text-sky-900");
+
+  // BARIS 2: Info Kamar, Materi Rakor, Produk Rakor
+  if (btnKamar) {
+    btnKamar.className = "service-menu-btn service-grid-tile p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/90 flex flex-col items-center justify-between text-center gap-1.5 active:scale-95 transition shadow-2xs";
+    btnKamar.innerHTML = `
+      <div class="w-10 h-10 rounded-2xl bg-violet-700 text-amber-300 flex items-center justify-center text-base shadow-xs shrink-0">
+        <i class="fa-solid fa-bed"></i>
+      </div>
+      <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Info Kamar</span>
+      <span id="badgeHomeKamar" class="text-[9px] font-bold bg-violet-100 text-violet-900 px-2 py-0.5 rounded-full truncate max-w-full">${currentKamarText}</span>
     `;
   }
+  styleGridTile(btnMateri, "bg-teal-700 text-white", "fa-chalkboard-user", "Materi Rakor", "Narasumber", "bg-teal-100 text-teal-900");
+  styleGridTile(btnProduk, "bg-emerald-700 text-amber-300", "fa-briefcase", "Produk Rakor", "Proker 2027", "bg-emerald-100 text-emerald-900");
 
-  // B. Ubah Card "Tentang Aplikasi & Pasang di HP" menjadi Card Kompak 1 Kolom
-  let tentangBtn = document.getElementById("btnServiceTentangAplikasi");
-  if (!tentangBtn) {
-    tentangBtn = document.createElement("button");
-    tentangBtn.id = "btnServiceTentangAplikasi";
-    tentangBtn.type = "button";
-    gridContainer.appendChild(tentangBtn);
-  }
-  tentangBtn.className = "p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex flex-col items-center text-center gap-1.5 active:scale-95 transition";
-  tentangBtn.innerHTML = `
-    <div class="w-10 h-10 rounded-2xl bg-slate-900 text-amber-300 flex items-center justify-center text-base shadow-sm">
-      <i class="fa-solid fa-mobile-screen-button"></i>
-    </div>
-    <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Tentang Aplikasi</span>
-    <span class="text-[9px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">Install & Paten</span>
-  `;
-  tentangBtn.onclick = () => openTentangAplikasiModal();
+  // BARIS 3: Sertifikat, Laporan/LPH, Tentang Aplikasi
+  styleGridTile(btnSertifikat, "bg-amber-500 text-slate-950", "fa-award", "Sertifikat", "Pola 32 JP", "bg-amber-100 text-amber-900");
+  styleGridTile(btnLaporan, "bg-rose-700 text-white", "fa-file-contract", "Laporan/LPH", "Dokumen", "bg-rose-100 text-rose-900");
+  styleGridTile(btnTentang, "bg-slate-900 text-amber-300", "fa-mobile-screen-button", "Tentang Aplikasi", "Install & Paten", "bg-slate-200 text-slate-800");
 
-  // C. Tambahkan Card Kompak Baru: "Produk Rakor 2027"
-  let produkBtn = document.getElementById("btnServiceProdukRakor");
-  if (!produkBtn) {
-    produkBtn = document.createElement("button");
-    produkBtn.id = "btnServiceProdukRakor";
-    produkBtn.type = "button";
-    gridContainer.appendChild(produkBtn);
-  }
-  produkBtn.className = "p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 flex flex-col items-center text-center gap-1.5 active:scale-95 transition";
-  produkBtn.innerHTML = `
-    <div class="w-10 h-10 rounded-2xl bg-emerald-700 text-amber-300 flex items-center justify-center text-base shadow-sm">
-      <i class="fa-solid fa-briefcase"></i>
-    </div>
-    <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Produk Rakor</span>
-    <span class="text-[9px] font-bold bg-emerald-200/80 text-emerald-950 px-2 py-0.5 rounded-full">Proker 2027</span>
-  `;
-  produkBtn.onclick = () => openProdukRakorModal(activeUser, layananList, reloadCallback);
-
-  // Pastikan urutan tombol kompak berada rapi di bagian bawah grid setelah card berlebar penuh (col-span-3)
-  const compactButtons = [
-    undanganBtn,
-    document.querySelector('.service-menu-btn[data-service="kamar"]'),
-    document.querySelector('.service-menu-btn[data-service="panduan"]'),
-    document.querySelector('.service-menu-btn[data-service="materi"]'),
-    document.querySelector('.service-menu-btn[data-service="dokumentasi"]'),
-    document.querySelector('.service-menu-btn[data-service="sertifikat"]'),
-    produkBtn,
-    tentangBtn
+  // Susun tepat 9 tombol sesuai urutan Baris 1, Baris 2, dan Baris 3
+  const orderedNineButtons = [
+    // Baris 1
+    btnUndangan,
+    btnPanduan,
+    btnDokumentasi,
+    // Baris 2
+    btnKamar,
+    btnMateri,
+    btnProduk,
+    // Baris 3
+    btnSertifikat,
+    btnLaporan,
+    btnTentang
   ].filter(Boolean);
 
-  compactButtons.forEach(btn => gridContainer.appendChild(btn));
+  orderedNineButtons.forEach(btn => gridContainer.appendChild(btn));
+
+  // =========================================================================
+  // PINDAHKAN CARD INFOGRAFIS & PANEL KHUSUS PANITIA KE DI ANTARA
+  // CARD MENU LAYANAN DAN CARD PROGRES PENDAFTARAN 6 SUB RAYON
+  // =========================================================================
+  const layananSectionCard = gridContainer.closest(".bg-white") || gridContainer.parentElement;
+  const subrayonBarsEl = document.getElementById("homeSubrayonBars");
+  const subrayonSectionCard = subrayonBarsEl ? (subrayonBarsEl.closest(".bg-white") || subrayonBarsEl.parentElement) : null;
+
+  if (layananSectionCard && layananSectionCard.parentElement) {
+    const parentBeranda = layananSectionCard.parentElement;
+    let middleSlot = document.getElementById("berandaMiddleSlotContainer");
+    if (!middleSlot) {
+      middleSlot = document.createElement("div");
+      middleSlot.id = "berandaMiddleSlotContainer";
+      middleSlot.className = "space-y-3";
+    }
+
+    // Tempatkan middleSlot persis sebelum Card Progres Pendaftaran 6 Sub Rayon (atau tepat setelah Card Menu Layanan)
+    if (subrayonSectionCard && subrayonSectionCard.parentElement === parentBeranda) {
+      parentBeranda.insertBefore(middleSlot, subrayonSectionCard);
+    } else {
+      layananSectionCard.insertAdjacentElement("afterend", middleSlot);
+    }
+
+    // Pindahkan Card Infografis & Profil 160 Sekolah (beserta banner akses khusus panitia) keluar dari grid 9 menu ke middleSlot
+    const fullWidthCardsToMove = [
+      document.getElementById("btnServiceStatistikSekolah"),
+      document.getElementById("panitiaSpjControlWidget"),
+      document.getElementById("btnServiceInfoKeuangan"),
+      document.getElementById("btnServiceRekapProfilKepsek"),
+      document.getElementById("btnServiceBulkIdCards")
+    ].filter(Boolean);
+
+    fullWidthCardsToMove.forEach(cardEl => {
+      cardEl.classList.remove("col-span-3");
+      cardEl.classList.add("w-full");
+      middleSlot.appendChild(cardEl);
+    });
+  }
 }
 
 // =========================================================================
