@@ -757,12 +757,18 @@ function renderQrView() {
     }
   }
 
+  // Pastikan wadah induk QR menyusun elemen secara vertikal di tengah (bukan berjejer ke samping)
+  if (qrBox.parentElement) {
+    qrBox.parentElement.classList.remove("flex", " justify-center");
+    qrBox.parentElement.classList.add("flex", "flex-col", "items-center", "justify-center");
+  }
+
   qrBox.innerHTML = "";
-  qrBox.className = "w-[190px] h-[190px] mx-auto bg-white p-2.5 rounded-2xl border-2 border-slate-200 flex flex-col items-center justify-center shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition relative";
+  qrBox.className = "w-[200px] h-[200px] mx-auto bg-white p-3 rounded-3xl border-2 border-slate-200 flex items-center justify-center shadow-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition relative";
   qrBox.title = "Ketuk untuk memperbesar QR Code";
 
   const innerQrHolder = document.createElement("div");
-  innerQrHolder.className = "w-[165px] h-[165px] flex items-center justify-center";
+  innerQrHolder.className = "w-[170px] h-[170px] flex items-center justify-center";
   qrBox.appendChild(innerQrHolder);
 
   const encoded = encodeURIComponent(qrPayloadText);
@@ -774,15 +780,15 @@ function renderQrView() {
     try {
       new window.QRCode(innerQrHolder, {
         text: qrPayloadText,
-        width: 165,
-        height: 165,
+        width: 170,
+        height: 170,
         colorDark: "#0f172a",
         colorLight: "#ffffff"
       });
       setTimeout(() => {
         const hasCanvasOrImg = innerQrHolder.querySelector("canvas, img");
         if (!hasCanvasOrImg) {
-          innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[165px] h-[165px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
+          innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[170px] h-[170px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
         }
       }, 80);
       localSuccess = true;
@@ -792,18 +798,20 @@ function renderQrView() {
   }
 
   if (!localSuccess) {
-    innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[165px] h-[165px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
+    innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[170px] h-[170px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
   }
 
+  // Tempatkan pita petunjuk ramping tepat di BAWAH QR Code (bukan lingkaran di sampingnya)
   let zoomHint = document.getElementById("qrClickZoomHint");
   if (!zoomHint && qrBox.parentElement) {
-    zoomHint = document.createElement("div");
+    zoomHint = document.createElement("button");
     zoomHint.id = "qrClickZoomHint";
+    zoomHint.type = "button";
     qrBox.insertAdjacentElement("afterend", zoomHint);
   }
   if (zoomHint) {
-    zoomHint.className = "mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-extrabold cursor-pointer hover:bg-blue-100 transition";
-    zoomHint.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus text-blue-700"></i> <span>Ketuk QR Code untuk Memperbesar (Mode Scan Cepat)</span>';
+    zoomHint.className = "mt-3 inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200/80 text-[10px] font-extrabold cursor-pointer transition shadow-2xs";
+    zoomHint.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus text-blue-700"></i> <span>Ketuk QR Code untuk Memperbesar</span>';
     zoomHint.onclick = () => openFullscreenQrZoomModal(qrPayloadText, zoomTitle, zoomSub);
   }
 
