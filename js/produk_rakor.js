@@ -82,8 +82,11 @@ function ensureJsPdfLoaded() {
 
 // =========================================================================
 // 1. PENATAAN GRID 9 MENU LAYANAN (3x3) & SECTION "KHUSUS PANITIA & AKSES KHUSUS"
+// (ANTI-BERANTAKAN SAAT LOGOUT & LOGIN GANTI AKUN BERKALI-KALI)
 // =========================================================================
-let gridObserverAttached = false;
+let cachedMainGridContainer = null;
+let cachedLayananSectionCard = null;
+let gridObserverInstance = null;
 
 // Wewenang Merilis Running Text Info Khusus Panitia:
 // HANYA Penanggung Jawab, Ketua Panitia, Sekretaris, dan Seksi Konsumsi
@@ -102,32 +105,44 @@ function canManagePanitiaTicker(activeUser) {
 }
 
 export function renderProdukRakorAndUniformCards(activeUser, layananList, reloadCallback) {
-  const undanganBtn = document.querySelector('.service-menu-btn[data-service="undangan"]');
-  const gridContainer = undanganBtn ? undanganBtn.parentElement : document.querySelector(".service-menu-btn")?.parentElement;
+  // 1. Kunci referensi wadah Grid Layanan Utama agar tidak pernah salah sasaran saat ganti akun
+  if (!cachedMainGridContainer || !document.body.contains(cachedMainGridContainer)) {
+    const anyBtn = document.querySelector('[data-service="undangan"], [data-service="panduan"], [data-service="kamar"]');
+    if (anyBtn) {
+      cachedMainGridContainer = anyBtn.parentElement;
+      cachedLayananSectionCard = cachedMainGridContainer.closest(".bg-white") || cachedMainGridContainer.parentElement;
+    }
+  }
+
+  const gridContainer = cachedMainGridContainer;
   if (!gridContainer) return;
 
+  gridContainer.id = "k3sUniformNineGrid";
   gridContainer.className = "grid grid-cols-3 gap-2.5";
 
-  const styleGridTile = (btn, bgBoxClass, iconClass, titleText, badgeText, badgeClass) => {
+  // Helper menyeragamkan ke-9 tombol TANPA menghapus class 'service-menu-btn' & 'data-service'
+  const styleGridTile = (btn, bgBoxClass, iconClass, titleText, badgeText, badgeClass, badgeId = "") => {
     if (!btn) return;
-    btn.className = "service-grid-tile p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/90 flex flex-col items-center justify-between text-center gap-1.5 active:scale-95 transition shadow-2xs";
+    btn.className = "service-menu-btn service-grid-tile p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/90 flex flex-col items-center justify-between text-center gap-1.5 active:scale-95 transition shadow-2xs";
     btn.innerHTML = `
       <div class="w-10 h-10 rounded-2xl ${bgBoxClass} flex items-center justify-center text-base shadow-xs shrink-0">
         <i class="fa-solid ${iconClass}"></i>
       </div>
       <span class="text-[11px] font-extrabold text-slate-800 leading-tight line-clamp-1">${titleText}</span>
-      <span class="text-[9px] font-bold ${badgeClass} px-2 py-0.5 rounded-full truncate max-w-full">${badgeText}</span>
+      <span ${badgeId ? `id="${badgeId}"` : ""} class="text-[9px] font-bold ${badgeClass} px-2 py-0.5 rounded-full truncate max-w-full">${badgeText}</span>
     `;
   };
 
-  const btnUndangan = document.querySelector('.service-menu-btn[data-service="undangan"]');
-  const btnPanduan = document.querySelector('.service-menu-btn[data-service="panduan"]');
-  const btnDokumentasi = document.querySelector('.service-menu-btn[data-service="dokumentasi"]');
-  const btnKamar = document.querySelector('.service-menu-btn[data-service="kamar"]');
-  const btnMateri = document.querySelector('.service-menu-btn[data-service="materi"]');
-  const btnSertifikat = document.querySelector('.service-menu-btn[data-service="sertifikat"]');
-  const btnLaporan = document.querySelector('.service-menu-btn[data-service="lpj"], .service-menu-btn[data-service="laporan"], .service-menu-btn[data-service="lph"]');
+  // Ambil ketujuh tombol bawaan berdasarkan atribut data-service
+  const btnUndangan = document.querySelector('[data-service="undangan"]');
+  const btnPanduan = document.querySelector('[data-service="panduan"]');
+  const btnDokumentasi = document.querySelector('[data-service="dokumentasi"]');
+  const btnKamar = document.querySelector('[data-service="kamar"]');
+  const btnMateri = document.querySelector('[data-service="materi"]');
+  const btnSertifikat = document.querySelector('[data-service="sertifikat"]');
+  const btnLaporan = document.querySelector('[data-service="lpj"], [data-service="laporan"], [data-service="lph"]');
 
+  // Buat atau ambil tombol ke-8: Produk Rakor
   let btnProduk = document.getElementById("btnServiceProdukRakor");
   if (!btnProduk) {
     btnProduk = document.createElement("button");
@@ -136,6 +151,7 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   }
   btnProduk.onclick = () => openProdukRakorModal(activeUser, layananList, reloadCallback);
 
+  // Buat atau ambil tombol ke-9: Tentang Aplikasi
   let btnTentang = document.getElementById("btnServiceTentangAplikasi");
   if (!btnTentang) {
     btnTentang = document.createElement("button");
@@ -144,25 +160,20 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   }
   btnTentang.onclick = () => openTentangAplikasiModal();
 
-  const currentKamarText = document.getElementById("badgeHomeKamar")?.textContent ||
-    (activeUser?.role === "panitia" ? "Atur Kamar" : (activeUser?.profile?.nomor_kamar || "Cek Kamar"));
+  const currentKamarText = activeUser?.role === "panitia"
+    ? "Atur Kamar"
+    : (activeUser?.profile?.nomor_kamar && activeUser.profile.nomor_kamar !== "Belum Ditentukan"
+        ? activeUser.profile.nomor_kamar
+        : "Cek Kamar");
 
+  // Terapkan desain seragam ke-9 tombol:
   // BARIS 1: Surat Undangan, Buku Panduan, Dokumentasi
   styleGridTile(btnUndangan, "bg-blue-900 text-amber-300", "fa-envelope-open-text", "Surat Undangan", "Resmi PDF", "bg-blue-100 text-blue-900");
   styleGridTile(btnPanduan, "bg-indigo-700 text-white", "fa-book-open", "Buku Panduan", "Pedoman", "bg-indigo-100 text-indigo-900");
   styleGridTile(btnDokumentasi, "bg-sky-600 text-white", "fa-camera-retro", "Dokumentasi", "Galeri Foto", "bg-sky-100 text-sky-900");
 
   // BARIS 2: Info Kamar, Materi Rakor, Produk Rakor
-  if (btnKamar) {
-    btnKamar.className = "service-menu-btn service-grid-tile p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/90 flex flex-col items-center justify-between text-center gap-1.5 active:scale-95 transition shadow-2xs";
-    btnKamar.innerHTML = `
-      <div class="w-10 h-10 rounded-2xl bg-violet-700 text-amber-300 flex items-center justify-center text-base shadow-xs shrink-0">
-        <i class="fa-solid fa-bed"></i>
-      </div>
-      <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Info Kamar</span>
-      <span id="badgeHomeKamar" class="text-[9px] font-bold bg-violet-100 text-violet-900 px-2 py-0.5 rounded-full truncate max-w-full">${currentKamarText}</span>
-    `;
-  }
+  styleGridTile(btnKamar, "bg-violet-700 text-amber-300", "fa-bed", "Info Kamar", currentKamarText, "bg-violet-100 text-violet-900", "badgeHomeKamar");
   styleGridTile(btnMateri, "bg-teal-700 text-white", "fa-chalkboard-user", "Materi Rakor", "Narasumber", "bg-teal-100 text-teal-900");
   styleGridTile(btnProduk, "bg-emerald-700 text-amber-300", "fa-briefcase", "Produk Rakor", "Proker 2027", "bg-emerald-100 text-emerald-900");
 
@@ -183,116 +194,145 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
     btnTentang
   ].filter(Boolean);
 
-  orderedNineButtons.forEach(btn => gridContainer.appendChild(btn));
+  // Fungsi penata ulang & pembersih kartu saat pindah akun (Peserta <-> Panitia atau Panitia A <-> Panitia B)
+  const enforceCleanLayout = () => {
+    // Matikan sementara observer agar tidak memicu loop saat kita memindahkan elemen
+    if (gridObserverInstance) gridObserverInstance.disconnect();
 
-  // Penataan Section "KHUSUS PANITIA & AKSES KHUSUS" serta Card Infografis
-  const relocateExternalCards = () => {
-    const layananSectionCard = gridContainer.closest(".bg-white") || gridContainer.parentElement;
+    const layananCard = cachedLayananSectionCard || gridContainer.closest(".bg-white") || gridContainer.parentElement;
     const subrayonBarsEl = document.getElementById("homeSubrayonBars");
     const subrayonSectionCard = subrayonBarsEl ? (subrayonBarsEl.closest(".bg-white") || subrayonBarsEl.parentElement) : null;
 
-    if (!layananSectionCard || !layananSectionCard.parentElement) return;
-    const parentBeranda = layananSectionCard.parentElement;
+    if (layananCard && layananCard.parentElement) {
+      const parentBeranda = layananCard.parentElement;
 
-    let middleSlot = document.getElementById("berandaMiddleSlotContainer");
-    if (!middleSlot) {
-      middleSlot = document.createElement("div");
-      middleSlot.id = "berandaMiddleSlotContainer";
-      middleSlot.className = "space-y-3.5";
-    }
-
-    if (subrayonSectionCard && subrayonSectionCard.parentElement === parentBeranda) {
-      parentBeranda.insertBefore(middleSlot, subrayonSectionCard);
-    } else {
-      layananSectionCard.insertAdjacentElement("afterend", middleSlot);
-    }
-
-    const isPanitia = Boolean(activeUser && activeUser.role === "panitia");
-    let panitiaSpecialCard = document.getElementById("panitiaSpecialAccessSection");
-
-    if (isPanitia) {
-      if (!panitiaSpecialCard) {
-        panitiaSpecialCard = document.createElement("div");
-        panitiaSpecialCard.id = "panitiaSpecialAccessSection";
-        panitiaSpecialCard.className = "bg-white rounded-3xl p-4 border-2 border-indigo-100 shadow-sm space-y-3";
-        panitiaSpecialCard.innerHTML = `
-          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-xl bg-slate-900 text-amber-300 flex items-center justify-center text-xs shadow-2xs">
-                <i class="fa-solid fa-user-shield"></i>
-              </div>
-              <div>
-                <h3 class="font-extrabold text-xs text-slate-900 uppercase tracking-tight">Khusus Panitia & Akses Khusus</h3>
-                <p class="text-[10px] text-slate-500">Manajemen Keuangan, Rekap Profil, Evaluasi & Koordinasi</p>
-              </div>
-            </div>
-            <span class="text-[9px] font-extrabold uppercase bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full">
-              Internal Panitia
-            </span>
-          </div>
-          <div id="panitiaInternalTickerSlot"></div>
-          <div id="panitiaSpecialCardsBox" class="space-y-2.5"></div>
-        `;
+      let middleSlot = document.getElementById("berandaMiddleSlotContainer");
+      if (!middleSlot) {
+        middleSlot = document.createElement("div");
+        middleSlot.id = "berandaMiddleSlotContainer";
+        middleSlot.className = "space-y-3.5";
       }
-      middleSlot.appendChild(panitiaSpecialCard);
 
-      // Render Running Text Khusus Panitia di dalam Card Khusus Panitia
-      renderPanitiaInternalTicker(activeUser, layananList, reloadCallback);
+      if (subrayonSectionCard && subrayonSectionCard.parentElement === parentBeranda) {
+        parentBeranda.insertBefore(middleSlot, subrayonSectionCard);
+      } else {
+        layananCard.insertAdjacentElement("afterend", middleSlot);
+      }
 
-      const cardsBox = document.getElementById("panitiaSpecialCardsBox");
-      if (cardsBox) {
-        // Urutan utama: 1. Info Keuangan & Kontribusi, 2. Rekap Profil Kepsek, 3. Catatan & Evaluasi (plus Otoritas SPJ & ID Card jika berwenang)
-        const panitiaCardIds = [
-          "btnServiceInfoKeuangan",
-          "btnServiceRekapProfilKepsek",
-          "btnServiceCatatanPanitia",
-          "panitiaSpjControlWidget",
-          "btnServiceBulkIdCards"
-        ];
+      const isPanitia = Boolean(activeUser && activeUser.role === "panitia");
+      const userDivisi = activeUser?.profile?.divisi || "";
+      const hasSubrayonDuty = Boolean(activeUser?.profile?.tugas_subrayon && activeUser.profile.tugas_subrayon.trim() !== "");
 
-        panitiaCardIds.forEach(id => {
-          const el = document.getElementById(id);
-          if (el) {
-            el.classList.remove("col-span-3");
-            el.classList.add("w-full");
-            cardsBox.appendChild(el);
-          }
-        });
+      // Validasi ulang hak akses masing-masing kartu untuk akun yang sedang login saat ini
+      const allowKeuangan = isPanitia && (["Penanggung Jawab", "Ketua Panitia", "Sekretaris", "Bendahara"].includes(userDivisi) || hasSubrayonDuty);
+      const allowSpjToggle = isPanitia && ["Sekretaris", "Bendahara"].includes(userDivisi);
+      const allowIdCardPrint = isPanitia && ["Sekretaris", "Seksi Kesekretariatan"].includes(userDivisi);
 
-        // Jika ada elemen non-9-menu lain yang terselip di gridContainer, masukkan juga ke cardsBox
+      if (!allowKeuangan) document.getElementById("btnServiceInfoKeuangan")?.remove();
+      if (!allowSpjToggle) document.getElementById("panitiaSpjControlWidget")?.remove();
+      if (!allowIdCardPrint) document.getElementById("btnServiceBulkIdCards")?.remove();
+      if (!isPanitia) {
+        document.getElementById("btnServiceRekapProfilKepsek")?.remove();
+        document.getElementById("btnServiceCatatanPanitia")?.remove();
+      }
+
+      let panitiaSpecialCard = document.getElementById("panitiaSpecialAccessSection");
+
+      if (isPanitia) {
+        if (!panitiaSpecialCard) {
+          panitiaSpecialCard = document.createElement("div");
+          panitiaSpecialCard.id = "panitiaSpecialAccessSection";
+          panitiaSpecialCard.className = "bg-white rounded-3xl p-4 border-2 border-indigo-100 shadow-sm space-y-3";
+          panitiaSpecialCard.innerHTML = `
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-slate-900 text-amber-300 flex items-center justify-center text-xs shadow-2xs">
+                  <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                  <h3 class="font-extrabold text-xs text-slate-900 uppercase tracking-tight">Khusus Panitia & Akses Khusus</h3>
+                  <p class="text-[10px] text-slate-500">Manajemen Keuangan, Rekap Profil, Evaluasi & Koordinasi</p>
+                </div>
+              </div>
+              <span id="badgePanitiaRoleActive" class="text-[9px] font-extrabold uppercase bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full">
+                ${userDivisi || 'Internal Panitia'}
+              </span>
+            </div>
+            <div id="panitiaInternalTickerSlot"></div>
+            <div id="panitiaSpecialCardsBox" class="space-y-2.5"></div>
+          `;
+        } else {
+          const roleBadge = document.getElementById("badgePanitiaRoleActive");
+          if (roleBadge) roleBadge.textContent = userDivisi || "Internal Panitia";
+        }
+
+        middleSlot.appendChild(panitiaSpecialCard);
+        renderPanitiaInternalTicker(activeUser, layananList, reloadCallback);
+
+        const cardsBox = document.getElementById("panitiaSpecialCardsBox");
+        if (cardsBox) {
+          // Tarik semua kartu panitia dari mana pun mereka berada ke dalam cardsBox dengan urutan baku
+          const panitiaCardIds = [
+            "btnServiceInfoKeuangan",
+            "btnServiceRekapProfilKepsek",
+            "btnServiceCatatanPanitia",
+            "panitiaSpjControlWidget",
+            "btnServiceBulkIdCards"
+          ];
+
+          panitiaCardIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+              el.classList.remove("col-span-3");
+              el.classList.add("w-full");
+              cardsBox.appendChild(el);
+            }
+          });
+
+          // Jika masih ada kartu asing yang nyasar di dalam grid 9 menu, pindahkan ke cardsBox
+          Array.from(gridContainer.children).forEach(child => {
+            if (!orderedNineButtons.includes(child) && child.id !== "btnServiceStatistikSekolah") {
+              child.classList.remove("col-span-3");
+              child.classList.add("w-full");
+              cardsBox.appendChild(child);
+            }
+          });
+        }
+      } else {
+        if (panitiaSpecialCard) panitiaSpecialCard.remove();
+        // Jika login sebagai peserta dan masih ada kartu nyasar di gridContainer, bersihkan
         Array.from(gridContainer.children).forEach(child => {
           if (!orderedNineButtons.includes(child) && child.id !== "btnServiceStatistikSekolah") {
-            child.classList.remove("col-span-3");
-            child.classList.add("w-full");
-            cardsBox.appendChild(child);
+            child.remove();
           }
         });
       }
-    } else {
-      if (panitiaSpecialCard) panitiaSpecialCard.remove();
+
+      // Pastikan Card Infografis & Profil 160 Sekolah selalu berada tepat di bawah Card Khusus Panitia
+      const statCard = document.getElementById("btnServiceStatistikSekolah");
+      if (statCard) {
+        statCard.classList.remove("col-span-3");
+        statCard.classList.add("w-full");
+        middleSlot.appendChild(statCard);
+      }
     }
 
-    // Tempatkan Card Infografis & Profil 160 Sekolah berdiri sendiri tepat di bawah Card Khusus Panitia (dan di atas Card Progres 6 Sub Rayon)
-    const statCard = document.getElementById("btnServiceStatistikSekolah");
-    if (statCard) {
-      statCard.classList.remove("col-span-3");
-      statCard.classList.add("w-full");
-      middleSlot.appendChild(statCard);
+    // Pastikan ke-9 tombol menu utama selalu berurutan tepat 3x3 di dalam gridContainer
+    orderedNineButtons.forEach(btn => gridContainer.appendChild(btn));
+
+    // Aktifkan kembali observer untuk menangkap kartu async (seperti Rekap Profil / SPJ) yang baru selesai dimuat
+    if (!gridObserverInstance) {
+      gridObserverInstance = new MutationObserver(() => {
+        const hasIntruder = Array.from(gridContainer.children).some(ch => !orderedNineButtons.includes(ch));
+        if (hasIntruder) enforceCleanLayout();
+      });
     }
+    gridObserverInstance.observe(gridContainer, { childList: true });
   };
 
-  relocateExternalCards();
-  setTimeout(relocateExternalCards, 180);
-  setTimeout(relocateExternalCards, 600);
-
-  if (!gridObserverAttached) {
-    gridObserverAttached = true;
-    const obs = new MutationObserver(() => {
-      const hasIntruder = Array.from(gridContainer.children).some(ch => !ch.classList.contains("service-grid-tile"));
-      if (hasIntruder) relocateExternalCards();
-    });
-    obs.observe(gridContainer, { childList: true });
-  }
+  enforceCleanLayout();
+  setTimeout(enforceCleanLayout, 150);
+  setTimeout(enforceCleanLayout, 500);
 }
 
 // Running Text Khusus Internal Panitia (Hanya bisa dirilis oleh PJ, Ketua, Sekretaris, dan Seksi Konsumsi)
@@ -343,7 +383,7 @@ function renderPanitiaInternalTicker(activeUser, layananList, reloadCallback) {
     return;
   }
 
-  const sig = `${isActive}|${canEdit}|${speedSec}|${item.judul}|${item.deskripsi}`;
+  const sig = `${activeUser?.profile?.id_panitia || ''}|${isActive}|${canEdit}|${speedSec}|${item.judul}|${item.deskripsi}`;
   if (slot.dataset.sig === sig) {
     const barEl = slot.firstElementChild;
     if (barEl) barEl.onclick = () => openPanitiaTickerEditorModal(activeUser, item, speedSec, reloadCallback);
