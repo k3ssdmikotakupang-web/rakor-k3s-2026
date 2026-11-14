@@ -500,7 +500,7 @@ function findMejaLayananCardElement() {
         (txt.includes("meja layanan") && txt.includes("otorisasi")) ||
         txt.includes("meja layanan & otorisasi pos")
       ) {
-        const card = h.closest(".bg-white, .rounded-3xl, .rounded-2xl");
+        .closest(".bg-white, .from-slate-900, .rounded-3xl, .rounded-2xl")
         if (card) return card;
       }
     }
@@ -569,57 +569,57 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     targetSlot.dataset.sig = currentSig;
     targetSlot.className = "space-y-2 my-2";
     targetSlot.innerHTML = `
-      <!-- Baris 1: Rekap Kehadiran 3 Hari (H1, H2, H3) -->
+      <!-- Baris 1: Rekap Kehadiran 3 Hari (Warna Semula: Glass Dark Navy) -->
       <div class="grid grid-cols-3 gap-2 text-center">
-        <div data-trackday="H1" class="btn-quick-track-day bg-blue-50 hover:bg-blue-100 rounded-2xl p-2 border border-blue-200 cursor-pointer transition shadow-2xs">
-          <div class="text-sm font-extrabold text-blue-900">${h1Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-          <div class="text-[9px] font-extrabold text-blue-800 uppercase">Hadir H1 (26/11)</div>
-          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h1Count}</div>
+        <div data-trackday="H1" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 cursor-pointer transition">
+          <div class="text-sm font-extrabold text-amber-300">${h1Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H1 (26/11)</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h1Count}</div>
         </div>
-        <div data-trackday="H2" class="btn-quick-track-day bg-indigo-50 hover:bg-indigo-100 rounded-2xl p-2 border border-indigo-200 cursor-pointer transition shadow-2xs">
-          <div class="text-sm font-extrabold text-indigo-900">${h2Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-          <div class="text-[9px] font-extrabold text-indigo-800 uppercase">Hadir H2 (27/11)</div>
-          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h2Count}</div>
+        <div data-trackday="H2" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 cursor-pointer transition">
+          <div class="text-sm font-extrabold text-amber-300">${h2Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H2 (27/11)</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h2Count}</div>
         </div>
-        <div data-trackday="H3" class="btn-quick-track-day bg-violet-50 hover:bg-violet-100 rounded-2xl p-2 border border-violet-200 cursor-pointer transition shadow-2xs">
-          <div class="text-sm font-extrabold text-violet-900">${h3Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-          <div class="text-[9px] font-extrabold text-violet-800 uppercase">Hadir H3 (28/11)</div>
-          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h3Count}</div>
+        <div data-trackday="H3" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 cursor-pointer transition">
+          <div class="text-sm font-extrabold text-amber-300">${h3Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H3 (28/11)</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h3Count}</div>
         </div>
       </div>
 
-      <!-- Baris 2: Rakor Kit & Uang Transpor -->
+      <!-- Baris 2: Rakor Kit & Uang Transpor (Warna Semula: Glass Dark Navy) -->
       <div class="grid grid-cols-2 gap-2 text-center">
-        <div data-trackday="KIT" class="btn-quick-track-day bg-amber-50 hover:bg-amber-100 rounded-2xl p-2 border border-amber-200 flex items-center justify-between px-3 cursor-pointer transition shadow-2xs">
+        <div data-trackday="KIT" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 flex items-center justify-between px-3 cursor-pointer transition">
           <div class="text-left">
-            <div class="text-[9px] font-extrabold text-amber-900 uppercase">Ambil Rakor Kit</div>
-            <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - kitCount} Sekolah</div>
+            <div class="text-[9px] font-bold text-emerald-200 uppercase">Rakor Kit</div>
+            <div class="text-[8px] font-bold text-rose-300">Belum: ${totalSek - kitCount}</div>
           </div>
-          <div class="text-sm font-extrabold text-amber-800">${kitCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-emerald-300">${kitCount}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
         </div>
-        <div data-trackday="TRANS" class="btn-quick-track-day bg-emerald-50 hover:bg-emerald-100 rounded-2xl p-2 border border-emerald-200 flex items-center justify-between px-3 cursor-pointer transition shadow-2xs">
+        <div data-trackday="TRANS" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 flex items-center justify-between px-3 cursor-pointer transition">
           <div class="text-left">
-            <div class="text-[9px] font-extrabold text-emerald-900 uppercase">Terima Transpor</div>
-            <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - transCount} Sekolah</div>
+            <div class="text-[9px] font-bold text-sky-200 uppercase">Transpor</div>
+            <div class="text-[8px] font-bold text-rose-300">Belum: ${totalSek - transCount}</div>
           </div>
-          <div class="text-sm font-extrabold text-emerald-800">${transCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-sky-300">${transCount}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
         </div>
       </div>
 
-      <!-- Tombol Pelacak Kehadiran Peserta (Siapa yang Belum Absen) & Upload Absensi Manual -->
+      <!-- Tombol Pelacak Kehadiran Peserta & Upload Absensi Manual -->
       <div class="pt-1 space-y-1.5">
-        <button type="button" id="btnOpenAttendanceTrackerModal" class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 hover:from-slate-800 hover:to-blue-900 text-white font-extrabold text-xs shadow flex items-center justify-between active:scale-[0.99] transition">
+        <button type="button" id="btnOpenAttendanceTrackerModal" class="w-full py-2.5 px-3 rounded-2xl bg-white/15 hover:bg-white/25 border border-amber-400/40 text-white font-extrabold text-xs shadow flex items-center justify-between active:scale-[0.99] transition">
           <div class="flex items-center gap-2">
             <i class="fa-solid fa-user-clock text-amber-300"></i>
             <span>Rekap Kehadiran & Lacak Peserta Belum Absen</span>
           </div>
-          <span class="text-[9px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-extrabold">Lacak</span>
+          <span class="text-[9px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-extrabold">Lacak</span>
         </button>
 
         ${canUploadManual ? `
-          <button type="button" id="btnQuickUploadManualFromMeja" class="w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 font-extrabold text-[11px] flex items-center justify-between transition">
-            <span><i class="fa-solid fa-file-signature text-amber-700 mr-1.5"></i>Upload Scan Absensi Manual (SPJ BOSP)</span>
-            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${hasManualFile ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'}">
+          <button type="button" id="btnQuickUploadManualFromMeja" class="w-full py-2 px-3 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-amber-200 font-extrabold text-[11px] flex items-center justify-between transition">
+            <span><i class="fa-solid fa-file-signature text-amber-300 mr-1.5"></i>Upload Scan Absensi Manual (SPJ BOSP)</span>
+            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${hasManualFile ? 'bg-emerald-400 text-slate-950' : 'bg-amber-400 text-slate-950'}">
               ${hasManualFile ? '✓ Terunggah' : 'Upload PDF'}
             </span>
           </button>
