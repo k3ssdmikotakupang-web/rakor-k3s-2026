@@ -88,7 +88,7 @@ function injectSubrayonStatButton(activeUser, sekolahList, reloadCallback) {
         <i class="fa-solid fa-chart-pie"></i>
       </div>
       <div class="min-w-0">
-        <div class="text-xs font-extrabold text-slate-900 truncate">Infografis & Database Sekolah</div>
+        <div class="text-xs font-extrabold text-slate-900 truncate">Infografis & Database (${sekolahList.length || 160} Sekolah)</div>
         <div class="text-[10px] text-slate-500 truncate">Sebaran Jenjang, Status, Kelurahan & Kecamatan</div>
       </div>
     </div>
@@ -154,79 +154,188 @@ function renderStatistikModalContent(activeUser, sekolahList, bodyEl, reloadCall
   }
 }
 
+// =========================================================================
+// SUB-TAB 1: INFOGRAFIS DATA SEKOLAH + RINCIAN IKUT / TIDAK IKUT
+// =========================================================================
 function renderInfografisView(sekolahList, container) {
-  const total = sekolahList.length || 1;
+  const total = sekolahList.length || 160;
+  const totalIkut = sekolahList.filter(s => s.status_ikut === 'Ikut').length;
+  const totalTidak = sekolahList.filter(s => s.status_ikut === 'Tidak Ikut').length;
+  const totalBelum = total - totalIkut - totalTidak;
+  const pctTotalIkut = total > 0 ? Math.round((totalIkut / total) * 100) : 0;
 
-  const countSD = sekolahList.filter(s => detectJenjang(s.nama_sekolah) === 'SD').length;
-  const countMI = total - countSD;
+  // 1. Hitung berdasarkan Jenjang (SD vs MI) beserta Ikut & Tidak Ikut
+  const sdList = sekolahList.filter(s => detectJenjang(s.nama_sekolah) === 'SD');
+  const countSD = sdList.length;
+  const sdIkut = sdList.filter(s => s.status_ikut === 'Ikut').length;
+  const sdTidak = sdList.filter(s => s.status_ikut === 'Tidak Ikut').length;
+
+  const miList = sekolahList.filter(s => detectJenjang(s.nama_sekolah) === 'MI');
+  const countMI = miList.length;
+  const miIkut = miList.filter(s => s.status_ikut === 'Ikut').length;
+  const miTidak = miList.filter(s => s.status_ikut === 'Tidak Ikut').length;
+
   const pctSD = Math.round((countSD / total) * 100);
   const pctMI = 100 - pctSD;
 
-  const countNegeri = sekolahList.filter(s => String(s.status_sekolah || '').toLowerCase() === 'negeri').length;
-  const countSwasta = total - countNegeri;
+  // 2. Hitung berdasarkan Status Sekolah (Negeri vs Swasta) beserta Ikut & Tidak Ikut
+  const negList = sekolahList.filter(s => String(s.status_sekolah || '').toLowerCase() === 'negeri');
+  const countNegeri = negList.length;
+  const negIkut = negList.filter(s => s.status_ikut === 'Ikut').length;
+  const negTidak = negList.filter(s => s.status_ikut === 'Tidak Ikut').length;
+
+  const swaList = sekolahList.filter(s => String(s.status_sekolah || '').toLowerCase() !== 'negeri');
+  const countSwasta = swaList.length;
+  const swaIkut = swaList.filter(s => s.status_ikut === 'Ikut').length;
+  const swaTidak = swaList.filter(s => s.status_ikut === 'Tidak Ikut').length;
+
   const pctNegeri = Math.round((countNegeri / total) * 100);
   const pctSwasta = 100 - pctNegeri;
 
+  // 3. Hitung berdasarkan Sub Rayon & Kecamatan
   const subrayonStats = SUBRAYON_LIST.map(sr => {
     const items = sekolahList.filter(s => s.subrayon === sr);
     const neg = items.filter(s => String(s.status_sekolah || '').toLowerCase() === 'negeri').length;
     const swa = items.length - neg;
+    const sd = items.filter(s => detectJenjang(s.nama_sekolah) === 'SD').length;
+    const mi = items.length - sd;
     const ikut = items.filter(s => s.status_ikut === 'Ikut').length;
-    return { sr, count: items.length, neg, swa, ikut, pct: Math.round((items.length / total) * 100) };
+    const tidak = items.filter(s => s.status_ikut === 'Tidak Ikut').length;
+    return { sr, count: items.length, neg, swa, sd, mi, ikut, tidak, pct: Math.round((items.length / total) * 100) };
   });
 
+  // 4. Hitung berdasarkan Kelurahan
   const kelurahanMap = {};
   sekolahList.forEach(s => {
     const kel = (s.kelurahan || 'Lainnya').trim();
-    if (!kelurahanMap[kel]) kelurahanMap[kel] = { kel, total: 0, kecamatan: s.subrayon || '-' };
+    if (!kelurahanMap[kel]) kelurahanMap[kel] = { kel, total: 0, ikut: 0, kecamatan: s.subrayon || '-' };
     kelurahanMap[kel].total += 1;
+    if (s.status_ikut === 'Ikut') kelurahanMap[kel].ikut += 1;
   });
   const kelurahanList = Object.values(kelurahanMap).sort((a, b) => b.total - a.total);
 
   container.innerHTML = `
-    <div class="grid grid-cols-2 gap-2.5">
-      <div class="p-3.5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-white space-y-2 shadow">
-        <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
-          <i class="fa-solid fa-graduation-cap mr-1"></i>Berdasarkan Jenjang
+    <!-- BANNER RINGKASAN KEIKUTSERTAAN SE-KOTA KUPANG (160 SEKOLAH) -->
+    <div class="p-3.5 rounded-2xl bg-slate-900 text-white space-y-2 shadow">
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2 py-0.5 rounded">
+            Rekapitulasi Se-Kota Kupang
+          </span>
+          <h4 class="text-xs font-extrabold mt-1">Total ${total} Satuan Pendidikan (SD/MI)</h4>
         </div>
-        <div class="flex items-end justify-between">
-          <div>
-            <div class="text-xl font-extrabold">${countSD} <span class="text-xs font-normal text-blue-200">SD</span></div>
-            <div class="text-[10px] text-emerald-300 font-bold">${countMI} Madrasah (MI)</div>
-          </div>
-          <span class="text-xs font-extrabold bg-white/15 px-2 py-0.5 rounded-lg">${pctSD}% : ${pctMI}%</span>
-        </div>
-        <div class="w-full bg-white/15 h-2 rounded-full overflow-hidden flex">
-          <div class="bg-amber-400 h-full" style="width:${pctSD}%"></div>
-          <div class="bg-emerald-400 h-full" style="width:${pctMI}%"></div>
+        <div class="text-right">
+          <div class="text-lg font-extrabold text-emerald-400">${pctTotalIkut}% Ikut</div>
+          <div class="text-[9px] text-slate-300">${totalIkut} dari ${total} Sekolah</div>
         </div>
       </div>
 
-      <div class="p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 to-teal-950 text-white space-y-2 shadow">
-        <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300">
-          <i class="fa-solid fa-building-flag mr-1"></i>Status Sekolah
+      <div class="w-full bg-white/15 h-2 rounded-full overflow-hidden">
+        <div class="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full" style="width:${pctTotalIkut}%"></div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-1.5 pt-1 text-center text-[10px] font-extrabold">
+        <div class="bg-emerald-500/20 border border-emerald-400/30 rounded-xl py-1.5 text-emerald-300">
+          Ikut: ${totalIkut}
         </div>
-        <div class="flex items-end justify-between">
-          <div>
-            <div class="text-xl font-extrabold">${countNegeri} <span class="text-xs font-normal text-teal-200">Negeri</span></div>
-            <div class="text-[10px] text-amber-300 font-bold">${countSwasta} Swasta</div>
-          </div>
-          <span class="text-xs font-extrabold bg-white/15 px-2 py-0.5 rounded-lg">${pctNegeri}% : ${pctSwasta}%</span>
+        <div class="bg-rose-500/20 border border-rose-400/30 rounded-xl py-1.5 text-rose-300">
+          Tidak Ikut: ${totalTidak}
         </div>
-        <div class="w-full bg-white/15 h-2 rounded-full overflow-hidden flex">
-          <div class="bg-emerald-400 h-full" style="width:${pctNegeri}%"></div>
-          <div class="bg-amber-400 h-full" style="width:${pctSwasta}%"></div>
+        <div class="bg-amber-500/20 border border-amber-400/30 rounded-xl py-1.5 text-amber-300">
+          Belum: ${totalBelum}
         </div>
       </div>
     </div>
 
+    <!-- KARTU 1: JENJANG (SD vs MI) & STATUS SEKOLAH (NEGERI vs SWASTA) BESERTA IKUT/TIDAK IKUT -->
+    <div class="grid grid-cols-2 gap-2.5">
+      <!-- Kotak Jenjang -->
+      <div class="p-3.5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-white space-y-2.5 shadow">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
+            <i class="fa-solid fa-graduation-cap mr-1"></i>Jenjang
+          </span>
+          <span class="text-[10px] font-extrabold bg-white/15 px-1.5 py-0.5 rounded">${pctSD}% : ${pctMI}%</span>
+        </div>
+
+        <div class="w-full bg-white/15 h-2 rounded-full overflow-hidden flex">
+          <div class="bg-amber-400 h-full" style="width:${pctSD}%"></div>
+          <div class="bg-emerald-400 h-full" style="width:${pctMI}%"></div>
+        </div>
+
+        <div class="space-y-1.5 pt-0.5">
+          <div class="p-2 rounded-xl bg-white/10 border border-white/10">
+            <div class="flex items-center justify-between text-xs font-extrabold">
+              <span>SD</span>
+              <span class="text-amber-300">${countSD} Sekolah</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-bold mt-1 text-blue-100">
+              <span class="text-emerald-300">✓ Ikut: ${sdIkut}</span>
+              <span class="text-rose-300">✕ Tdk: ${sdTidak}</span>
+            </div>
+          </div>
+
+          <div class="p-2 rounded-xl bg-white/10 border border-white/10">
+            <div class="flex items-center justify-between text-xs font-extrabold">
+              <span>MI</span>
+              <span class="text-emerald-300">${countMI} Madrasah</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-bold mt-1 text-blue-100">
+              <span class="text-emerald-300">✓ Ikut: ${miIkut}</span>
+              <span class="text-rose-300">✕ Tdk: ${miTidak}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kotak Status Sekolah -->
+      <div class="p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 to-teal-950 text-white space-y-2.5 shadow">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300">
+            <i class="fa-solid fa-building-flag mr-1"></i>Status
+          </span>
+          <span class="text-[10px] font-extrabold bg-white/15 px-1.5 py-0.5 rounded">${pctNegeri}% : ${pctSwasta}%</span>
+        </div>
+
+        <div class="w-full bg-white/15 h-2 rounded-full overflow-hidden flex">
+          <div class="bg-emerald-400 h-full" style="width:${pctNegeri}%"></div>
+          <div class="bg-amber-400 h-full" style="width:${pctSwasta}%"></div>
+        </div>
+
+        <div class="space-y-1.5 pt-0.5">
+          <div class="p-2 rounded-xl bg-white/10 border border-white/10">
+            <div class="flex items-center justify-between text-xs font-extrabold">
+              <span>Negeri</span>
+              <span class="text-emerald-300">${countNegeri} Sekolah</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-bold mt-1 text-teal-100">
+              <span class="text-emerald-300">✓ Ikut: ${negIkut}</span>
+              <span class="text-rose-300">✕ Tdk: ${negTidak}</span>
+            </div>
+          </div>
+
+          <div class="p-2 rounded-xl bg-white/10 border border-white/10">
+            <div class="flex items-center justify-between text-xs font-extrabold">
+              <span>Swasta</span>
+              <span class="text-amber-300">${countSwasta} Sekolah</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-bold mt-1 text-teal-100">
+              <span class="text-emerald-300">✓ Ikut: ${swaIkut}</span>
+              <span class="text-rose-300">✕ Tdk: ${swaTidak}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KARTU 2: GRAFIK SEBARAN PER SUB RAYON & KECAMATAN -->
     <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
       <div class="flex items-center justify-between">
         <div>
           <h4 class="font-extrabold text-xs text-slate-900 uppercase">
             <i class="fa-solid fa-map-location-dot text-blue-800 mr-1"></i> Infografis Sub Rayon & Kecamatan
           </h4>
-          <p class="text-[10px] text-slate-500">Proporsi jumlah sekolah, rincian Negeri/Swasta & peserta terdaftar</p>
+          <p class="text-[10px] text-slate-500">Proporsi jenjang, status Negeri/Swasta & rincian Ikut/Tidak Ikut</p>
         </div>
         <span class="text-[10px] font-extrabold bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md">6 Wilayah</span>
       </div>
@@ -245,9 +354,11 @@ function renderInfografisView(sekolahList, container) {
                 <div class="bg-blue-700 h-full" style="width:${negW}%"></div>
                 <div class="bg-amber-400 h-full" style="width:${swaW}%"></div>
               </div>
-              <div class="flex items-center justify-between text-[10px] font-semibold text-slate-500">
-                <span><b class="text-blue-800">Negeri: ${st.neg}</b> | <b class="text-amber-600">Swasta: ${st.swa}</b></span>
-                <span class="text-emerald-700 font-bold">Ikut Rakor: ${st.ikut}/${st.count}</span>
+              <div class="flex items-center justify-between text-[10px] font-semibold text-slate-500 flex-wrap gap-1">
+                <span><b>${st.sd} SD • ${st.mi} MI</b> | <b class="text-blue-800">${st.neg} Negeri</b> • <b class="text-amber-600">${st.swa} Swasta</b></span>
+                <span>
+                  <b class="text-emerald-700">Ikut: ${st.ikut}</b> • <b class="text-rose-600">Tidak: ${st.tidak}</b>
+                </span>
               </div>
             </div>
           `;
@@ -255,6 +366,7 @@ function renderInfografisView(sekolahList, container) {
       </div>
     </div>
 
+    <!-- KARTU 3: INFOGRAFIS SEBARAN PER KELURAHAN -->
     <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
       <div class="flex items-center justify-between">
         <div>
@@ -286,7 +398,7 @@ function renderInfografisView(sekolahList, container) {
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between mb-1">
               <span class="font-extrabold text-slate-800 truncate">${idx + 1}. Kel. ${k.kel} <span class="text-[10px] font-normal text-slate-400">(Kec. ${k.kecamatan})</span></span>
-              <span class="font-extrabold text-emerald-700 shrink-0">${k.total} SD/MI</span>
+              <span class="font-extrabold text-emerald-700 shrink-0">${k.total} SD/MI <span class="text-[9px] font-normal text-slate-500">(${k.ikut} Ikut)</span></span>
             </div>
             <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
               <div class="bg-emerald-500 h-full rounded-full" style="width:${barWidth}%"></div>
@@ -301,10 +413,15 @@ function renderInfografisView(sekolahList, container) {
   document.getElementById("statSearchKelurahan")?.addEventListener("input", renderKelurahanRows);
 }
 
+// =========================================================================
+// SUB-TAB 2: DIREKTORI, EDIT & DOWNLOAD DATABASE SEKOLAH (160 SEKOLAH)
+// =========================================================================
 function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container, bodyEl, reloadCallback) {
   const editingItem = editingSchoolId
     ? sekolahList.find(s => s.id_sekolah === editingSchoolId)
     : null;
+
+  const totalSek = sekolahList.length || 160;
 
   container.innerHTML = `
     <div class="p-3.5 rounded-2xl ${isAdminDb ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-200'} border flex items-center justify-between gap-2">
@@ -313,7 +430,7 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
           ${isAdminDb ? 'Mode Editor Database Aktif' : 'Direktori Database Sekolah'}
         </div>
         <div class="text-xs font-extrabold text-slate-900">
-          ${isAdminDb ? 'Sekretaris & Seksi Kesekretariatan' : 'Data Master ' + (sekolahList.length || 160) + ' SD/MI Kota Kupang'}
+          ${isAdminDb ? 'Sekretaris & Seksi Kesekretariatan' : 'Data Master ' + totalSek + ' SD/MI Kota Kupang'}
         </div>
       </div>
 
@@ -487,6 +604,7 @@ function renderDatabaseManagerView(activeUser, isAdminDb, sekolahList, container
               <span class="text-[9px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
               <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${jenjang === 'MI' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${jenjang}</span>
               <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${String(s.status_sekolah).toLowerCase() === 'negeri' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-800'}">${s.status_sekolah}</span>
+              <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${s.status_ikut === 'Ikut' ? 'bg-emerald-100 text-emerald-800' : s.status_ikut === 'Tidak Ikut' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500'}">${s.status_ikut || 'Belum'}</span>
             </div>
             <h4 class="font-extrabold text-xs text-slate-900 mt-1">${s.nama_sekolah}</h4>
             <p class="text-[10px] text-slate-500">Kel. ${s.kelurahan || '-'} | Kec./Rayon ${s.subrayon} | ${s.alamat || '-'}</p>
@@ -564,13 +682,14 @@ export function exportDatabaseToCsv(activeUser, sekolahList) {
   const blob = new Blob([bomBytes, csvBody], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
 
+  const totalSek = sekolahList.length || 160;
   const link = document.createElement("a");
   link.href = url;
-  link.download = "Database_160_Sekolah_Rakor_K3S_Kupang.csv";
+  link.download = `Database_${totalSek}_Sekolah_Rakor_K3S_Kupang.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 
-  toast("Database 160 Sekolah (.CSV/Excel) berhasil diunduh!");
+  toast(`Database ${totalSek} Sekolah (.CSV/Excel) berhasil diunduh!`);
 }
