@@ -1,15 +1,11 @@
 // js/spj_bosp.js
-// Mencakup:
-// 1. Dokumen Pertanggungjawaban BOSP (26-28 Nov 2026) + Tombol Download Absensi Manual
-// 2. Panel Upload Absensi Manual (Khusus Sekretaris & Seksi Kesekretariatan)
-// 3. Upgrade Card Meja Layanan & Otorisasi Pos (Hadir H1, H2, H3, Rakor Kit, Transpor) + Pelacak Peserta Belum Absen
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
 let spjLockState = {
-  spj_absen: false,    // Dikendalikan oleh Sekretaris
-  spj_kwitansi: false  // Dikendalikan oleh Bendahara
+  spj_absen: false,
+  spj_kwitansi: false
 };
 
 let manualAbsenRecord = {
@@ -23,7 +19,8 @@ let manualAbsenRecord = {
 let logoK3sImageObj = null;
 let selectedRekapDay = "H1";
 let selectedRekapRayon = "ALL";
-let selectedRekapStatus = "BELUM"; // Default langsung melacak yang BELUM absen
+let selectedRekapStatus = "BELUM";
+let mejaPosObserver = null;
 
 function isUserSekretaris(activeUser) {
   return Boolean(
@@ -33,7 +30,6 @@ function isUserSekretaris(activeUser) {
   );
 }
 
-// Hak Akses Upload Absensi Manual: Sekretaris & Seksi Kesekretariatan
 function canUploadManualAbsen(activeUser) {
   return Boolean(
     activeUser &&
@@ -93,7 +89,6 @@ function ensureJsPdfLoaded() {
   });
 }
 
-// Fungsi Utama yang Dipanggil dari renderAllViews() di app.js
 export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList) {
   await fetchSpjLockAndManualDocState();
   injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList);
@@ -102,7 +97,7 @@ export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList)
 }
 
 // =========================================================================
-// 1. PANEL KONTROL AKTIVASI SPJ & UPLOAD ABSENSI MANUAL (SEKRETARIS, KESEKRETARIATAN & BENDAHARA)
+// 1. PANEL KONTROL AKTIVASI SPJ & UPLOAD ABSENSI MANUAL
 // =========================================================================
 function injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList) {
   const existing = document.getElementById("panitiaSpjControlWidget");
@@ -203,9 +198,7 @@ function injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList) {
       waktu_update: new Date().toLocaleString("id-ID")
     }]);
 
-    toast(nextVal
-      ? `Dokumen SPJ resmi DIBUKA untuk peserta!`
-      : `Dokumen SPJ DIKUNCI kembali.`);
+    toast(nextVal ? "Dokumen SPJ resmi DIBUKA untuk peserta!" : "Dokumen SPJ DIKUNCI kembali.");
     renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
   });
 
@@ -214,7 +207,6 @@ function injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList) {
   });
 }
 
-// Modal Upload File Absensi Manual (Khusus Sekretaris & Seksi Kesekretariatan)
 export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList) {
   if (!canUploadManualAbsen(activeUser)) {
     return toast("Akses Ditolak: Hanya Sekretaris & Seksi Kesekretariatan yang dapat mengunggah Absensi Manual!");
@@ -349,7 +341,6 @@ export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList)
 
 // =========================================================================
 // 2. KARTU UNDUH PAKET DOKUMEN SPJ BOSP DI TAB ABSENSI PESERTA
-// (Tanggal 26–28 Nov 2026 + Tombol Download Absensi Manual)
 // =========================================================================
 function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
   if (!activeUser || activeUser.role !== 'peserta') return;
@@ -382,7 +373,6 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
       <i class="fa-solid fa-file-shield text-blue-800 text-lg"></i>
     </div>
 
-    <!-- BAGIAN A: DAFTAR HADIR RESMI (26–28 NOV 2026) & ABSENSI MANUAL -->
     <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
       <div class="flex items-center justify-between">
         <span class="text-[11px] font-extrabold text-slate-800">
@@ -405,7 +395,6 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
           </button>
         </div>
 
-        <!-- Tombol ke-3: Download Absensi Manual (Hasil Upload Sekretaris & Kesekretariatan) -->
         <button type="button" id="btnDownloadAbsensiManual" class="w-full py-2.5 px-3 rounded-xl ${
           hasManualAbsenUrl
             ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
@@ -421,7 +410,6 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
       `}
     </div>
 
-    <!-- BAGIAN B: E-KWITANSI KONTRIBUSI RP 2.000.000 (DIBUKA OLEH BENDAHARA) -->
     <div class="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
       <div class="flex items-center justify-between">
         <span class="text-[11px] font-extrabold text-slate-800">
@@ -471,13 +459,9 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
 }
 
 // =========================================================================
-// 3. UPGRADE CARD "MEJA LAYANAN & OTORISASI POS" DI AKUN PANITIA:
-// Deteksi Otomatis Kartu Meja Layanan + Tampilkan Hadir H1, H2, H3, Rakor Kit, Transpor & Lacak Belum Absen
+// 3. UPGRADE CARD "MEJA LAYANAN & OTORISASI POS" DI AKUN PANITIA (TEMA GELAP SEMULA)
 // =========================================================================
-let mejaPosObserver = null;
-
 function findMejaLayananCardElement() {
-  // 1. Cek berdasarkan daftar kemungkinan ID yang digunakan di scanner_pos.js / index.html
   const candidateIds = [
     "berandaPosLayananBox",
     "posScannerHomeWidget",
@@ -490,7 +474,6 @@ function findMejaLayananCardElement() {
     if (el) return el;
   }
 
-  // 2. Jika ID berbeda, cari langsung di dalam tabContentBeranda berdasarkan teks judul kartu ("Meja Layanan" / "Otorisasi Pos")
   const tabBeranda = document.getElementById("tabContentBeranda") || document.body;
   const headings = tabBeranda.querySelectorAll("h2, h3, h4, span, div");
   for (const h of headings) {
@@ -500,21 +483,11 @@ function findMejaLayananCardElement() {
         (txt.includes("meja layanan") && txt.includes("otorisasi")) ||
         txt.includes("meja layanan & otorisasi pos")
       ) {
-        .closest(".bg-white, .from-slate-900, .rounded-3xl, .rounded-2xl")
+        const card = h.closest(".from-slate-900, .bg-white, .rounded-3xl, .rounded-2xl");
         if (card) return card;
       }
     }
   }
-
-  // 3. Fallback: Cari grid 3 kolom di Beranda yang berisi teks "Hadir H1" dan "Rakor Kit"
-  const grids = tabBeranda.querySelectorAll(".grid.grid-cols-3");
-  for (const g of grids) {
-    const t = (g.textContent || "").toLowerCase();
-    if (t.includes("hadir h1") && t.includes("rakor kit")) {
-      return g.closest(".bg-white, .rounded-3xl, .rounded-2xl") || g.parentElement;
-    }
-  }
-
   return null;
 }
 
@@ -535,14 +508,12 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     const canUploadManual = canUploadManualAbsen(activeUser);
     const hasManualFile = Boolean(manualAbsenRecord.url_link && manualAbsenRecord.url_link.trim() !== "");
 
-    // Cegah re-render berulang jika konten kita sudah terpasang dan angkanya masih sama
     const currentSig = `${totalSek}|${h1Count}|${h2Count}|${h3Count}|${kitCount}|${transCount}|${canUploadManual}|${hasManualFile}`;
     const existingUpgraded = box.querySelector("#upgradedMejaLayananStatsGrid");
     if (existingUpgraded && existingUpgraded.dataset.sig === currentSig) {
       return;
     }
 
-    // Cari grid 3 kolom lama (Hadir H1, Rakor Kit, Transport) di dalam kartu Meja Layanan
     let targetSlot = existingUpgraded;
     if (!targetSlot) {
       const allThreeGrids = box.querySelectorAll(".grid.grid-cols-3");
@@ -569,7 +540,6 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     targetSlot.dataset.sig = currentSig;
     targetSlot.className = "space-y-2 my-2";
     targetSlot.innerHTML = `
-      <!-- Baris 1: Rekap Kehadiran 3 Hari (Warna Semula: Glass Dark Navy) -->
       <div class="grid grid-cols-3 gap-2 text-center">
         <div data-trackday="H1" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 cursor-pointer transition">
           <div class="text-sm font-extrabold text-amber-300">${h1Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
@@ -588,7 +558,6 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
         </div>
       </div>
 
-      <!-- Baris 2: Rakor Kit & Uang Transpor (Warna Semula: Glass Dark Navy) -->
       <div class="grid grid-cols-2 gap-2 text-center">
         <div data-trackday="KIT" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 flex items-center justify-between px-3 cursor-pointer transition">
           <div class="text-left">
@@ -606,7 +575,6 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
         </div>
       </div>
 
-      <!-- Tombol Pelacak Kehadiran Peserta & Upload Absensi Manual -->
       <div class="pt-1 space-y-1.5">
         <button type="button" id="btnOpenAttendanceTrackerModal" class="w-full py-2.5 px-3 rounded-2xl bg-white/15 hover:bg-white/25 border border-amber-400/40 text-white font-extrabold text-xs shadow flex items-center justify-between active:scale-[0.99] transition">
           <div class="flex items-center gap-2">
@@ -644,17 +612,15 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     });
   };
 
-  // Jalankan langsung & jadwalkan ulang untuk mengantisipasi render async dari scanner_pos.js
   applyUpgradeToDom();
   setTimeout(applyUpgradeToDom, 200);
   setTimeout(applyUpgradeToDom, 650);
 
-  // Pasang pemantau pada tabContentBeranda agar jika scanner_pos.js merender ulang kartu Meja Layanan, upgrade kita otomatis dipasang kembali
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (tabBeranda && !mejaPosObserver) {
     mejaPosObserver = new MutationObserver(() => {
       const box = findMejaLayananCardElement();
-      if (box && !box.querySelector("#upgradedMejaLayananStatsGrid")) {
+      if (box && (!box.querySelector("#upgradedMejaLayananStatsGrid") || !box.querySelector("#btnOpenAttendanceTrackerModal"))) {
         applyUpgradeToDom();
       }
     });
@@ -663,7 +629,7 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
 }
 
 // =========================================================================
-// MODAL PELACAK KEHADIRAN PESERTA (SIAPA YANG HADIR & SIAPA YANG BELUM ABSEN)
+// MODAL PELACAK KEHADIRAN PESERTA
 // =========================================================================
 export function openAttendanceTrackerModal(activeUser, sekolahList) {
   if (!activeUser || activeUser.role !== "panitia") return;
@@ -708,7 +674,6 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
   const pct = totalSek > 0 ? Math.round((sudahCount / totalSek) * 100) : 0;
 
   bodyEl.innerHTML = `
-    <!-- Pilih Kategori Pelacakan: H1, H2, H3, Rakor Kit, Transpor -->
     <div class="grid grid-cols-5 gap-1 bg-slate-100 p-1 rounded-2xl text-center">
       ${[
         { k: "H1", lbl: "Hadir H1" },
@@ -723,7 +688,6 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
       `).join('')}
     </div>
 
-    <!-- Banner Ringkasan Status -->
     <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white space-y-2.5 shadow">
       <div class="flex items-center justify-between">
         <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
@@ -758,7 +722,6 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
       </div>
     </div>
 
-    <!-- Rekap Per Sub Rayon (Klik untuk menyaring siapa yang belum absen di rayon tersebut) -->
     <div class="grid grid-cols-3 gap-1.5">
       ${SUBRAYON_LIST.map(sr => {
         const srList = sekolahList.filter(s => s.subrayon === sr);
@@ -778,7 +741,6 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
       }).join('')}
     </div>
 
-    <!-- Filter & Pencarian Cepat -->
     <div class="grid grid-cols-2 gap-2">
       <select id="trackFilterRayonSelect" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-blue-950">
         <option value="ALL" ${selectedRekapRayon === 'ALL' ? 'selected' : ''}>Semua Sub Rayon (${totalSek})</option>
@@ -961,9 +923,6 @@ function drawQrOnCanvas(ctx, textUrl, x, y, size) {
   });
 }
 
-// =========================================================================
-// CETAK PDF DAFTAR HADIR INDIVIDU (26 s.d. 28 NOVEMBER 2026)
-// =========================================================================
 async function generatePdfDaftarHadirIndividu(school) {
   toast("Menyiapkan PDF Daftar Hadir Individu...");
   await ensureJsPdfLoaded();
@@ -1083,9 +1042,6 @@ async function generatePdfDaftarHadirIndividu(school) {
   toast("PDF Daftar Hadir Individu berhasil diunduh!");
 }
 
-// =========================================================================
-// CETAK PDF DAFTAR HADIR KOLEKTIF SUB RAYON (26 s.d. 28 NOVEMBER 2026)
-// =========================================================================
 async function generatePdfDaftarHadirKolektif(subrayon, srSchools, ketuaRayon) {
   toast(`Menyiapkan PDF Daftar Hadir Kolektif Sub Rayon ${subrayon}...`);
   await ensureJsPdfLoaded();
@@ -1175,9 +1131,6 @@ async function generatePdfDaftarHadirKolektif(subrayon, srSchools, ketuaRayon) {
   toast(`PDF Daftar Hadir Kolektif Sub Rayon ${subrayon} diunduh!`);
 }
 
-// =========================================================================
-// CETAK PDF E-KWITANSI RESMI DANA BOSP (26 s.d. 28 NOVEMBER 2026)
-// =========================================================================
 async function generatePdfEKwitansiBosp(school) {
   toast("Menyiapkan PDF E-Kwitansi Resmi BOSP...");
   await ensureJsPdfLoaded();
