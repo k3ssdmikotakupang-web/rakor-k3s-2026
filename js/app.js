@@ -789,14 +789,99 @@ function renderSubrayonView() {
 
   const allSr = sekolahList.filter(s => s.subrayon === sr);
   const ikutSr = allSr.filter(s => s.status_ikut === "Ikut").length;
+  const tidakSr = allSr.filter(s => s.status_ikut === "Tidak Ikut").length;
+  const belumSr = allSr.length - ikutSr - tidakSr;
   const pct = allSr.length > 0 ? Math.round((ikutSr / allSr.length) * 100) : 0;
 
   document.getElementById("srProgressTitle").textContent = `Sub Rayon ${sr}`;
   document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
   document.getElementById("srProgressBar").style.width = pct + "%";
 
-  let shortcutBar = document.getElementById("srFinanceShortcutBar");
+  const getJenjang = (nama = "") => {
+    const u = String(nama).toUpperCase().trim();
+    return (u.startsWith("MI ") || u.startsWith("MIN ") || u.startsWith("MIS ") || u.includes("MADRASAH IBTIDAIYAH")) ? "MI" : "SD";
+  };
+
+  const sdList = allSr.filter(s => getJenjang(s.nama_sekolah) === "SD");
+  const sdIkut = sdList.filter(s => s.status_ikut === "Ikut").length;
+  const sdTidak = sdList.filter(s => s.status_ikut === "Tidak Ikut").length;
+
+  const miList = allSr.filter(s => getJenjang(s.nama_sekolah) === "MI");
+  const miIkut = miList.filter(s => s.status_ikut === "Ikut").length;
+  const miTidak = miList.filter(s => s.status_ikut === "Tidak Ikut").length;
+
+  const negList = allSr.filter(s => String(s.status_sekolah || "").toLowerCase() === "negeri");
+  const negIkut = negList.filter(s => s.status_ikut === "Ikut").length;
+  const negTidak = negList.filter(s => s.status_ikut === "Tidak Ikut").length;
+
+  const swaList = allSr.filter(s => String(s.status_sekolah || "").toLowerCase() !== "negeri");
+  const swaIkut = swaList.filter(s => s.status_ikut === "Ikut").length;
+  const swaTidak = swaList.filter(s => s.status_ikut === "Tidak Ikut").length;
+
   const cardsContainer = document.getElementById("srSchoolCardsContainer");
+
+  let breakdownBox = document.getElementById("srBreakdownSummaryBox");
+  if (!breakdownBox && cardsContainer && cardsContainer.parentElement) {
+    breakdownBox = document.createElement("div");
+    breakdownBox.id = "srBreakdownSummaryBox";
+    cardsContainer.parentElement.insertBefore(breakdownBox, cardsContainer);
+  }
+
+  if (breakdownBox) {
+    breakdownBox.className = "p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2.5";
+    breakdownBox.innerHTML = `
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">
+          <i class="fa-solid fa-layer-group text-blue-800 mr-1"></i> Rekap Sub Rayon ${sr}
+        </span>
+        <div class="flex items-center gap-1 text-[10px] font-extrabold">
+          <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">Ikut: ${ikutSr}</span>
+          <span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800">Tidak: ${tidakSr}</span>
+          ${belumSr > 0 ? `<span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">Belum: ${belumSr}</span>` : ''}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          <div class="text-[9px] font-extrabold uppercase tracking-wider text-blue-900">
+            <i class="fa-solid fa-graduation-cap mr-1"></i>Berdasarkan Jenjang
+          </div>
+          <div class="flex items-center justify-between text-[11px] bg-white px-2 py-1.5 rounded-lg border border-slate-200/60">
+            <span class="font-extrabold text-slate-800">SD (${sdList.length})</span>
+            <span class="text-[10px] font-bold">
+              <b class="text-emerald-700">${sdIkut} Ikut</b> • <b class="text-rose-600">${sdTidak} Tdk</b>
+            </span>
+          </div>
+          <div class="flex items-center justify-between text-[11px] bg-white px-2 py-1.5 rounded-lg border border-slate-200/60">
+            <span class="font-extrabold text-slate-800">MI (${miList.length})</span>
+            <span class="text-[10px] font-bold">
+              <b class="text-emerald-700">${miIkut} Ikut</b> • <b class="text-rose-600">${miTidak} Tdk</b>
+            </span>
+          </div>
+        </div>
+
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          <div class="text-[9px] font-extrabold uppercase tracking-wider text-indigo-900">
+            <i class="fa-solid fa-building-flag mr-1"></i>Berdasarkan Status
+          </div>
+          <div class="flex items-center justify-between text-[11px] bg-white px-2 py-1.5 rounded-lg border border-slate-200/60">
+            <span class="font-extrabold text-slate-800">Negeri (${negList.length})</span>
+            <span class="text-[10px] font-bold">
+              <b class="text-emerald-700">${negIkut} Ikut</b> • <b class="text-rose-600">${negTidak} Tdk</b>
+            </span>
+          </div>
+          <div class="flex items-center justify-between text-[11px] bg-white px-2 py-1.5 rounded-lg border border-slate-200/60">
+            <span class="font-extrabold text-slate-800">Swasta (${swaList.length})</span>
+            <span class="text-[10px] font-bold">
+              <b class="text-emerald-700">${swaIkut} Ikut</b> • <b class="text-rose-600">${swaTidak} Tdk</b>
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  let shortcutBar = document.getElementById("srFinanceShortcutBar");
   if (!shortcutBar && cardsContainer && cardsContainer.parentElement) {
     shortcutBar = document.createElement("div");
     shortcutBar.id = "srFinanceShortcutBar";
@@ -835,6 +920,7 @@ function renderSubrayonView() {
     const isIkut = s.status_ikut === "Ikut";
     const isTidak = s.status_ikut === "Tidak Ikut";
     const statusBayar = s.status_bayar || "Belum Bayar";
+    const jenjang = getJenjang(s.nama_sekolah);
 
     const bayarBadgeStyle = statusBayar === "Lunas"
       ? "bg-emerald-100 text-emerald-800 border-emerald-300"
@@ -850,6 +936,8 @@ function renderSubrayonView() {
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
             <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
+            <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${jenjang === 'MI' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${jenjang}</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${String(s.status_sekolah).toLowerCase() === 'negeri' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-800'}">${s.status_sekolah || 'Negeri'}</span>
             ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded"><i class="fa-solid fa-bed mr-0.5"></i>${s.nomor_kamar}</span>` : ''}
           </div>
           <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
@@ -899,7 +987,6 @@ function renderSubrayonView() {
     cardsContainer.appendChild(card);
   });
 }
-
 async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
   if (!canEditPaymentAndParticipation(activeUser, targetSubrayon)) {
     return toast("Akses Ditolak: Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
