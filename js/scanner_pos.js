@@ -1,6 +1,6 @@
 // js/scanner_pos.js
 // Mencakup:
-// 1. Pemisahan Ketat: "Meja Layanan & Otorisasi Pos" (Khusus Panitia) vs "Status Layanan & Hak Peserta" (Data Pribadi Peserta)
+// 1. Pemisahan Ketat: "Meja Layanan & Otorisasi Pos" (Khusus Panitia) vs "Status Layanan & Hak Peserta" (Data Pribadi Peserta) dengan Tema Warna Gelap Elegan Semula
 // 2. Pemindahan Card "Pantauan Absensi & Izin Peserta" dari Tab Kinerja ke dalam Card Meja Layanan & Otorisasi Pos
 // 3. Penambahan Jenis Perizinan "Lainnya" pada Form Izin Peserta
 import { sb, toast } from './supabase.js';
@@ -75,7 +75,6 @@ function removeOldKinerjaAttendanceCard() {
       txt.includes("PANTAUAN ABSENSI DAN IZIN") ||
       (txt.includes("PANTAUAN ABSENSI") && txt.includes("IZIN PESERTA"))
     ) {
-      // Pastikan bukan kontainer utama daftar tugas
       if (!card.querySelector("#taskCardsContainer")) {
         card.remove();
       }
@@ -92,8 +91,7 @@ function renderBerandaPosOrPesertaRightsCard(activeUser, sekolahList, reloadCall
 
   let container = document.getElementById("berandaPosLayananBox");
   if (!container) {
-    // Cek apakah di index.html sudah ada kartu statis Meja Layanan / Status Layanan
-    const cards = tabBeranda.querySelectorAll(".bg-white.rounded-3xl, .bg-white.rounded-2xl");
+    const cards = tabBeranda.querySelectorAll(".rounded-3xl, .rounded-2xl");
     for (const c of cards) {
       const t = (c.textContent || "").toUpperCase();
       if (
@@ -128,7 +126,7 @@ function renderBerandaPosOrPesertaRightsCard(activeUser, sekolahList, reloadCall
   }
 }
 
-// A. TAMPILAN KHUSUS PESERTA: HANYA DATA MILIK SEKOLAHNYA SENDIRI
+// A. TAMPILAN KHUSUS PESERTA: HANYA DATA MILIK SEKOLAHNYA SENDIRI (WARNA GELAP ELEGAN SEMULA)
 function renderPesertaPersonalRightsView(container, activeUser, sekolahList) {
   const s = sekolahList.find(x => x.id_sekolah === activeUser.profile?.id_sekolah) || activeUser.profile || {};
 
@@ -139,74 +137,93 @@ function renderPesertaPersonalRightsView(container, activeUser, sekolahList) {
   const sudahTrans = Boolean(s.terima_transport);
   const isLunas = s.status_bayar === "Lunas";
   const kamar = (s.nomor_kamar && s.nomor_kamar !== "Belum Ditentukan") ? s.nomor_kamar : "Belum Ditentukan";
-  const hasIzin = Boolean(s.status_izin && String(s.status_izin).trim() !== "");
+  const hasIzin = Boolean(s.status_izin && String(s.status_izin).trim() !== "" && s.status_izin !== "Hadir Penuh (Tanpa Izin)");
 
-  container.className = "bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs space-y-3";
+  // Warna kembali ke tema semula: Dark Navy-Indigo Gradient dengan Aksen Amber Gold & Glass Cards
+  container.className = "p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white shadow-lg border border-blue-800/40 space-y-3.5";
   container.innerHTML = `
-    <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-xl bg-blue-900 text-amber-300 flex items-center justify-center text-xs shadow-2xs">
+    <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-sm font-extrabold shadow shrink-0">
           <i class="fa-solid fa-user-check"></i>
         </div>
-        <div>
-          <h3 class="font-extrabold text-xs text-slate-900 uppercase tracking-tight">Status Layanan & Hak Peserta</h3>
-          <p class="text-[10px] text-slate-500 truncate max-w-[210px]">${s.nama_sekolah || 'Sekolah Peserta'}</p>
+        <div class="min-w-0">
+          <h3 class="font-extrabold text-xs text-white uppercase tracking-tight">Status Layanan & Hak Peserta</h3>
+          <p class="text-[10px] text-blue-200 truncate max-w-[200px]">${s.nama_sekolah || 'Sekolah Peserta'}</p>
         </div>
       </div>
-      <span class="text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-full ${isLunas ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+      <span class="text-[9px] font-extrabold uppercase px-2.5 py-1 rounded-full shrink-0 ${
+        isLunas ? 'bg-emerald-400 text-slate-950' : 'bg-amber-400 text-slate-950'
+      }">
         ${s.status_bayar || 'Belum Bayar'}
       </span>
     </div>
 
     <!-- Baris 1: Status Kehadiran Pribadi 3 Hari (26-28 Nov 2026) -->
     <div>
-      <div class="text-[9px] font-extrabold uppercase text-slate-400 mb-1.5 tracking-wider">
+      <div class="text-[9px] font-extrabold uppercase text-blue-200/90 mb-1.5 tracking-wider">
         1. Status Presensi Kehadiran Anda (26–28 Nov 2026):
       </div>
       <div class="grid grid-cols-3 gap-2 text-center">
-        <div class="p-2.5 rounded-2xl border ${sudahH1 ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-500'}">
-          <i class="fa-solid ${sudahH1 ? 'fa-circle-check text-emerald-600' : 'fa-clock text-slate-400'} text-sm"></i>
-          <div class="text-[10px] font-extrabold mt-1">Hari Ke-1</div>
-          <div class="text-[9px] font-bold ${sudahH1 ? 'text-emerald-700' : 'text-slate-400'}">${sudahH1 ? 'Hadir Sah' : 'Belum Scan'}</div>
+        <div class="p-2.5 rounded-2xl border ${
+          sudahH1 ? 'bg-emerald-500/25 border-emerald-400/50 text-white' : 'bg-white/10 border-white/10 text-slate-300'
+        }">
+          <i class="fa-solid ${sudahH1 ? 'fa-circle-check text-emerald-300' : 'fa-clock text-amber-300/80'} text-sm"></i>
+          <div class="text-[10px] font-extrabold mt-1 text-white">Hari Ke-1</div>
+          <div class="text-[9px] font-bold ${sudahH1 ? 'text-emerald-300' : 'text-blue-200'}">${sudahH1 ? '✓ Hadir Sah' : 'Belum Scan'}</div>
         </div>
-        <div class="p-2.5 rounded-2xl border ${sudahH2 ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-500'}">
-          <i class="fa-solid ${sudahH2 ? 'fa-circle-check text-emerald-600' : 'fa-clock text-slate-400'} text-sm"></i>
-          <div class="text-[10px] font-extrabold mt-1">Hari Ke-2</div>
-          <div class="text-[9px] font-bold ${sudahH2 ? 'text-emerald-700' : 'text-slate-400'}">${sudahH2 ? 'Hadir Sah' : 'Belum Scan'}</div>
+
+        <div class="p-2.5 rounded-2xl border ${
+          sudahH2 ? 'bg-emerald-500/25 border-emerald-400/50 text-white' : 'bg-white/10 border-white/10 text-slate-300'
+        }">
+          <i class="fa-solid ${sudahH2 ? 'fa-circle-check text-emerald-300' : 'fa-clock text-amber-300/80'} text-sm"></i>
+          <div class="text-[10px] font-extrabold mt-1 text-white">Hari Ke-2</div>
+          <div class="text-[9px] font-bold ${sudahH2 ? 'text-emerald-300' : 'text-blue-200'}">${sudahH2 ? '✓ Hadir Sah' : 'Belum Scan'}</div>
         </div>
-        <div class="p-2.5 rounded-2xl border ${sudahH3 ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-500'}">
-          <i class="fa-solid ${sudahH3 ? 'fa-circle-check text-emerald-600' : 'fa-clock text-slate-400'} text-sm"></i>
-          <div class="text-[10px] font-extrabold mt-1">Hari Ke-3</div>
-          <div class="text-[9px] font-bold ${sudahH3 ? 'text-emerald-700' : 'text-slate-400'}">${sudahH3 ? 'Hadir Sah' : 'Belum Scan'}</div>
+
+        <div class="p-2.5 rounded-2xl border ${
+          sudahH3 ? 'bg-emerald-500/25 border-emerald-400/50 text-white' : 'bg-white/10 border-white/10 text-slate-300'
+        }">
+          <i class="fa-solid ${sudahH3 ? 'fa-circle-check text-emerald-300' : 'fa-clock text-amber-300/80'} text-sm"></i>
+          <div class="text-[10px] font-extrabold mt-1 text-white">Hari Ke-3</div>
+          <div class="text-[9px] font-bold ${sudahH3 ? 'text-emerald-300' : 'text-blue-200'}">${sudahH3 ? '✓ Hadir Sah' : 'Belum Scan'}</div>
         </div>
       </div>
     </div>
 
-    <!-- Baris 2: Status Penerimaan Hak Peserta (Rakor Kit, Uang Transpor & Kamar) -->
+    <!-- Baris 2: Status Penerimaan Fasilitas & Hak Peserta Pribadi -->
     <div>
-      <div class="text-[9px] font-extrabold uppercase text-slate-400 mb-1.5 tracking-wider">
+      <div class="text-[9px] font-extrabold uppercase text-blue-200/90 mb-1.5 tracking-wider">
         2. Status Penerimaan Fasilitas & Hak Peserta Anda:
       </div>
       <div class="grid grid-cols-2 gap-2">
-        <div class="p-3 rounded-2xl border ${sudahKit ? 'bg-emerald-50 border-emerald-300' : 'bg-amber-50/60 border-amber-200'} flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl ${sudahKit ? 'bg-emerald-600 text-white' : 'bg-amber-400 text-slate-950'} flex items-center justify-center text-sm shrink-0">
+        <div class="p-3 rounded-2xl border ${
+          sudahKit ? 'bg-emerald-500/25 border-emerald-400/50' : 'bg-white/10 border-white/15'
+        } flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl ${
+            sudahKit ? 'bg-emerald-400 text-slate-950' : 'bg-amber-400 text-slate-950'
+          } flex items-center justify-center text-sm font-extrabold shrink-0 shadow">
             <i class="fa-solid fa-briefcase"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[10px] font-extrabold text-slate-900">Rakor Kit / ATK</div>
-            <div class="text-[10px] font-bold ${sudahKit ? 'text-emerald-700' : 'text-amber-800'}">
+            <div class="text-[10px] font-extrabold text-white">Rakor Kit / ATK</div>
+            <div class="text-[10px] font-bold ${sudahKit ? 'text-emerald-300' : 'text-amber-300'}">
               ${sudahKit ? '✓ Sudah Diterima' : '⏳ Belum Diambil'}
             </div>
           </div>
         </div>
 
-        <div class="p-3 rounded-2xl border ${sudahTrans ? 'bg-emerald-50 border-emerald-300' : 'bg-blue-50/60 border-blue-200'} flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl ${sudahTrans ? 'bg-emerald-600 text-white' : 'bg-blue-900 text-amber-300'} flex items-center justify-center text-sm shrink-0">
+        <div class="p-3 rounded-2xl border ${
+          sudahTrans ? 'bg-emerald-500/25 border-emerald-400/50' : 'bg-white/10 border-white/15'
+        } flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl ${
+            sudahTrans ? 'bg-emerald-400 text-slate-950' : 'bg-sky-400 text-slate-950'
+          } flex items-center justify-center text-sm font-extrabold shrink-0 shadow">
             <i class="fa-solid fa-money-bill-wave"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[10px] font-extrabold text-slate-900">Uang Transpor</div>
-            <div class="text-[10px] font-bold ${sudahTrans ? 'text-emerald-700' : 'text-blue-900'}">
+            <div class="text-[10px] font-extrabold text-white">Uang Transpor</div>
+            <div class="text-[10px] font-bold ${sudahTrans ? 'text-emerald-300' : 'text-sky-300'}">
               ${sudahTrans ? '✓ Sudah Diterima' : '⏳ Belum Diambil'}
             </div>
           </div>
@@ -214,30 +231,30 @@ function renderPesertaPersonalRightsView(container, activeUser, sekolahList) {
       </div>
     </div>
 
-    <!-- Info Kamar & Status Izin Pribadi -->
-    <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+    <!-- Info Kamar Hotel Pribadi -->
+    <div class="p-3 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-between text-xs">
       <div class="flex items-center gap-2">
-        <i class="fa-solid fa-bed text-indigo-700"></i>
-        <span class="text-[11px] font-bold text-slate-700">Kamar Hotel Anda:</span>
+        <i class="fa-solid fa-bed text-amber-300"></i>
+        <span class="text-[11px] font-bold text-blue-100">Nomor Kamar Hotel Anda:</span>
       </div>
-      <span class="text-[11px] font-extrabold text-indigo-950 bg-indigo-100 px-2.5 py-0.5 rounded-lg">${kamar}</span>
+      <span class="text-[11px] font-extrabold text-slate-950 bg-amber-400 px-2.5 py-0.5 rounded-lg shadow-2xs">${kamar}</span>
     </div>
 
     ${hasIzin ? `
-      <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-between text-[11px]">
-        <span class="font-bold text-amber-950"><i class="fa-solid fa-envelope-open-text mr-1 text-amber-700"></i>Status Izin Anda: <b>${s.status_izin}</b></span>
-        <span class="text-[10px] text-amber-800 truncate max-w-[140px]">${s.alasan_izin || ''}</span>
+      <div class="p-2.5 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-between text-[11px]">
+        <span class="font-bold text-amber-200"><i class="fa-solid fa-envelope-open-text mr-1 text-amber-300"></i>Status Izin: <b class="text-white">${s.status_izin}</b></span>
+        <span class="text-[10px] text-amber-100 truncate max-w-[140px]">${s.alasan_izin || ''}</span>
       </div>
     ` : ''}
 
-    <button type="button" id="btnShowMyQrFromRights" class="w-full py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-xs flex items-center justify-center gap-2 shadow transition active:scale-95">
+    <button type="button" id="btnShowMyQrFromRights" class="w-full py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow transition active:scale-95">
       <i class="fa-solid fa-qrcode"></i>
-      <span>Tampilkan QR Code Saya untuk Scan Layanan</span>
+      <span>Tampilkan & Perbesar QR Code Saya</span>
     </button>
   `;
 
   document.getElementById("btnShowMyQrFromRights")?.addEventListener("click", () => {
-    document.querySelector('.bottom-nav-btn[data-tab="qr"]')?.click();
+    document.getElementById("footerBtnQr")?.click();
   });
 }
 
@@ -250,11 +267,10 @@ function renderPanitiaMejaLayananAndIzinView(container, activeUser, sekolahList,
   const kitCount = sekolahList.filter(s => s.ambil_kit).length;
   const transCount = sekolahList.filter(s => s.terima_transport).length;
 
-  const izinList = sekolahList.filter(s => s.status_izin && String(s.status_izin).trim() !== "");
+  const izinList = sekolahList.filter(s => s.status_izin && String(s.status_izin).trim() !== "" && s.status_izin !== "Hadir Penuh (Tanpa Izin)");
   const isSekretaris = activeUser.profile?.divisi === "Sekretaris";
   const isBendahara = activeUser.profile?.divisi === "Bendahara";
 
-  // Warna kembali ke tema semula: Dark Navy-Blue Gradient + Aksen Amber Gold
   container.className = "p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white shadow-lg border border-blue-800/40 space-y-3.5";
   container.innerHTML = `
     <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
@@ -358,7 +374,7 @@ function renderPanitiaMejaLayananAndIzinView(container, activeUser, sekolahList,
       `}
     </div>
 
-    <!-- Status Buka/Tutup 6 Pos Layanan (Warna Semula di Atas Latar Dark Navy) -->
+    <!-- Status Buka/Tutup 6 Pos Layanan -->
     <div class="space-y-1.5 pt-1 border-t border-white/10">
       <div class="flex items-center justify-between text-[10px] font-bold text-blue-200">
         <span>Status Otorisasi 6 Pos Layanan:</span>
@@ -476,7 +492,6 @@ function renderPesertaIzinFormInAbsensiTab(activeUser, sekolahList, reloadCallba
         </select>
       </div>
 
-      <!-- Input Jenis Perizinan Lainnya (Muncul otomatis jika memilih "Lainnya") -->
       <div id="boxInputJenisIzinLainnya" class="${selectedDropdownVal === 'Lainnya' ? '' : 'hidden'}">
         <label class="block text-[10px] font-bold text-amber-950 mb-1">Tuliskan Jenis Perizinan Lainnya:</label>
         <input id="inpPesertaJenisIzinCustom" type="text" value="${isCustomType ? currentJenis.replace(/^Izin\s+/i, '') : ''}" placeholder="Contoh: Urusan Keluarga Mendesak / Cuti / Studi..." class="w-full rounded-xl border-2 border-amber-400 bg-white px-3 py-2 text-xs font-bold text-slate-900" />
