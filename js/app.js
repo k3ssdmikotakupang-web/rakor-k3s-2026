@@ -441,10 +441,10 @@ function renderAbsensiPesertaView() {
   const pctHadir = Math.round((hadirCount / 3) * 100);
 
   const days = [
-  { key: "hadir_h1", isHadir: h1, dayNum: 1, label: "Hari Ke-1 • Kamis, 26 Nov 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
-  { key: "hadir_h2", isHadir: h2, dayNum: 2, label: "Hari Ke-2 • Jumat, 27 Nov 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
-  { key: "hadir_h3", isHadir: h3, dayNum: 3, label: "Hari Ke-3 • Sabtu, 28 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
-];
+    { key: "hadir_h1", isHadir: h1, dayNum: 1, label: "Hari Ke-1 • Kamis, 26 Nov 2026", desc: "Registrasi, Pembukaan & Materi Kebijakan Dinas P&K" },
+    { key: "hadir_h2", isHadir: h2, dayNum: 2, label: "Hari Ke-2 • Jumat, 27 Nov 2026", desc: "Sidang Komisi & Penyusunan Program Kerja K3S" },
+    { key: "hadir_h3", isHadir: h3, dayNum: 3, label: "Hari Ke-3 • Sabtu, 28 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan Resmi" }
+  ];
 
   const subViewHadir = document.getElementById("subViewHadirBox");
   if (subViewHadir && subViewHadir.children.length > 1) {
@@ -603,11 +603,16 @@ function renderAbsensiPesertaView() {
   const izinBanner = document.getElementById("currentIzinStatusBanner");
   if (s.status_izin && s.status_izin !== "Hadir Penuh (Tanpa Izin)") {
     izinBanner?.classList.remove("hidden");
-    document.getElementById("badgeCurrentIzinType").textContent = s.status_izin;
-    document.getElementById("textCurrentIzinReason").textContent = s.alasan_izin || "-";
-    document.getElementById("textCurrentIzinTime").textContent = `Diperbarui: ${s.waktu_izin || '-'}`;
-    document.getElementById("selectJenisIzin").value = s.status_izin;
-    document.getElementById("inputAlasanIzin").value = s.alasan_izin || "";
+    const bType = document.getElementById("badgeCurrentIzinType");
+    const tReason = document.getElementById("textCurrentIzinReason");
+    const tTime = document.getElementById("textCurrentIzinTime");
+    const selIzin = document.getElementById("selectJenisIzin");
+    const inpAlasan = document.getElementById("inputAlasanIzin");
+    if (bType) bType.textContent = s.status_izin;
+    if (tReason) tReason.textContent = s.alasan_izin || "-";
+    if (tTime) tTime.textContent = `Diperbarui: ${s.waktu_izin || '-'}`;
+    if (selIzin) selIzin.value = s.status_izin;
+    if (inpAlasan) inpAlasan.value = s.alasan_izin || "";
   } else {
     izinBanner?.classList.add("hidden");
   }
@@ -616,8 +621,8 @@ function renderAbsensiPesertaView() {
 async function submitPerijinanPeserta() {
   if (!activeUser || activeUser.role !== "peserta") return;
   const s = activeUser.profile;
-  const status_izin = document.getElementById("selectJenisIzin").value;
-  const alasan_izin = document.getElementById("inputAlasanIzin").value.trim();
+  const status_izin = document.getElementById("selectJenisIzin")?.value || "";
+  const alasan_izin = document.getElementById("inputAlasanIzin")?.value.trim() || "";
   const waktu_izin = new Date().toLocaleString("id-ID");
 
   if (status_izin !== "Hadir Penuh (Tanpa Izin)" && !alasan_izin) {
@@ -749,94 +754,6 @@ function renderQrView() {
   qrBox.innerHTML = '<img src="' + apiPrimary + '" alt="QR Code Resmi" class="w-[165px] h-[165px] object-contain mx-auto rounded-lg" onerror="this.onerror=null; this.src=\'' + apiBackup + '\';" />';
 }
 
-  // Jika library lokal gagal atau menghasilkan canvas kosong saat tab tersembunyi, gunakan Image API dengan backup otomatis
-  if (!renderedByLocalLib) {
-    qrBox.innerHTML = `
-      <img
-        src="${apiPrimary}"
-        alt="QR Code Resmi"
-        class="w-[165px] h-[165px] object-contain mx-auto rounded-lg"
-        onerror="this.onerror=null; this.src='${apiBackup}';"
-      />
-    `;
-  }
-
-  // Pastikan saat tombol navigasi bawah "ID & QR" diklik, QR dirender ulang dalam keadaan layar terbuka
-  const navQrBtn = document.querySelector('.bottom-nav-btn[data-tab="qr"]');
-  if (navQrBtn && !navQrBtn.dataset.qrRefreshBound) {
-    navQrBtn.dataset.qrRefreshBound = "1";
-    navQrBtn.addEventListener("click", () => {
-      setTimeout(() => renderQrView(), 60);
-    });
-  }
-}
-  // 2. Tampilkan Peringatan jika Data Profil belum lengkap (atau info terverifikasi jika sudah lengkap)
-  let alertBox = document.getElementById("qrProfileWarningBanner");
-  if (!alertBox && oldKepsekForm && oldKepsekForm.parentElement) {
-    alertBox = document.createElement("div");
-    alertBox.id = "qrProfileWarningBanner";
-    oldKepsekForm.insertAdjacentElement("afterend", alertBox);
-  }
-
-  if (alertBox) {
-    if (missingFields.length > 0) {
-      alertBox.className = "mt-3 p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-left space-y-2.5 shadow-2xs";
-      alertBox.innerHTML = `
-        <div class="flex items-start gap-2.5">
-          <div class="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 text-sm font-extrabold">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-          </div>
-          <div class="min-w-0 flex-1">
-            <h4 class="text-xs font-extrabold text-amber-950">Data Profil Belum Lengkap!</h4>
-            <p class="text-[10px] text-amber-900 leading-relaxed mt-0.5">
-              Mohon lengkapi <b>${missingFields.join(", ")}</b> pada menu Profil untuk keperluan pencetakan E-Sertifikat dan kartu peserta.
-            </p>
-          </div>
-        </div>
-        <button type="button" id="btnOpenProfileFromQrAlert" class="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow transition">
-          <i class="fa-solid fa-user-pen"></i>
-          <span>Lengkapi Data di Menu Profil Sekarang</span>
-        </button>
-      `;
-      document.getElementById("btnOpenProfileFromQrAlert")?.addEventListener("click", () => {
-        document.getElementById("topUserAvatar")?.click();
-      });
-    } else {
-      alertBox.className = "mt-3 p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between px-3.5";
-      alertBox.innerHTML = `
-        <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-900">
-          <i class="fa-solid fa-circle-check text-emerald-600"></i>
-          <span>Biodata Profil & Sertifikat Lengkap</span>
-        </div>
-        <button type="button" id="btnEditProfileFromQr" class="text-[10px] font-extrabold text-blue-800 hover:underline">
-          Ubah Profil
-        </button>
-      `;
-      document.getElementById("btnEditProfileFromQr")?.addEventListener("click", () => {
-        document.getElementById("topUserAvatar")?.click();
-      });
-    }
-  }
-
-  // 3. Render Gambar QR Code
-  try {
-    if (typeof window.QRCode === "function") {
-      new window.QRCode(qrBox, {
-        text: qrPayloadText,
-        width: 170,
-        height: 170,
-        colorDark: "#0f172a",
-        colorLight: "#ffffff"
-      });
-    } else {
-      throw new Error("QRCode fallback");
-    }
-  } catch (e) {
-    const encoded = encodeURIComponent(qrPayloadText);
-    qrBox.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${encoded}" alt="QR Code" class="w-[170px] h-[170px] mx-auto rounded-lg" />`;
-  }
-}
-
 async function saveNamaKepsek() {
   if (!activeUser || activeUser.role !== "peserta") return;
   const val = document.getElementById("qrInputNamaKepsek")?.value.trim() || "";
@@ -869,9 +786,12 @@ function renderSubrayonView() {
   const belumSr = allSr.length - ikutSr - tidakSr;
   const pct = allSr.length > 0 ? Math.round((ikutSr / allSr.length) * 100) : 0;
 
-  document.getElementById("srProgressTitle").textContent = `Sub Rayon ${sr}`;
-  document.getElementById("srProgressNumbers").textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
-  document.getElementById("srProgressBar").style.width = pct + "%";
+  const titleEl = document.getElementById("srProgressTitle");
+  const numEl = document.getElementById("srProgressNumbers");
+  const barEl = document.getElementById("srProgressBar");
+  if (titleEl) titleEl.textContent = `Sub Rayon ${sr}`;
+  if (numEl) numEl.textContent = `${ikutSr} / ${allSr.length} Ikut (${pct}%)`;
+  if (barEl) barEl.style.width = pct + "%";
 
   const getJenjang = (nama = "") => {
     const u = String(nama).toUpperCase().trim();
@@ -1063,6 +983,7 @@ function renderSubrayonView() {
     cardsContainer.appendChild(card);
   });
 }
+
 async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
   if (!canEditPaymentAndParticipation(activeUser, targetSubrayon)) {
     return toast("Akses Ditolak: Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
@@ -1116,31 +1037,12 @@ function renderKinerjaView() {
   const done = tugasList.filter(t => t.status === "Selesai").length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  document.getElementById("kinerjaBigPercent").textContent = pct + "%";
-  document.getElementById("kinerjaSubtitleCount").textContent = `${done} dari ${total} Tugas Selesai`;
-  document.getElementById("kinerjaBigBar").style.width = pct + "%";
-
-  const h1Count = sekolahList.filter(s => s.hadir_h1).length;
-  const h2Count = sekolahList.filter(s => s.hadir_h2).length;
-  const h3Count = sekolahList.filter(s => s.hadir_h3).length;
-  const izinSchools = sekolahList.filter(s => s.status_izin && s.status_izin !== "Hadir Penuh (Tanpa Izin)");
-
-  document.getElementById("rekapHadirH1").textContent = `${h1Count} Kepsek`;
-  document.getElementById("rekapHadirH2").textContent = `${h2Count} Kepsek`;
-  document.getElementById("rekapHadirH3").textContent = `${h3Count} Kepsek`;
-  document.getElementById("badgePanitiaCountIzin").textContent = `${izinSchools.length} Pengajuan Izin`;
-
-  const izinBox = document.getElementById("panitiaIzinListContainer");
-  if (izinBox) {
-    izinBox.innerHTML = izinSchools.length === 0
-      ? `<div class="text-[11px] text-slate-400 text-center py-2">Belum ada peserta yang mengajukan izin.</div>`
-      : izinSchools.map(s => `
-          <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px]">
-            <div class="font-extrabold text-amber-950">${s.nama_sekolah} (${s.subrayon})</div>
-            <div class="font-bold text-amber-800">${s.status_izin}: <span class="font-normal">${s.alasan_izin || '-'}</span></div>
-          </div>
-        `).join("");
-  }
+  const bigPctEl = document.getElementById("kinerjaBigPercent");
+  const subCntEl = document.getElementById("kinerjaSubtitleCount");
+  const bigBarEl = document.getElementById("kinerjaBigBar");
+  if (bigPctEl) bigPctEl.textContent = pct + "%";
+  if (subCntEl) subCntEl.textContent = `${done} dari ${total} Tugas Selesai`;
+  if (bigBarEl) bigBarEl.style.width = pct + "%";
 
   const phases = ["Perencanaan", "Persiapan", "Pelaksanaan", "Pasca-Acara"];
   const pGrid = document.getElementById("kinerjaPhaseGrid");
@@ -1158,7 +1060,8 @@ function renderKinerjaView() {
         <div class="text-[9px] text-blue-300">${doneP}/${allP.length}</div>
       `;
       item.addEventListener("click", () => {
-        document.getElementById("taskFilterPhase").value = ph;
+        const phSel = document.getElementById("taskFilterPhase");
+        if (phSel) phSel.value = ph;
         renderTaskListView();
       });
       pGrid.appendChild(item);
@@ -1186,7 +1089,8 @@ function renderKinerjaView() {
         </div>
       `;
       row.addEventListener("click", () => {
-        document.getElementById("taskFilterDivisi").value = div;
+        const divSel = document.getElementById("taskFilterDivisi");
+        if (divSel) divSel.value = div;
         renderTaskListView();
       });
       dBars.appendChild(row);
@@ -1220,7 +1124,6 @@ function renderTaskListView() {
   const div = document.getElementById("taskFilterDivisi")?.value || "ALL";
   const canEditMaster = canManageMasterTasks(activeUser);
 
-  // Sembunyikan tombol "+ Tambah Tugas" jika bukan Ketua Panitia / Sekretaris
   const btnAddTop = document.getElementById("btnAddTaskTop");
   if (btnAddTop) {
     btnAddTop.classList.toggle("hidden", !canEditMaster);
