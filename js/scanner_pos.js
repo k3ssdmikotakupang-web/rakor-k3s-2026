@@ -306,15 +306,15 @@ function injectHomeScannerCard(activeUser, sekolahList, reloadCallback) {
 
         <div class="grid grid-cols-3 gap-2 text-center bg-black/25 p-2 rounded-2xl border border-white/10">
           <div>
-            <div class="text-xs font-extrabold text-emerald-300">${totalH1}/158</div>
+            <div class="text-xs font-extrabold text-emerald-300">${totalH1}/160</div>
             <div class="text-[9px] text-slate-300">Hadir H1</div>
           </div>
           <div>
-            <div class="text-xs font-extrabold text-amber-300">${totalKit}/158</div>
+            <div class="text-xs font-extrabold text-amber-300">${totalKit}/160</div>
             <div class="text-[9px] text-slate-300">Rakor Kit</div>
           </div>
           <div>
-            <div class="text-xs font-extrabold text-sky-300">${totalTrans}/158</div>
+            <div class="text-xs font-extrabold text-sky-300">${totalTrans}/160</div>
             <div class="text-[9px] text-slate-300">Transpor</div>
           </div>
         </div>
@@ -425,11 +425,11 @@ function renderPosScannerBody(activeUser, allowedPos, sekolahList, bodyEl, reloa
         <div class="text-[9px] text-slate-300">Hadir H1 / H2 / H3</div>
       </div>
       <div class="bg-white/10 rounded-xl p-1.5">
-        <div class="text-xs font-extrabold text-amber-300">${countKit} / 158</div>
+        <div class="text-xs font-extrabold text-amber-300">${countKit} / 160</div>
         <div class="text-[9px] text-slate-300">Terima Rakor Kit</div>
       </div>
       <div class="bg-white/10 rounded-xl p-1.5">
-        <div class="text-xs font-extrabold text-sky-300">${countTrans} / 158</div>
+        <div class="text-xs font-extrabold text-sky-300">${countTrans} / 160</div>
         <div class="text-[9px] text-slate-300">Terima Transpor</div>
       </div>
     </div>
@@ -507,7 +507,7 @@ function renderPosScannerBody(activeUser, allowedPos, sekolahList, bodyEl, reloa
           </div>
           <div class="flex gap-1.5">
             <select id="selectManualPosSchool" class="flex-1 rounded-xl border bg-white px-2.5 py-2 text-xs font-semibold">
-              <option value="">-- Pilih Sekolah (158 SD/MI) --</option>
+              <option value="">-- Pilih Sekolah (160 SD/MI) --</option>
               ${sekolahList.map(s => `<option value="${s.npsn}">${s.nama_sekolah} (${s.subrayon})</option>`).join('')}
             </select>
             <button id="btnExecManualPos" class="bg-blue-900 text-white font-extrabold px-3.5 py-2 rounded-xl text-xs shrink-0">
@@ -541,10 +541,10 @@ function renderPosScannerBody(activeUser, allowedPos, sekolahList, bodyEl, reloa
       </div>
     `}
 
-    <!-- Tabel Rekapitulasi Status 158 Sekolah -->
+    <!-- Tabel Rekapitulasi Status 160 Sekolah -->
     <div class="space-y-2 pt-2 border-t border-slate-200">
       <div class="flex items-center justify-between">
-        <span class="font-extrabold text-xs text-slate-800 uppercase">Daftar Status 158 Sekolah</span>
+        <span class="font-extrabold text-xs text-slate-800 uppercase">Daftar Status 160 Sekolah</span>
         <input id="searchRekapPosInput" type="text" placeholder="Cari sekolah/rayon..." class="w-40 rounded-xl border bg-slate-50 px-2.5 py-1 text-[11px] font-semibold" />
       </div>
       <div id="posRekapTableList" class="space-y-1.5 max-h-56 overflow-y-auto pr-0.5"></div>
