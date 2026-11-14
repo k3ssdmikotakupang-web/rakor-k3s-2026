@@ -241,7 +241,7 @@ function renderPesertaPersonalRightsView(container, activeUser, sekolahList) {
   });
 }
 
-// B. TAMPILAN KHUSUS PANITIA: MEJA LAYANAN, OTORISASI POS & PANTAUAN ABSENSI/IZIN PESERTA
+// B. TAMPILAN KHUSUS PANITIA: TEMA WARNA SEMULA (DARK NAVY & GOLD) DENGAN MENU LENGKAP
 function renderPanitiaMejaLayananAndIzinView(container, activeUser, sekolahList, reloadCallback) {
   const totalSek = sekolahList.length || 160;
   const h1Count = sekolahList.filter(s => s.hadir_h1).length;
@@ -254,99 +254,100 @@ function renderPanitiaMejaLayananAndIzinView(container, activeUser, sekolahList,
   const isSekretaris = activeUser.profile?.divisi === "Sekretaris";
   const isBendahara = activeUser.profile?.divisi === "Bendahara";
 
-  container.className = "bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs space-y-3.5";
+  // Warna kembali ke tema semula: Dark Navy-Blue Gradient + Aksen Amber Gold
+  container.className = "p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white shadow-lg border border-blue-800/40 space-y-3.5";
   container.innerHTML = `
-    <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-xl bg-blue-900 text-amber-300 flex items-center justify-center text-xs shadow-2xs">
+    <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-sm font-extrabold shadow">
           <i class="fa-solid fa-qrcode"></i>
         </div>
         <div>
-          <h3 class="font-extrabold text-xs text-slate-900 uppercase tracking-tight">Meja Layanan & Otorisasi Pos</h3>
-          <p class="text-[10px] text-slate-500">Pantauan Absensi, Izin Peserta, Rakor Kit & Transpor</p>
+          <h3 class="font-extrabold text-xs text-white uppercase tracking-tight">Meja Layanan & Otorisasi Pos</h3>
+          <p class="text-[10px] text-blue-200">Pantauan Absensi, Izin Peserta, Rakor Kit & Transpor</p>
         </div>
       </div>
-      <button type="button" id="btnOpenPosScannerModal" class="px-3 py-1.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-extrabold text-[11px] shadow flex items-center gap-1.5 active:scale-95 transition">
+      <button type="button" id="btnOpenPosScannerModal" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[11px] shadow flex items-center gap-1.5 active:scale-95 transition shrink-0">
         <i class="fa-solid fa-camera"></i>
         <span>Scan Pos</span>
       </button>
     </div>
 
-    <!-- Container Statistik 5 Indikator (Terintegrasi dengan Pelacak spj_bosp.js) -->
+    <!-- Container Statistik 5 Indikator dengan Warna Semula (Glass White/10 di atas Dark Navy) -->
     <div id="upgradedMejaLayananStatsGrid" class="space-y-2">
       <div class="grid grid-cols-3 gap-2 text-center">
-        <div class="bg-blue-50 rounded-2xl p-2 border border-blue-200">
-          <div class="text-sm font-extrabold text-blue-900">${h1Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-          <div class="text-[9px] font-extrabold text-blue-800 uppercase">Hadir H1 (26/11)</div>
-          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h1Count}</div>
+        <div class="bg-white/10 rounded-2xl p-2 border border-white/10">
+          <div class="text-sm font-extrabold text-amber-300">${h1Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H1 (26/11)</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h1Count}</div>
         </div>
-        <div class="bg-indigo-50 rounded-2xl p-2 border border-indigo-200">
-          <div class="text-sm font-extrabold text-indigo-900">${h2Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-          <div class="text-[9px] font-extrabold text-indigo-800 uppercase">Hadir H2 (27/11)</div>
-          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h2Count}</div>
+        <div class="bg-white/10 rounded-2xl p-2 border border-white/10">
+          <div class="text-sm font-extrabold text-amber-300">${h2Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H2 (27/11)</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h2Count}</div>
         </div>
-        <div class="bg-violet-50 rounded-2xl p-2 border border-violet-200">
-          <div class="text-sm font-extrabold text-violet-900">${h3Count}<span class="text-[10px] font-semibold text-slate-400">/${totalSek}</span></div>
-          <div class="text-[9px] font-extrabold text-violet-800 uppercase">Hadir H3 (28/11)</div>
-          <div class="text-[8px] font-bold text-rose-600 mt-0.5">Belum: ${totalSek - h3Count}</div>
+        <div class="bg-white/10 rounded-2xl p-2 border border-white/10">
+          <div class="text-sm font-extrabold text-amber-300">${h3Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H3 (28/11)</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h3Count}</div>
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2 text-center">
-        <div class="bg-amber-50 rounded-2xl p-2 border border-amber-200 flex items-center justify-between px-3">
+        <div class="bg-white/10 rounded-2xl p-2 border border-white/10 flex items-center justify-between px-3">
           <div class="text-left">
-            <div class="text-[9px] font-extrabold text-amber-900 uppercase">Ambil Rakor Kit</div>
-            <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - kitCount} Sekolah</div>
+            <div class="text-[9px] font-bold text-emerald-200 uppercase">Rakor Kit</div>
+            <div class="text-[8px] font-bold text-rose-300">Belum: ${totalSek - kitCount}</div>
           </div>
-          <div class="text-sm font-extrabold text-amber-800">${kitCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-emerald-300">${kitCount}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
         </div>
-        <div class="bg-emerald-50 rounded-2xl p-2 border border-emerald-200 flex items-center justify-between px-3">
+        <div class="bg-white/10 rounded-2xl p-2 border border-white/10 flex items-center justify-between px-3">
           <div class="text-left">
-            <div class="text-[9px] font-extrabold text-emerald-900 uppercase">Terima Transpor</div>
-            <div class="text-[8px] font-bold text-rose-600">Belum: ${totalSek - transCount} Sekolah</div>
+            <div class="text-[9px] font-bold text-sky-200 uppercase">Transpor</div>
+            <div class="text-[8px] font-bold text-rose-300">Belum: ${totalSek - transCount}</div>
           </div>
-          <div class="text-sm font-extrabold text-emerald-800">${transCount}<span class="text-[10px] font-normal text-slate-400">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-sky-300">${transCount}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
         </div>
       </div>
     </div>
 
-    <!-- BAGIAN PINDAHAN DARI MENU KINERJA: PANTAUAN ABSENSI & IZIN PESERTA -->
-    <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2.5">
+    <!-- Pantauan Absensi & Izin Peserta (Nuansa Gelap Transparan Serasi) -->
+    <div class="p-3 rounded-2xl bg-white/10 border border-white/15 space-y-2">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-1.5">
-          <i class="fa-solid fa-envelope-open-text text-amber-700 text-xs"></i>
-          <span class="text-[11px] font-extrabold text-slate-900 uppercase">Pantauan Absensi & Izin Peserta</span>
+          <i class="fa-solid fa-envelope-open-text text-amber-300 text-xs"></i>
+          <span class="text-[11px] font-extrabold text-white uppercase">Pantauan Absensi & Izin Peserta</span>
         </div>
-        <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${izinList.length > 0 ? 'bg-amber-400 text-slate-950' : 'bg-slate-200 text-slate-600'}">
+        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full ${izinList.length > 0 ? 'bg-amber-400 text-slate-950' : 'bg-white/15 text-slate-300'}">
           ${izinList.length} Pengajuan Izin
         </span>
       </div>
 
       ${izinList.length === 0 ? `
-        <div class="text-[10px] text-slate-500 bg-white/80 rounded-xl p-2.5 text-center border border-amber-200/60 font-semibold">
+        <div class="text-[10px] text-slate-300 bg-slate-950/40 rounded-xl p-2.5 text-center border border-white/10 font-semibold">
           Belum ada peserta yang mengajukan izin ketidakhadiran.
         </div>
       ` : `
         <div class="space-y-1.5 max-h-44 overflow-y-auto pr-0.5">
           ${izinList.map(iz => `
-            <div class="p-2.5 rounded-xl bg-white border border-amber-200 flex items-start justify-between gap-2 text-[10px]">
+            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/15 flex items-start justify-between gap-2 text-[10px]">
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-extrabold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">${iz.status_izin}</span>
-                  <span class="font-bold text-slate-500">Rayon ${iz.subrayon}</span>
+                  <span class="font-extrabold bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">${iz.status_izin}</span>
+                  <span class="font-bold text-blue-200">Rayon ${iz.subrayon}</span>
                 </div>
-                <div class="font-extrabold text-slate-900 truncate mt-1">${iz.nama_sekolah}</div>
-                <div class="text-slate-600">Kepsek: <b>${iz.nama_kepsek || '-'}</b></div>
-                <div class="text-slate-500 italic mt-0.5">"${iz.alasan_izin || '-'}"</div>
+                <div class="font-extrabold text-white truncate mt-1">${iz.nama_sekolah}</div>
+                <div class="text-slate-300">Kepsek: <b>${iz.nama_kepsek || '-'}</b></div>
+                <div class="text-amber-200/90 italic mt-0.5">"${iz.alasan_izin || '-'}"</div>
               </div>
               <div class="flex flex-col items-end gap-1 shrink-0">
                 ${iz.surat_izin_url ? `
-                  <a href="${iz.surat_izin_url}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 font-extrabold text-[9px] flex items-center gap-1">
+                  <a href="${iz.surat_izin_url}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[9px] flex items-center gap-1">
                     <i class="fa-solid fa-file-lines"></i> Bukti
                   </a>
                 ` : ''}
                 ${(isSekretaris || activeUser.profile?.divisi === 'Seksi Kesekretariatan') ? `
-                  <button type="button" data-sch="${iz.id_sekolah}" class="btn-clear-izin-row text-[9px] font-bold text-rose-600 hover:underline">
+                  <button type="button" data-sch="${iz.id_sekolah}" class="btn-clear-izin-row text-[9px] font-bold text-rose-300 hover:underline">
                     Reset Izin
                   </button>
                 ` : ''}
@@ -357,9 +358,9 @@ function renderPanitiaMejaLayananAndIzinView(container, activeUser, sekolahList,
       `}
     </div>
 
-    <!-- Status Buka/Tutup 6 Pos Layanan (Khusus Sekretaris & Bendahara Bisa Klik Saklar) -->
-    <div class="space-y-1.5 pt-1 border-t border-slate-100">
-      <div class="flex items-center justify-between text-[10px] font-bold text-slate-500">
+    <!-- Status Buka/Tutup 6 Pos Layanan (Warna Semula di Atas Latar Dark Navy) -->
+    <div class="space-y-1.5 pt-1 border-t border-white/10">
+      <div class="flex items-center justify-between text-[10px] font-bold text-blue-200">
         <span>Status Otorisasi 6 Pos Layanan:</span>
         <span>${(isSekretaris || isBendahara) ? 'Ketuk pos untuk Buka/Kunci' : 'Dikendalikan Sekretaris & Bendahara'}</span>
       </div>
@@ -369,14 +370,14 @@ function renderPanitiaMejaLayananAndIzinView(container, activeUser, sekolahList,
           const canToggle = canTogglePosLock(activeUser, pos.controller);
           return `
             <div data-posid="${pos.id}" data-ctrl="${pos.controller}" class="pos-lock-item p-2 rounded-xl border flex items-center justify-between gap-1.5 ${
-              isOpen ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-200'
-            } ${canToggle ? 'cursor-pointer hover:border-blue-500 active:scale-95 transition' : ''}">
+              isOpen ? 'bg-emerald-500/20 border-emerald-400/40 text-white' : 'bg-white/5 border-white/10 text-slate-300'
+            } ${canToggle ? 'cursor-pointer hover:bg-white/15 active:scale-95 transition' : ''}">
               <div class="min-w-0">
-                <div class="text-[10px] font-extrabold text-slate-800 truncate">${pos.label}</div>
-                <div class="text-[8px] font-bold text-slate-400">Otoritas: ${pos.controller}</div>
+                <div class="text-[10px] font-extrabold text-white truncate">${pos.label}</div>
+                <div class="text-[8px] font-bold text-blue-200">Otoritas: ${pos.controller}</div>
               </div>
               <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
-                isOpen ? 'bg-emerald-600 text-white' : 'bg-slate-300 text-slate-700'
+                isOpen ? 'bg-emerald-400 text-slate-950' : 'bg-rose-500/80 text-white'
               }">
                 <i class="fa-solid ${isOpen ? 'fa-lock-open' : 'fa-lock'}"></i>
               </span>
