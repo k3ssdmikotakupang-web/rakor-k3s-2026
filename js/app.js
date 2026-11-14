@@ -639,13 +639,13 @@ async function submitPerijinanPeserta() {
   await loadAllDatabase(false);
 }
 
-// =========================================================================
-// RENDER QR CODE PESERTA & PANITIA + FITUR KLIK UNTUK MEMPERBESAR (ZOOM)
-// =========================================================================
 function renderQrView() {
   if (!activeUser) return;
   const qrBox = document.getElementById("qrCodeCanvas");
   if (!qrBox) return;
+
+  // Hapus elemen zoomHint luar jika sempat terbuat sebelumnya
+  document.getElementById("qrClickZoomHint")?.remove();
 
   const oldKepsekForm = document.getElementById("qrKepsekFormBox");
   if (oldKepsekForm) oldKepsekForm.classList.add("hidden");
@@ -756,6 +756,53 @@ function renderQrView() {
       });
     }
   }
+
+  // Render QR Code & label petunjuk di dalam 1 kotak terpusat (tanpa mengubah parentElement)
+  qrBox.innerHTML = "";
+  qrBox.className = "w-[210px] mx-auto bg-white p-3 rounded-3xl border-2 border-slate-200 flex flex-col items-center justify-center gap-2 shadow-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition";
+  qrBox.title = "Ketuk untuk memperbesar QR Code";
+
+  const innerQrHolder = document.createElement("div");
+  innerQrHolder.className = "w-[170px] h-[170px] flex items-center justify-center mx-auto";
+  qrBox.appendChild(innerQrHolder);
+
+  const hintBadge = document.createElement("div");
+  hintBadge.className = "w-full py-1 px-2 rounded-xl bg-blue-50 text-blue-900 border border-blue-200/80 text-[9px] font-extrabold text-center flex items-center justify-center gap-1";
+  hintBadge.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus text-blue-700"></i> <span>Ketuk QR untuk Perbesar</span>';
+  qrBox.appendChild(hintBadge);
+
+  const encoded = encodeURIComponent(qrPayloadText);
+  const fallbackImgUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=6&data=" + encoded;
+  const backupImgUrl = "https://quickchart.io/qr?size=300&margin=1&text=" + encoded;
+
+  let localSuccess = false;
+  if (typeof window.QRCode === "function") {
+    try {
+      new window.QRCode(innerQrHolder, {
+        text: qrPayloadText,
+        width: 170,
+        height: 170,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff"
+      });
+      setTimeout(() => {
+        const hasCanvasOrImg = innerQrHolder.querySelector("canvas, img");
+        if (!hasCanvasOrImg) {
+          innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[170px] h-[170px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
+        }
+      }, 80);
+      localSuccess = true;
+    } catch (e) {
+      localSuccess = false;
+    }
+  }
+
+  if (!localSuccess) {
+    innerQrHolder.innerHTML = '<img src="' + fallbackImgUrl + '" alt="QR Code" class="w-[170px] h-[170px] object-contain rounded-lg" onerror="this.onerror=null;this.src=\'' + backupImgUrl + '\';" />';
+  }
+
+  qrBox.onclick = () => openFullscreenQrZoomModal(qrPayloadText, zoomTitle, zoomSub);
+}
 
   // Pastikan wadah induk QR menyusun elemen secara vertikal di tengah (bukan berjejer ke samping)
   if (qrBox.parentElement) {
