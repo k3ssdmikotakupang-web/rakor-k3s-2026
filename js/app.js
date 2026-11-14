@@ -639,7 +639,6 @@ function renderQrView() {
   const qrBox = document.getElementById("qrCodeCanvas");
   if (!qrBox) return;
 
-  // Sembunyikan permanen form input Nama Kepala Sekolah lama di halaman QR
   const oldKepsekForm = document.getElementById("qrKepsekFormBox");
   if (oldKepsekForm) oldKepsekForm.classList.add("hidden");
 
@@ -652,7 +651,7 @@ function renderQrView() {
     const titleEl = document.getElementById("qrCardTitle");
     const subEl = document.getElementById("qrCardSubtitle");
     if (titleEl) titleEl.textContent = s.nama_sekolah || "Sekolah Peserta";
-    if (subEl) subEl.textContent = `${s.nama_kepsek ? s.nama_kepsek + ' • ' : ''}NPSN: ${s.npsn || '-'} • Sub Rayon ${s.subrayon || '-'}`;
+    if (subEl) subEl.textContent = (s.nama_kepsek ? s.nama_kepsek + " • " : "") + "NPSN: " + (s.npsn || "-") + " • Sub Rayon " + (s.subrayon || "-");
 
     if (!s.nama_kepsek || String(s.nama_kepsek).trim() === "") missingFields.push("Nama & Gelar Kepala Sekolah");
     if (!s.nip_kepsek || String(s.nip_kepsek).trim() === "") missingFields.push("NIP");
@@ -660,13 +659,30 @@ function renderQrView() {
 
     if (roomPill) {
       roomPill.classList.remove("hidden");
-      roomPill.innerHTML = `<i class="fa-solid fa-bed mr-1"></i>Kamar: ${s.nomor_kamar || 'Belum Ditentukan'} • <i class="fa-solid fa-coins ml-1 mr-0.5"></i>${s.status_bayar \vert{}\vert{} 'Belum Bayar'}`; }  const pill = document.getElementById("qrStatusPill"); if (pill) { if (s.status_ikut === "Ikut") { pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800"; pill.textContent = "Terdaftar Ikut Rakor"; } else if (s.status_ikut === "Tidak Ikut") { pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-rose-100 text-rose-800"; pill.textContent = "Tidak Ikut"; } else { pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800"; pill.textContent = "Menunggu Validasi Ketua Rayon / Bendahara"; } }  qrPayloadText = `PESERTA\vert{}${s.npsn || ''}|${s.nama_sekolah \vert{}\vert{} ''}\vert{}${s.subrayon || ''}`;
+      roomPill.innerHTML = '<i class="fa-solid fa-bed mr-1"></i>Kamar: ' + (s.nomor_kamar || "Belum Ditentukan") + ' • <i class="fa-solid fa-coins ml-1 mr-0.5"></i>' + (s.status_bayar || "Belum Bayar");
+    }
+
+    const pill = document.getElementById("qrStatusPill");
+    if (pill) {
+      if (s.status_ikut === "Ikut") {
+        pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800";
+        pill.textContent = "Terdaftar Ikut Rakor";
+      } else if (s.status_ikut === "Tidak Ikut") {
+        pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-rose-100 text-rose-800";
+        pill.textContent = "Tidak Ikut";
+      } else {
+        pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-amber-100 text-amber-800";
+        pill.textContent = "Menunggu Validasi Ketua Rayon / Bendahara";
+      }
+    }
+
+    qrPayloadText = "PESERTA|" + (s.npsn || "") + "|" + (s.nama_sekolah || "") + "|" + (s.subrayon || "");
   } else {
     const p = panitiaList.find(x => x.id_panitia === activeUser.profile?.id_panitia) || activeUser.profile || {};
     const titleEl = document.getElementById("qrCardTitle");
     const subEl = document.getElementById("qrCardSubtitle");
     if (titleEl) titleEl.textContent = p.nama_panitia || "Panitia Rakor";
-    if (subEl) subEl.textContent = `${p.divisi \vert{}\vert{} 'Panitia'} (${p.jabatan || 'Anggota'})`;
+    if (subEl) subEl.textContent = (p.divisi || "Panitia") + " (" + (p.jabatan || "Anggota") + ")";
     roomPill?.classList.add("hidden");
 
     if (!p.no_hp || String(p.no_hp).trim() === "") missingFields.push("No. WhatsApp Aktif");
@@ -674,10 +690,12 @@ function renderQrView() {
     const pill = document.getElementById("qrStatusPill");
     if (pill) {
       pill.className = "inline-block text-xs font-extrabold px-3.5 py-1 rounded-full bg-blue-100 text-blue-900";
-      pill.textContent = p.tugas_subrayon ? `Panitia & Ketua Rayon ${p.tugas_subrayon}` : "Panitia Resmi Rakor K3S 2026"; }  qrPayloadText = `PANITIA\vert{}${p.id_panitia || ''}|${p.nama_panitia \vert{}\vert{} ''}\vert{}${p.divisi || ''}`;
+      pill.textContent = p.tugas_subrayon ? "Panitia & Ketua Rayon " + p.tugas_subrayon : "Panitia Resmi Rakor K3S 2026";
+    }
+
+    qrPayloadText = "PANITIA|" + (p.id_panitia || "") + "|" + (p.nama_panitia || "") + "|" + (p.divisi || "");
   }
 
-  // Banner Peringatan Kelengkapan Profil
   let alertBox = document.getElementById("qrProfileWarningBanner");
   if (!alertBox && oldKepsekForm && oldKepsekForm.parentElement) {
     alertBox = document.createElement("div");
@@ -688,73 +706,48 @@ function renderQrView() {
   if (alertBox) {
     if (missingFields.length > 0) {
       alertBox.className = "mt-3 p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-left space-y-2.5 shadow-2xs";
-      alertBox.innerHTML = `
-        <div class="flex items-start gap-2.5">
-          <div class="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 text-sm font-extrabold">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-          </div>
-          <div class="min-w-0 flex-1">
-            <h4 class="text-xs font-extrabold text-amber-950">Data Profil Belum Lengkap!</h4>
-            <p class="text-[10px] text-amber-900 leading-relaxed mt-0.5">
-              Mohon lengkapi <b>${missingFields.join(", ")}</b> pada menu Profil untuk keperluan pencetakan E-Sertifikat dan kartu peserta.
-            </p>
-          </div>
-        </div>
-        <button type="button" id="btnOpenProfileFromQrAlert" class="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow transition">
-          <i class="fa-solid fa-user-pen"></i>
-          <span>Lengkapi Data di Menu Profil Sekarang</span>
-        </button>
-      `;
+      alertBox.innerHTML =
+        '<div class="flex items-start gap-2.5">' +
+          '<div class="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 text-sm font-extrabold">' +
+            '<i class="fa-solid fa-triangle-exclamation"></i>' +
+          '</div>' +
+          '<div class="min-w-0 flex-1">' +
+            '<h4 class="text-xs font-extrabold text-amber-950">Data Profil Belum Lengkap!</h4>' +
+            '<p class="text-[10px] text-amber-900 leading-relaxed mt-0.5">' +
+              'Mohon lengkapi <b>' + missingFields.join(", ") + '</b> pada menu Profil untuk keperluan pencetakan E-Sertifikat dan kartu peserta.' +
+            '</p>' +
+          '</div>' +
+        '</div>' +
+        '<button type="button" id="btnOpenProfileFromQrAlert" class="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow transition">' +
+          '<i class="fa-solid fa-user-pen"></i>' +
+          '<span>Lengkapi Data di Menu Profil Sekarang</span>' +
+        '</button>';
       document.getElementById("btnOpenProfileFromQrAlert")?.addEventListener("click", () => {
         document.getElementById("topUserAvatar")?.click();
       });
     } else {
       alertBox.className = "mt-3 p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between px-3.5";
-      alertBox.innerHTML = `
-        <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-900">
-          <i class="fa-solid fa-circle-check text-emerald-600"></i>
-          <span>Biodata Profil & Sertifikat Lengkap</span>
-        </div>
-        <button type="button" id="btnEditProfileFromQr" class="text-[10px] font-extrabold text-blue-800 hover:underline">
-          Ubah Profil
-        </button>
-      `;
+      alertBox.innerHTML =
+        '<div class="flex items-center gap-2 text-[11px] font-bold text-emerald-900">' +
+          '<i class="fa-solid fa-circle-check text-emerald-600"></i>' +
+          '<span>Biodata Profil & Sertifikat Lengkap</span>' +
+        '</div>' +
+        '<button type="button" id="btnEditProfileFromQr" class="text-[10px] font-extrabold text-blue-800 hover:underline">' +
+          'Ubah Profil' +
+        '</button>';
       document.getElementById("btnEditProfileFromQr")?.addEventListener("click", () => {
         document.getElementById("topUserAvatar")?.click();
       });
     }
   }
 
-  // Render QR Code Multi-Lapis (Pasti Muncul untuk Peserta & Panitia)
   const encoded = encodeURIComponent(qrPayloadText);
-  const apiPrimary = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encoded}`; const apiBackup = `https://quickchart.io/qr?size=220&margin=1&text=${encoded}`;
+  const apiPrimary = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=" + encoded;
+  const apiBackup = "https://quickchart.io/qr?size=220&margin=1&text=" + encoded;
 
   qrBox.className = "w-[185px] h-[185px] mx-auto bg-white p-2 rounded-2xl border-2 border-slate-200 flex items-center justify-center shadow-inner relative";
-  qrBox.innerHTML = "";
-
-  let renderedByLocalLib = false;
-  if (typeof window.QRCode === "function") {
-    try {
-      const tempDiv = document.createElement("div");
-      new window.QRCode(tempDiv, {
-        text: qrPayloadText,
-        width: 165,
-        height: 165,
-        colorDark: "#0f172a",
-        colorLight: "#ffffff"
-      });
-      const canvasEl = tempDiv.querySelector("canvas");
-      if (canvasEl && canvasEl.width > 0) {
-        const dataUrl = canvasEl.toDataURL("image/png");
-        if (dataUrl && dataUrl.length > 100) {
-          qrBox.innerHTML = `<img src="${dataUrl}" alt="QR Code Resmi" class="w-[165px] h-[165px] object-contain mx-auto rounded-lg" />`;
-          renderedByLocalLib = true;
-        }
-      }
-    } catch (err) {
-      renderedByLocalLib = false;
-    }
-  }
+  qrBox.innerHTML = '<img src="' + apiPrimary + '" alt="QR Code Resmi" class="w-[165px] h-[165px] object-contain mx-auto rounded-lg" onerror="this.onerror=null; this.src=\'' + apiBackup + '\';" />';
+}
 
   // Jika library lokal gagal atau menghasilkan canvas kosong saat tab tersembunyi, gunakan Image API dengan backup otomatis
   if (!renderedByLocalLib) {
