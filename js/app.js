@@ -1017,11 +1017,14 @@ function renderSubrayonView() {
   if (!cardsContainer) return;
   cardsContainer.innerHTML = "";
 
+  const isPesertaView = Boolean(activeUser && activeUser.role === "peserta");
+
   filtered.forEach((s, i) => {
     const isIkut = s.status_ikut === "Ikut";
     const isTidak = s.status_ikut === "Tidak Ikut";
     const statusBayar = s.status_bayar || "Belum Bayar";
     const jenjang = getJenjang(s.nama_sekolah);
+    const waClean = String(s.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
 
     const bayarBadgeStyle = statusBayar === "Lunas"
       ? "bg-emerald-100 text-emerald-800 border-emerald-300"
@@ -1042,7 +1045,7 @@ function renderSubrayonView() {
             ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded"><i class="fa-solid fa-bed mr-0.5"></i>${s.nomor_kamar}</span>` : ''}
           </div>
           <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
-          <p class="text-[10px] text-slate-500 truncate">${s.kelurahan} • ${s.alamat}</p>
+          <p class="text-[10px] text-slate-500 truncate">Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • Kel. ${s.kelurahan || '-'}</p>
         </div>
 
         ${canEditThisRayon ? `
@@ -1057,28 +1060,47 @@ function renderSubrayonView() {
         `}
       </div>
 
-      <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <i class="fa-solid fa-money-bill-wave text-xs ${statusBayar === 'Lunas' ? 'text-emerald-600' : statusBayar === 'Dalam Proses' ? 'text-amber-500' : 'text-slate-400'}"></i>
-          <span class="text-[10px] font-bold text-slate-600">Kontribusi (Rp 2 Jt):</span>
-          <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${bayarBadgeStyle}">
-            ${statusBayar === 'Lunas' ? 'LUNAS' : statusBayar === 'Dalam Proses' ? 'PROSES' : 'BELUM BAYAR'}
-          </span>
+      <!-- Baris Bawah: Jika Peserta -> Tampilkan Nomor Kontak HP Kepala Sekolah; Jika Panitia -> Tampilkan Kontribusi Rp 2 Jt -->
+      ${isPesertaView ? `
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <i class="fa-solid fa-phone-volume text-xs ${s.no_hp ? 'text-emerald-600' : 'text-slate-400'}"></i>
+            <span class="text-[10px] font-bold text-slate-600">Kontak HP Kepsek:</span>
+            <span class="text-[11px] font-extrabold ${s.no_hp ? 'text-slate-900' : 'text-slate-400'}">
+              ${s.no_hp || 'Belum Diisi'}
+            </span>
+          </div>
+          ${s.no_hp ? `
+            <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold text-[10px] shrink-0 flex items-center gap-1 transition">
+              <i class="fa-brands fa-whatsapp text-emerald-600"></i>
+              <span>Hubungi</span>
+            </a>
+          ` : ''}
         </div>
+      ` : `
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <i class="fa-solid fa-money-bill-wave text-xs ${statusBayar === 'Lunas' ? 'text-emerald-600' : statusBayar === 'Dalam Proses' ? 'text-amber-500' : 'text-slate-400'}"></i>
+            <span class="text-[10px] font-bold text-slate-600">Kontribusi (Rp 2 Jt):</span>
+            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${bayarBadgeStyle}">
+              ${statusBayar === 'Lunas' ? 'LUNAS' : statusBayar === 'Dalam Proses' ? 'PROSES' : 'BELUM BAYAR'}
+            </span>
+          </div>
 
-        ${canEditThisRayon ? `
-          <select class="select-status-bayar rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-extrabold text-slate-800 shrink-0 focus:border-blue-900">
-            <option value="Belum Bayar" ${statusBayar === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
-            <option value="Dalam Proses" ${statusBayar === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
-            <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>Lunas</option>
-          </select>
-        ` : `
-          <span class="text-[10px] font-bold text-slate-400">${s.waktu_bayar ? s.waktu_bayar.split(',')[0] : ''}</span>
-        `}
-      </div>
+          ${canEditThisRayon ? `
+            <select class="select-status-bayar rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-extrabold text-slate-800 shrink-0 focus:border-blue-900">
+              <option value="Belum Bayar" ${statusBayar === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
+              <option value="Dalam Proses" ${statusBayar === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
+              <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>Lunas</option>
+            </select>
+          ` : `
+            <span class="text-[10px] font-bold text-slate-400">${s.waktu_bayar ? s.waktu_bayar.split(',')[0] : ''}</span>
+          `}
+        </div>
+      `}
     `;
 
-    if (canEditThisRayon) {
+    if (canEditThisRayon && !isPesertaView) {
       card.querySelector(".btn-ikut")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Ikut"));
       card.querySelector(".btn-tidak")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Tidak Ikut"));
       card.querySelector(".select-status-bayar")?.addEventListener("change", (e) => {
