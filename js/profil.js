@@ -182,6 +182,7 @@ export function bindUserProfileTrigger(activeUser, reloadCallback) {
   if (!avatarEl || !activeUser) return;
 
   setupOnlinePresenceTracker(activeUser);
+  injectInteractiveGuideTriggers(activeUser); // <--- Tambahkan 1 baris ini
   renderRekapProfilKepsekWidget(activeUser, reloadCallback);
 
   const headerEl = avatarEl.closest("header");
@@ -1040,5 +1041,413 @@ function renderProfileModalBody(activeUser, bodyEl, reloadCallback) {
     if (reloadCallback) await reloadCallback();
     toast("Password/PIN dikembalikan ke default!");
     renderProfileModalBody(activeUser, bodyEl, reloadCallback);
+  });
+}
+
+
+// =========================================================================
+// FITUR PANDUAN PENGGUNAAN INTERAKTIF (OTOMATIS SESUAI PERAN & DIVISI LOGIN)
+// =========================================================================
+const ROLE_GUIDES_DATA = {
+  "PESERTA": {
+    title: "Panduan Peserta (Kepala Sekolah SD/MI)",
+    badge: "Akses Peserta Rakor",
+    icon: "fa-user-graduate",
+    color: "from-blue-900 via-indigo-950 to-slate-900",
+    steps: [
+      {
+        judul: "1. Kelengkapan Biodata & Keamanan Akun",
+        isi: "Ketuk <b>Foto Profil / Nama Sekolah</b> di pojok kiri atas header untuk mengisi <b>Nama Lengkap & Gelar</b> (wajib sesuai ejaan karena akan tercetak otomatis pada E-Sertifikat Pola 32 JP), <b>NIP</b>, <b>No. WhatsApp</b>, mengunggah Foto Profil, serta mengganti password bawaan (NPSN) dengan password pribadi."
+      },
+      {
+        judul: "2. Kartu ID & QR Code (Mode Scan Cepat)",
+        isi: "Buka menu <b>ID & QR</b> di bagian tengah bawah. Tunjukkan QR Code kepada petugas untuk: <b>Absensi H1–H3</b>, <b>Pengambilan Rakor Kit</b>, <b>Uang Transpor</b>, dan <b>Check-In Kamar</b>. <b>Tips:</b> Ketuk gambar QR Code agar membesar satu layar penuh (Full-Screen Zoom) supaya kamera panitia mudah memindainya."
+      },
+      {
+        judul: "3. Cek Nomor Kamar, Teman Sekamar & Kontak Rayon",
+        isi: "Buka menu <b>Info Kamar</b> di Beranda untuk melihat nomor kamar hotel Anda beserta nama & kontak WhatsApp <b>teman sekamar Anda</b>. Di menu <b>Rayon</b>, Anda dapat melihat rekap SD/MI Negeri & Swasta serta menghubungi nomor WA rekan Kepala Sekolah satu Sub Rayon."
+      },
+      {
+        judul: "4. Pengajuan Izin & Unduh Paket SPJ BOSP Sekolah",
+        isi: "Buka tab <b>Absensi</b> di kanan bawah. Jika berhalangan hadir, gunakan sub-tab <b>Perizinan</b> (tersedia opsi Sakit, Tugas Kedinasan, Kedukaan, atau Lainnya). Pada kotak <b>Dokumen Pertanggungjawaban BOSP</b>, Anda dapat mengunduh: <b>(1) PDF Daftar Hadir Individu</b>, <b>(2) PDF Kolektif Sub Rayon</b>, <b>(3) Scan Absensi Manual Sub Rayon Anda</b>, dan <b>(4) PDF E-Kwitansi Resmi Rp 2.000.000</b>."
+      },
+      {
+        judul: "5. Materi, Produk Rakor 2027 (BOSP) & E-Sertifikat",
+        isi: "Buka menu <b>Produk Rakor</b> untuk mengunduh Draft Proker (Word/Excel/PDF), melihat Proker K3S 2027 yang disahkan (6 Bidang), Kalender Bulanan, serta <b>Daftar Kegiatan Bersumber Dana BOSP</b> sebagai acuan penyusunan ARKAS 2027 sekolah Anda."
+      }
+    ]
+  },
+
+  "Penanggung Jawab": {
+    title: "Panduan Penanggung Jawab (Pengurus Inti K3S)",
+    badge: "Otoritas Pimpinan K3S",
+    icon: "fa-crown",
+    color: "from-slate-900 via-indigo-950 to-slate-900",
+    steps: [
+      {
+        judul: "1. Monitoring Eksekutif Keuangan & Kontribusi",
+        isi: "Buka menu <b>Info Keuangan & Kontribusi</b> di dalam kotak <i>Khusus Panitia</i> untuk memantau total kas masuk dari 160 SD/MI, persentase pelunasan, serta rincian per Sub Rayon secara realtime."
+      },
+      {
+        judul: "2. Monitoring Kuota Kamar Hotel (Panitia Inti)",
+        isi: "Buka menu <b>Info Kamar</b> untuk melihat kartu rekapitulasi jumlah kamar hotel (Peserta & Panitia), kamar terisi, dan sisa daya tampung yang diinput oleh Ketua Panitia."
+      },
+      {
+        judul: "3. Akses Penuh Arsip Laporan / LPJ Panitia Inti",
+        isi: "Buka menu <b>Laporan/LPH</b> untuk memeriksa seluruh 11 kategori scan dokumen pertanggungjawaban, termasuk dokumen berlabel <b>Khusus Panitia Inti</b> (Pajak, Honor Pemateri/Moderator, Kwitansi ATK & Konsumsi)."
+      },
+      {
+        judul: "4. Siaran Instruksi Internal Panitia (Running Text)",
+        isi: "Ketuk baris <b>INFO PANITIA</b> atau tombol <b>Siarkan</b> di dalam kotak <i>Khusus Panitia</i> untuk merilis instruksi berjalan kepada seluruh anggota panitia."
+      }
+    ]
+  },
+
+  "Ketua Panitia": {
+    title: "Panduan Khusus Ketua Panitia Pelaksana",
+    badge: "Pengendali Utama Kepanitiaan",
+    icon: "fa-user-tie",
+    color: "from-blue-950 via-indigo-950 to-slate-900",
+    steps: [
+      {
+        judul: "1. Kendali Penuh Master Tugas (Tab Kinerja)",
+        isi: "Di tab <b>Kinerja</b>, Anda bersama Sekretaris adalah pemegang otoritas untuk <b>Menambah Tugas Baru (+ Tambah)</b>, <b>Mengedit</b>, <b>Menghapus</b>, serta <b>Mencentang Lintas Divisi</b> seluruh progres kerja seksi."
+      },
+      {
+        judul: "2. Input Nomor Kamar, Kapasitas & Rekapan Kamar",
+        isi: "Buka menu <b>Info Kamar</b> &rarr; pilih tab <b>Input Kamar</b>. Masukkan nomor kamar (satuan misal <code>101</code> atau rentang sekaligus misal <code>101-120</code>), kapasitas, dan peruntukan (<b>Kamar Peserta</b> / <b>Kamar Khusus Panitia</b>). Anda juga dapat mengatur penghuni kamar dan mengunduh <b>Rekapan Kamar (Excel .CSV & PDF Resmi)</b>."
+      },
+      {
+        judul: "3. Monitoring Keuangan & Arsip 11 Dokumen LPJ",
+        isi: "Pantau kas masuk 160 sekolah di menu <b>Info Keuangan</b> dan periksa seluruh dokumen bukti fisik di menu <b>Laporan/LPH</b> (termasuk kategori <i>Khusus Panitia Inti</i>)."
+      },
+      {
+        judul: "4. Siaran Running Text Publik & Internal Panitia",
+        isi: "Anda dapat memperbarui teks berjalan untuk seluruh peserta di Beranda atas maupun merilis instruksi khusus di <b>Running Text Internal Panitia</b>."
+      }
+    ]
+  },
+
+  "Sekretaris": {
+    title: "Panduan Khusus Sekretaris Panitia",
+    badge: "Pusat Kendali Administrasi & Sistem",
+    icon: "fa-file-signature",
+    color: "from-emerald-950 via-teal-950 to-slate-900",
+    steps: [
+      {
+        judul: "1. Otorisasi 5 Pos Layanan & Pembukaan SPJ Daftar Hadir",
+        isi: "Pada kartu <b>Meja Layanan & Otorisasi Pos</b>, ketuk pos untuk Membuka/Mengunci <b>Absensi H1–H3, Rakor Kit, dan Check-In Kamar</b>. Di kotak <i>Khusus Panitia</i>, aktifkan saklar <b>Otoritas Sekretaris: Daftar Hadir SPJ</b> agar 160 Kepala Sekolah dapat mengunduh PDF Daftar Hadir Individu & Kolektif."
+      },
+      {
+        judul: "2. Upload Absensi Manual Per Sub Rayon & 11 Dokumen LPJ",
+        isi: "Klik tombol <b>Absen Rayon</b> untuk mengunggah Scan Absensi Manual (TTD Basah) per Sub Rayon. Buka menu <b>Laporan/LPH</b> untuk mengunggah <b>11 Kategori Scan Dokumen LPJ</b> sekaligus menentukan hak aksesnya (<b>Peserta / Panitia / Panitia Inti</b>)."
+      },
+      {
+        judul: "3. Kelola Produk Rakor 2027 (Draft Word/Excel & Proker Sah)",
+        isi: "Buka menu <b>Produk Rakor</b> untuk mengunggah file Draft (Word/Excel/Spreadsheet/PDF), menginput 9 komponen Program Kerja 6 Bidang, menekan tombol <b>Sahkan ke Proker Disepakati</b>, serta mengunggah PDF <b>Rekomendasi Rakor 2027</b>."
+      },
+      {
+        judul: "4. Unduh Spreadsheet Profil Kepsek, Database 160 Sekolah & Kamar",
+        isi: "Anda memiliki tombol eksklusif untuk mengunduh <b>Spreadsheet Rekap Profil Kepsek</b> (di menu Rekap Profil), <b>Excel Database 160 Sekolah</b> (di menu Infografis), <b>Rekapan Kamar (Excel & PDF)</b>, serta mencetak <b>ID Card Kalung Massal</b>."
+      }
+    ]
+  },
+
+  "Bendahara": {
+    title: "Panduan Khusus Bendahara Panitia",
+    badge: "Otoritas Keuangan & E-Kwitansi BOSP",
+    icon: "fa-sack-dollar",
+    color: "from-emerald-900 via-teal-950 to-slate-900",
+    steps: [
+      {
+        judul: "1. Validasi Status Kontribusi 160 Sekolah (Rp 2.000.000)",
+        isi: "Buka menu <b>Info Keuangan & Kontribusi</b> (atau melalui tab <b>Rayon</b>). Ubah status bayar sekolah menjadi <b>Belum Bayar</b>, <b>Dalam Proses</b>, atau <b>Lunas (2 Jt)</b>. Sekolah yang diubah menjadi Lunas/Proses otomatis tercatat <i>Ikut</i>."
+      },
+      {
+        judul: "2. Pembukaan Akses Unduh PDF E-Kwitansi BOSP",
+        isi: "Pada kotak <i>Khusus Panitia</i>, tekan tombol <b>Buka Akses</b> pada panel <b>Otoritas Bendahara: E-Kwitansi BOSP</b>. Begitu dibuka, seluruh sekolah yang berstatus <b>Lunas</b> dapat langsung mengunduh PDF E-Kwitansi Resmi ber-Kop K3S & QR Validasi."
+      },
+      {
+        judul: "3. Otorisasi Pos Penerimaan Uang Transpor Peserta",
+        isi: "Pada kartu <b>Meja Layanan & Otorisasi Pos</b>, ketuk saklar <b>Penerimaan Uang Transpor</b> untuk membuka/mengunci pos pencairan transpor peserta melalui pemindaian QR Code."
+      },
+      {
+        judul: "4. Akses Dokumen LPJ Keuangan & Kuota Kamar",
+        isi: "Sebagai Panitia Inti, Anda dapat melihat rekap kuota kamar hotel di menu <b>Info Kamar</b> serta memeriksa seluruh dokumen bukti pajak dan belanja di menu <b>Laporan/LPH</b>."
+      }
+    ]
+  },
+
+  "KETUA_SUBRAYON": {
+    title: "Panduan Koordinator / Ketua Sub Rayon",
+    badge: "Otoritas Wilayah Sub Rayon",
+    icon: "fa-map-location-dot",
+    color: "from-indigo-950 via-blue-950 to-slate-900",
+    steps: [
+      {
+        judul: "1. Validasi Keikutsertaan & Kontribusi Sekolah Wilayah Anda",
+        isi: "Buka tab <b>Rayon</b> (atau menu <b>Info Keuangan</b>). Anda memiliki wewenang penuh di wilayah Sub Rayon Anda untuk menekan tombol <b>Ikut / Tidak</b> serta memperbarui status kontribusi sekolah (<b>Belum Bayar / Dalam Proses / Lunas</b>)."
+      },
+      {
+        judul: "2. Penentuan Penghuni Kamar Peserta (Lintas Sub Rayon)",
+        isi: "Buka menu <b>Info Kamar</b>. Pilih nomor kamar pada dropdown di samping nama sekolah. Anda dapat memasangkan Kepala Sekolah dari Sub Rayon Anda maupun lintas Sub Rayon. Sistem otomatis menolak jika kamar yang dipilih sudah penuh."
+      },
+      {
+        judul: "3. Pelacakan Kehadiran & Kelengkapan Biodata Kepsek",
+        isi: "Gunakan tombol <b>Lacak</b> di kartu <i>Meja Layanan</i> untuk memantau siapa Kepala Sekolah di Sub Rayon Anda yang belum scan absen H1–H3, dan cek menu <b>Rekap Profil Kepsek</b> untuk memastikan seluruh Kepsek di rayon Anda sudah mengisi Nama & NIP sertifikat."
+      }
+    ]
+  },
+
+  "Seksi Kesekretariatan": {
+    title: "Panduan Seksi Kesekretariatan",
+    badge: "Tim Data, Persidangan & Dokumen SPJ",
+    icon: "fa-laptop-file",
+    color: "from-blue-900 via-slate-900 to-indigo-950",
+    steps: [
+      {
+        judul: "1. Input & Pengelolaan Produk Rakor 2027",
+        isi: "Bersama Sekretaris, Anda memiliki akses editor penuh di menu <b>Produk Rakor</b> untuk mengunggah file Draft (Word/Excel/Spreadsheet/PDF), menginput Program Kerja 2027 (6 Bidang), mengesahkan Draft, dan mengunggah PDF Rekomendasi."
+      },
+      {
+        judul: "2. Upload Absensi Manual Per Rayon & 11 Dokumen LPJ",
+        isi: "Unggah file scan <b>Absensi Manual Per Sub Rayon</b> melalui tombol di Meja Layanan/Khusus Panitia, serta kelola ke-11 kategori dokumen scan bukti fisik di menu <b>Laporan/LPH</b>."
+      },
+      {
+        judul: "3. Unduh Spreadsheet Rekap Profil, Edit DB 160 Sekolah & Cetak ID Card",
+        isi: "Anda berwenang mengunduh <b>Spreadsheet Rekap Profil Kepsek</b>, menambah/mengedit data di menu <b>Infografis & Profil 160 Sekolah</b>, serta mencetak <b>ID Card Kalung</b>."
+      },
+      {
+        judul: "4. Layanan Scan Pos & Checklist Kinerja Divisi",
+        isi: "Gunakan tombol <b>Scan Pos</b> untuk memindai QR peserta di meja registrasi/Rakor Kit, dan centang progres tugas <i>Seksi Kesekretariatan</i> di tab <b>Kinerja</b>."
+      }
+    ]
+  },
+
+  "Seksi Acara dan Humas": {
+    title: "Panduan Seksi Acara dan Humas",
+    badge: "Manajemen Acara, Materi & Audio",
+    icon: "fa-bullhorn",
+    color: "from-teal-900 via-slate-900 to-blue-950",
+    steps: [
+      {
+        judul: "1. Upload Surat Undangan, Buku Panduan & Materi Rakor",
+        isi: "Buka menu <b>Surat Undangan</b>, <b>Buku Panduan</b>, dan <b>Materi Rakor</b> di Beranda untuk mengunggah file PDF/PPT narasumber agar dapat diunduh langsung oleh 160 peserta."
+      },
+      {
+        judul: "2. Pengelolaan Audio Mars K3S & Lagu Daerah",
+        isi: "Pada widget pemutar musik di Beranda, Anda dapat mengunggah dan mengatur daftar lagu pengiring resmi Rakor."
+      },
+      {
+        judul: "3. Pemantauan Jadwal Live & Checklist Kinerja Seksi Acara",
+        isi: "Pantau urutan sesi acara harian (26–28 Nov 2026) di tab <b>Jadwal</b>, gunakan <b>Catatan & Evaluasi</b> untuk mencatat dinamika acara, dan centang tugas <i>Seksi Acara dan Humas</i> di tab <b>Kinerja</b>."
+      }
+    ]
+  },
+
+  "Seksi Konsumsi": {
+    title: "Panduan Seksi Konsumsi",
+    badge: "Koordinasi Konsumsi & Siaran Internal",
+    icon: "fa-utensils",
+    color: "from-amber-900 via-slate-900 to-stone-900",
+    steps: [
+      {
+        judul: "1. Merilis Running Text Info Khusus Panitia",
+        isi: "Anda memiliki hak akses khusus pada kotak <i>Khusus Panitia</i> untuk menekan tombol <b>Siarkan</b> pada <b>Running Text INFO PANITIA</b> guna menginformasikan jadwal makan siang, snack/coffee break, atau koordinasi konsumsi ke seluruh panitia."
+      },
+      {
+        judul: "2. Memantau Jumlah Riil Kehadiran Harian (Acuan Porsi)",
+        isi: "Lihat angka <b>Hadir H1, Hadir H2, dan Hadir H3</b> pada kartu <i>Meja Layanan & Otorisasi Pos</i> untuk mengetahui jumlah riil peserta yang hadir di lokasi setiap harinya."
+      },
+      {
+        judul: "3. Checklist Kinerja Seksi Konsumsi",
+        isi: "Buka tab <b>Kinerja</b> di kanan bawah untuk mencentang penyelesaian tugas khusus <i>Seksi Konsumsi</i> dari tahap persiapan hingga pelaksanaan."
+      }
+    ]
+  },
+
+  "Seksi Perlengkapan, Dokumentasi, dan Publikasi": {
+    title: "Panduan Seksi Perlengkapan, Dokumentasi & Publikasi",
+    badge: "Logistik, Galeri Foto & Publikasi",
+    icon: "fa-camera-retro",
+    color: "from-sky-900 via-slate-900 to-indigo-950",
+    steps: [
+      {
+        judul: "1. Mengunggah Foto Kegiatan ke Menu Dokumentasi",
+        isi: "Buka menu <b>Dokumentasi</b> di Beranda untuk mengunggah foto-foto terbaik kegiatan harian (H1–H3) maupun menautkan link folder Google Drive dokumentasi resmi."
+      },
+      {
+        judul: "2. Membantu Pemindaian di Meja Layanan",
+        isi: "Gunakan fitur <b>Scan Pos</b> pada kartu <i>Meja Layanan</i> saat membantu distribusi perlengkapan/Rakor Kit peserta."
+      },
+      {
+        judul: "3. Checklist Kinerja Seksi Perlengkapan & Dokumentasi",
+        isi: "Buka tab <b>Kinerja</b> untuk memperbarui status penyelesaian tugas kesiapan spanduk, sound system, dan publikasi pada divisi Anda."
+      }
+    ]
+  },
+
+  "Seksi Keamanan dan Ketertiban": {
+    title: "Panduan Seksi Keamanan dan Ketertiban",
+    badge: "Ketertiban Area & Pemantauan Peserta",
+    icon: "fa-shield-halved",
+    color: "from-slate-900 via-blue-950 to-slate-950",
+    steps: [
+      {
+        judul: "1. Melacak Kehadiran & Izin Peserta (H1–H3)",
+        isi: "Pada kartu <i>Meja Layanan & Otorisasi Pos</i>, tekan tombol <b>Lacak</b> untuk melihat siapa peserta yang belum hadir di ruangan serta memeriksa daftar peserta yang sedang izin."
+      },
+      {
+        judul: "2. Memantau Pembagian Kamar Peserta Per Sub Rayon",
+        isi: "Buka menu <b>Info Kamar</b> untuk melihat data penempatan kamar peserta per Sub Rayon guna mendukung ketertiban dan keamanan di area hotel."
+      },
+      {
+        judul: "3. Catatan Lapangan & Checklist Kinerja Keamanan",
+        isi: "Tuliskan laporan situasi di menu <b>Catatan & Evaluasi Kegiatan</b> serta centang rincian tugas <i>Seksi Keamanan dan Ketertiban</i> pada tab <b>Kinerja</b>."
+      }
+    ]
+  }
+};
+
+function injectInteractiveGuideTriggers(activeUser) {
+  if (!activeUser) return;
+
+  // 1. Tambahkan tombol ikon Buku Panduan Penggunaan (?) di Header (sebelah lonceng notifikasi)
+  const bellBtn = document.getElementById("btnHeaderNotifBell");
+  if (bellBtn && bellBtn.parentElement) {
+    let guideHeaderBtn = document.getElementById("btnHeaderInteractiveGuide");
+    if (!guideHeaderBtn) {
+      guideHeaderBtn = document.createElement("button");
+      guideHeaderBtn.id = "btnHeaderInteractiveGuide";
+      guideHeaderBtn.type = "button";
+      guideHeaderBtn.title = "Panduan Penggunaan Aplikasi Sesuai Peran Anda";
+      bellBtn.parentElement.insertBefore(guideHeaderBtn, bellBtn);
+    }
+    guideHeaderBtn.className = "w-9 h-9 rounded-2xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 flex items-center justify-center text-xs text-amber-300 active:scale-95 transition shrink-0";
+    guideHeaderBtn.innerHTML = `<i class="fa-solid fa-circle-question"></i>`;
+    guideHeaderBtn.onclick = () => openInteractiveUserGuideModal(activeUser);
+  }
+
+  // 2. Tambahkan lencana "📖 Panduan" di samping tombol Online pada Card Hero SIM-RAKOR 2026
+  const onlineBtn = document.getElementById("btnHeroOnlineUsers");
+  if (onlineBtn && onlineBtn.parentElement) {
+    let heroGuideBtn = document.getElementById("btnHeroInteractiveGuide");
+    if (!heroGuideBtn) {
+      heroGuideBtn = document.createElement("button");
+      heroGuideBtn.id = "btnHeroInteractiveGuide";
+      heroGuideBtn.type = "button";
+      onlineBtn.insertAdjacentElement("afterend", heroGuideBtn);
+    }
+    heroGuideBtn.className = "inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/40 text-[10px] font-extrabold text-amber-300 active:scale-95 transition cursor-pointer shrink-0";
+    heroGuideBtn.innerHTML = `<i class="fa-solid fa-book-open-reader"></i> <span>Panduan Akses</span>`;
+    heroGuideBtn.onclick = () => openInteractiveUserGuideModal(activeUser);
+  }
+}
+
+export function openInteractiveUserGuideModal(activeUser, forcedKey = null) {
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl || !activeUser) return;
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-book-open-reader text-blue-800 mr-1.5"></i> Panduan Penggunaan SIM-RAKOR`;
+
+  const isPeserta = activeUser.role === "peserta";
+  const userDivisi = activeUser.profile?.divisi || "Panitia";
+  const hasRayonDuty = Boolean(activeUser.profile?.tugas_subrayon && String(activeUser.profile.tugas_subrayon).trim() !== "");
+
+  // Tentukan kunci panduan default sesuai akun yang sedang login
+  let activeGuideKey = forcedKey;
+  if (!activeGuideKey) {
+    if (isPeserta) {
+      activeGuideKey = "PESERTA";
+    } else if (hasRayonDuty && !["Ketua Panitia", "Sekretaris", "Bendahara", "Penanggung Jawab"].includes(userDivisi)) {
+      activeGuideKey = "KETUA_SUBRAYON";
+    } else if (ROLE_GUIDES_DATA[userDivisi]) {
+      activeGuideKey = userDivisi;
+    } else {
+      activeGuideKey = "Seksi Acara dan Humas";
+    }
+  }
+
+  const guideObj = ROLE_GUIDES_DATA[activeGuideKey] || ROLE_GUIDES_DATA["PESERTA"];
+
+  // Jika Ketua Sub Rayon juga memiliki divisi seksi, tampilkan tombol switch cepat antara Panduan Ketua Sub Rayon & Panduan Divisinya
+  const allRoleKeys = [
+    { key: "PESERTA", label: "Peserta (Kepala Sekolah)" },
+    { key: "Penanggung Jawab", label: "Penanggung Jawab" },
+    { key: "Ketua Panitia", label: "Ketua Panitia" },
+    { key: "Sekretaris", label: "Sekretaris Panitia" },
+    { key: "Bendahara", label: "Bendahara Panitia" },
+    { key: "KETUA_SUBRAYON", label: "Ketua Sub Rayon (6 Wilayah)" },
+    { key: "Seksi Kesekretariatan", label: "Seksi Kesekretariatan" },
+    { key: "Seksi Acara dan Humas", label: "Seksi Acara dan Humas" },
+    { key: "Seksi Konsumsi", label: "Seksi Konsumsi" },
+    { key: "Seksi Perlengkapan, Dokumentasi, dan Publikasi", label: "Seksi Perlengkapan & Dokumentasi" },
+    { key: "Seksi Keamanan dan Ketertiban", label: "Seksi Keamanan & Ketertiban" }
+  ];
+
+  bodyEl.innerHTML = `
+    <!-- Banner Identitas Pengguna & Peran Aktif -->
+    <div class="p-4 rounded-3xl bg-gradient-to-br ${guideObj.color} text-white space-y-2.5 shadow-lg border border-white/15">
+      <div class="flex items-center justify-between">
+        <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+          ${guideObj.badge}
+        </span>
+        <span class="text-[10px] font-bold text-amber-300">26–28 Nov 2026</span>
+      </div>
+
+      <div class="flex items-center gap-3 pt-0.5">
+        <div class="w-11 h-11 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center text-lg text-amber-300 shrink-0">
+          <i class="fa-solid ${guideObj.icon}"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-extrabold text-white leading-snug">${guideObj.title}</h4>
+          <p class="text-[10px] text-blue-200 mt-0.5">
+            Login Aktif: <b>${isPeserta ? activeUser.profile?.nama_sekolah : activeUser.profile?.nama_panitia}</b>
+            ${hasRayonDuty ? ` • <b>Ketua Rayon ${activeUser.profile.tugas_subrayon}</b>` : ''}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pilihan Lihat Panduan Divisi Lain (Khususnya memudahkan Panitia melihat alur kerja lintas seksi) -->
+    <div class="p-2.5 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-between gap-2">
+      <span class="text-[10px] font-extrabold text-slate-700 uppercase shrink-0">
+        <i class="fa-solid fa-compass text-blue-800 mr-1"></i>Pilih Panduan:
+      </span>
+      <select id="selectInteractiveGuideRole" class="flex-1 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-extrabold text-blue-950">
+        ${allRoleKeys.map(r => `<option value="${r.key}" ${activeGuideKey === r.key ? 'selected' : ''}>${r.label}</option>`).join('')}
+      </select>
+    </div>
+
+    ${hasRayonDuty && activeGuideKey !== "KETUA_SUBRAYON" ? `
+      <button type="button" id="btnSwitchToRayonCoordGuide" class="w-full py-2 px-3 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-950 font-extrabold text-[11px] flex items-center justify-between transition">
+        <span><i class="fa-solid fa-map-location-dot mr-1.5 text-amber-700"></i>Anda juga bertugas sebagai Ketua Sub Rayon ${activeUser.profile.tugas_subrayon}</span>
+        <span class="underline">Lihat Panduan Rayon &rarr;</span>
+      </button>
+    ` : ''}
+
+    <!-- Daftar Langkah Panduan Sesuai Peran -->
+    <div class="space-y-2.5 max-h-96 overflow-y-auto pr-0.5">
+      ${guideObj.steps.map(st => `
+        <div class="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
+          <h5 class="font-extrabold text-xs text-blue-950 flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-[11px]"></i>
+            <span>${st.judul}</span>
+          </h5>
+          <p class="text-[11px] text-slate-600 leading-relaxed pl-4">${st.isi}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  document.getElementById("selectInteractiveGuideRole")?.addEventListener("change", (e) => {
+    openInteractiveUserGuideModal(activeUser, e.target.value);
+  });
+
+  document.getElementById("btnSwitchToRayonCoordGuide")?.addEventListener("click", () => {
+    openInteractiveUserGuideModal(activeUser, "KETUA_SUBRAYON");
   });
 }
