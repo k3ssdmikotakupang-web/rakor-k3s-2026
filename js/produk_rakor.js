@@ -654,11 +654,88 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
     ? prokerList.find(p => p.id_proker === editingProkerId)
     : null;
 
+  // Ambil data file lampiran Draft Program Kerja (bisa berupa Word, Excel, Spreadsheet, atau PDF)
+  const draftFileRec = (layananList || []).find(x => x.kode_menu === "draft_proker_file_2027") || {
+    kode_menu: "draft_proker_file_2027",
+    judul: "File Dokumen Draft Program Kerja 2027 (Word / Excel / Spreadsheet / PDF)",
+    deskripsi: "Unduh bahan rancangan Draft Program Kerja K3S 2027 untuk pembahasan sidang komisi.",
+    url_link: "",
+    status_tersedia: "Segera Hadir"
+  };
+  const hasDraftFile = Boolean(draftFileRec.url_link && draftFileRec.url_link.trim() !== "");
+
   container.innerHTML = `
+    <!-- KHUSUS TAB DRAFT: Kotak Unduh & Upload File Dokumen Draft (Word, Excel, Spreadsheet, PDF) -->
+    ${kategoriTarget === 'Draft' ? `
+      <div class="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 via-yellow-50/70 to-white border-2 border-amber-300 space-y-2.5 shadow-2xs">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-base font-extrabold shrink-0 shadow-2xs">
+              <i class="fa-solid fa-file-word"></i>
+            </div>
+            <div>
+              <span class="text-[9px] font-extrabold uppercase bg-amber-200 text-amber-950 px-2 py-0.5 rounded">
+                Dokumen Bahan Sidang (Word / Excel / Spreadsheet / PDF)
+              </span>
+              <h4 class="font-extrabold text-xs text-slate-900 mt-0.5">${draftFileRec.judul}</h4>
+              <p class="text-[10px] text-slate-600">${draftFileRec.deskripsi}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          ${hasDraftFile ? `
+            <a href="${draftFileRec.url_link}" target="_blank" rel="noopener noreferrer" download class="flex-1 py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-[11px] shadow flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-download text-amber-300"></i>
+              <span>Buka / Download File Draft (Word/Excel/Sheet/PDF)</span>
+            </a>
+          ` : `
+            <div class="flex-1 py-2 px-3 rounded-xl bg-white border border-amber-200 text-[10px] font-bold text-slate-400 text-center">
+              Belum ada file Word / Excel / Spreadsheet Draft yang diunggah
+            </div>
+          `}
+          ${isEditor ? `
+            <button type="button" id="btnToggleDraftDocUploadBox" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-[10px] shrink-0 flex items-center gap-1 shadow">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>${hasDraftFile ? 'Ganti File' : 'Upload File'}</span>
+            </button>
+          ` : ''}
+        </div>
+
+        ${isEditor ? `
+          <div id="draftDocUploadFormBox" class="hidden pt-2.5 border-t border-amber-200 space-y-2">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-700 mb-1">Pilih File Draft (.DOCX, .XLSX, .CSV, atau .PDF):</label>
+              <input id="inpDraftMultiFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="w-full rounded-xl border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-900 file:text-white file:text-[10px] file:font-extrabold" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-700 mb-1">Atau Tempel Link Google Docs / Google Spreadsheet / Drive:</label>
+              <input id="inpDraftMultiUrl" type="url" value="${draftFileRec.url_link || ''}" placeholder="https://docs.google.com/spreadsheets/..." class="w-full rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold" />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-700 mb-1">Judul / Keterangan File Draft:</label>
+              <input id="inpDraftMultiDesc" type="text" value="${draftFileRec.deskripsi || ''}" placeholder="Contoh: File Excel Simulasi Anggaran & Draft Proker 2027" class="w-full rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold" />
+            </div>
+            <div class="flex gap-2">
+              <button type="button" id="btnSaveDraftMultiFileNow" class="flex-1 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow">
+                <i class="fa-solid fa-floppy-disk mr-1"></i> Publikasikan File Draft
+              </button>
+              ${hasDraftFile ? `
+                <button type="button" id="btnRemoveDraftMultiFile" class="px-3 py-2 rounded-xl bg-rose-100 text-rose-700 font-extrabold text-xs">
+                  Hapus
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    ` : ''}
+
+    <!-- Bar Info & Tombol Aksi (Tambah Proker / Unduh PDF) -->
     <div class="p-3.5 rounded-2xl ${kategoriTarget === 'Disepakati' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'} border flex items-center justify-between gap-2">
       <div>
         <div class="text-[10px] font-extrabold uppercase ${kategoriTarget === 'Disepakati' ? 'text-emerald-800' : 'text-amber-800'}">
-          ${kategoriTarget === 'Disepakati' ? '✓ Program Kerja K3S 2027 (Telah Disahkan)' : '⏳ Draft Rancangan Program Kerja 2027'}
+          ${kategoriTarget === 'Disepakati' ? '✓ Program Kerja K3S 2027 (Telah Disahkan)' : '⏳ Rincian Item Draft Program Kerja 2027'}
         </div>
         <div class="text-xs font-extrabold text-slate-900 mt-0.5">
           Total ${itemsInCategory.length} Kegiatan • Estimasi Dana: ${formatRp(totalAnggaranKategori)}
@@ -668,7 +745,7 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
       <div class="flex items-center gap-1.5 shrink-0">
         <button type="button" id="btnPrintProkerPdf" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-[10px] shadow flex items-center gap-1">
           <i class="fa-solid fa-file-pdf"></i>
-          <span>Unduh PDF</span>
+          <span>Cetak PDF</span>
         </button>
         ${isEditor ? `
           <button type="button" id="btnToggleAddProkerForm" class="px-3 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-[10px] shadow flex items-center gap-1">
