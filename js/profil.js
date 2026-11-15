@@ -44,6 +44,8 @@ function setupOnlinePresenceTracker(activeUser) {
     ? `${activeUser.profile?.nama_sekolah} (Rayon ${activeUser.profile?.subrayon})`
     : `${activeUser.profile?.divisi || "Panitia"}`;
 
+  injectOnlineBadgeIntoHeroCard();
+
   if (presenceChannel && presenceChannel.topic === "realtime:k3s-online-users") {
     updateOnlineBadgeCount();
     return;
@@ -76,7 +78,54 @@ function setupOnlinePresenceTracker(activeUser) {
   }
 }
 
+// Tempatkan lencana Online di dalam Card Hero SIM-RAKOR 2026 (di samping info 26-28 Nov 2026)
+function injectOnlineBadgeIntoHeroCard() {
+  // Hapus lencana online lama dari header jika masih ada
+  document.getElementById("btnHeaderOnlineUsers")?.remove();
+
+  let badgeBtn = document.getElementById("btnHeroOnlineUsers");
+  const tabBeranda = document.getElementById("tabContentBeranda");
+  if (!tabBeranda) return;
+
+  // Cari elemen tanggal "26–28 Nov" atau kartu pertama (SIM-RAKOR 2026) di Beranda
+  if (!badgeBtn) {
+    let dateBadgeEl = null;
+    const spans = tabBeranda.querySelectorAll("span, div");
+    for (const el of spans) {
+      if (el.children.length <= 1 && el.textContent && (el.textContent.includes("26–28 Nov") || el.textContent.includes("26-28 Nov"))) {
+        dateBadgeEl = el;
+        break;
+      }
+    }
+
+    badgeBtn = document.createElement("button");
+    badgeBtn.id = "btnHeroOnlineUsers";
+    badgeBtn.type = "button";
+    badgeBtn.title = "Ketuk untuk melihat siapa saja yang sedang online";
+    badgeBtn.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-[10px] font-extrabold text-emerald-300 active:scale-95 transition cursor-pointer shrink-0";
+    badgeBtn.innerHTML = `
+      <span class="relative flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+      </span>
+      <span id="headerOnlineCountText">1 Online</span>
+    `;
+    badgeBtn.onclick = () => openOnlineUsersModal();
+
+    if (dateBadgeEl && dateBadgeEl.parentElement) {
+      dateBadgeEl.parentElement.classList.add("flex", "items-center", "gap-1.5", "flex-wrap");
+      dateBadgeEl.insertAdjacentElement("afterend", badgeBtn);
+    } else {
+      const firstHeroCard = tabBeranda.querySelector(".bg-gradient-to-br, .from-blue-950, .from-slate-900");
+      if (firstHeroCard) {
+        firstHeroCard.insertBefore(badgeBtn, firstHeroCard.firstChild);
+      }
+    }
+  }
+}
+
 function updateOnlineBadgeCount() {
+  injectOnlineBadgeIntoHeroCard();
   const badgeEl = document.getElementById("headerOnlineCountText");
   const keys = Object.keys(onlineUsersMap || {});
   const count = Math.max(1, keys.length);
@@ -140,8 +189,9 @@ export function bindUserProfileTrigger(activeUser, reloadCallback) {
   const fotoUrl = p.foto_profil || "";
   const isPeserta = activeUser.role === "peserta";
 
+  // Kunci ukuran header tetap stabil tanpa mengubah tinggi saat scroll (Anti Kedap-Kedip!)
   if (headerEl) {
-    headerEl.className = "bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white px-4 pt-4 pb-5 sticky top-0 z-30 rounded-b-3xl shadow-xl border-b border-white/10 transition-all duration-200 flex items-center justify-between";
+    headerEl.className = "bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white px-4 py-3.5 sticky top-0 z-30 rounded-b-3xl shadow-xl border-b border-white/10 flex items-center justify-between";
   }
 
   if (nameEl && nameEl.parentElement) {
@@ -194,47 +244,23 @@ export function bindUserProfileTrigger(activeUser, reloadCallback) {
   `;
   avatarEl.onclick = () => openUserProfileModal(activeUser, reloadCallback);
 
-  // Hapus tombol Refresh di Header dan ganti dengan Indikator Jumlah Online Realtime
-  const refreshBtn = document.getElementById("btnRefreshApp");
-  const logoutBtn = document.getElementById("btnLogout");
-  const actionWrap = (logoutBtn && logoutBtn.parentElement) || (refreshBtn && refreshBtn.parentElement);
+  // Bersihkan tombol Refresh & tombol Online dari Header agar Header lega (hanya Lonceng & Logout)
+  document.getElementById("btnRefreshApp")?.remove();
+  document.getElementById("btnHeaderOnlineUsers")?.remove();
 
-  if (refreshBtn) {
-    refreshBtn.remove(); // Hapus permanen ikon refresh dari header
-  }
+  const logoutBtn = document.getElementById("btnLogout");
+  const actionWrap = logoutBtn ? logoutBtn.parentElement : null;
 
   if (actionWrap) {
     actionWrap.className = "flex items-center gap-1.5 shrink-0";
 
-    // 1. Lencana Jumlah User Online Realtime
-    let onlineBadge = document.getElementById("btnHeaderOnlineUsers");
-    if (!onlineBadge) {
-      onlineBadge = document.createElement("button");
-      onlineBadge.id = "btnHeaderOnlineUsers";
-      onlineBadge.type = "button";
-      onlineBadge.title = "Ketuk untuk melihat siapa saja yang sedang online";
-      actionWrap.insertBefore(onlineBadge, actionWrap.firstChild);
-    }
-    onlineBadge.className = "h-9 px-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-300 active:scale-95 transition shrink-0";
-    onlineBadge.innerHTML = `
-      <span class="relative flex h-2 w-2">
-        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-      </span>
-      <span id="headerOnlineCountText">1 Online</span>
-    `;
-    onlineBadge.onclick = () => openOnlineUsersModal();
-    updateOnlineBadgeCount();
-
-    // 2. Lonceng Notifikasi
     let bellBtn = document.getElementById("btnHeaderNotifBell");
     if (!bellBtn) {
       bellBtn = document.createElement("button");
       bellBtn.id = "btnHeaderNotifBell";
       bellBtn.type = "button";
       bellBtn.title = "Pusat Info & Notifikasi";
-      if (logoutBtn) actionWrap.insertBefore(bellBtn, logoutBtn);
-      else actionWrap.appendChild(bellBtn);
+      actionWrap.insertBefore(bellBtn, logoutBtn);
     }
     bellBtn.className = "w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-xs text-amber-300 relative active:scale-95 transition";
     bellBtn.innerHTML = `
@@ -247,22 +273,6 @@ export function bindUserProfileTrigger(activeUser, reloadCallback) {
     if (logoutBtn) {
       logoutBtn.className = "w-9 h-9 rounded-2xl bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/25 flex items-center justify-center text-xs text-rose-300 active:scale-95 transition";
     }
-  }
-
-  if (!headerScrollBound && headerEl) {
-    headerScrollBound = true;
-    window.addEventListener("scroll", () => {
-      const greetEl = document.getElementById("topAndroidGreeting");
-      if (window.scrollY > 30) {
-        headerEl.classList.remove("pt-4", "pb-5");
-        headerEl.classList.add("py-2.5", "shadow-2xl");
-        if (greetEl) greetEl.classList.add("hidden");
-      } else {
-        headerEl.classList.add("pt-4", "pb-5");
-        headerEl.classList.remove("py-2.5", "shadow-2xl");
-        if (greetEl) greetEl.classList.remove("hidden");
-      }
-    }, { passive: true });
   }
 }
 
