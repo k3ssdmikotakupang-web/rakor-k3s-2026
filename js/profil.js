@@ -26,12 +26,113 @@ function getWitaGreeting() {
   return { text: "Selamat Malam", icon: "fa-moon text-indigo-200" };
 }
 
+let presenceChannel = null;
+let onlineUsersMap = {};
+
+function setupOnlinePresenceTracker(activeUser) {
+  if (!activeUser) return;
+
+  const userId = activeUser.role === "peserta"
+    ? `SEK-${activeUser.profile?.npsn || activeUser.profile?.id_sekolah}`
+    : `PAN-${activeUser.profile?.id_panitia}`;
+
+  const userName = activeUser.role === "peserta"
+    ? (activeUser.profile?.nama_kepsek || activeUser.profile?.nama_sekolah || "Peserta")
+    : (activeUser.profile?.nama_panitia || "Panitia");
+
+  const userUnit = activeUser.role === "peserta"
+    ? `${activeUser.profile?.nama_sekolah} (Rayon ${activeUser.profile?.subrayon})`
+    : `${activeUser.profile?.divisi || "Panitia"}`;
+
+  if (presenceChannel && presenceChannel.topic === "realtime:k3s-online-users") {
+    updateOnlineBadgeCount();
+    return;
+  }
+
+  try {
+    presenceChannel = sb.channel("k3s-online-users", {
+      config: { presence: { key: userId } }
+    });
+
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState();
+        onlineUsersMap = state || {};
+        updateOnlineBadgeCount();
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await presenceChannel.track({
+            id: userId,
+            nama: userName,
+            unit: userUnit,
+            role: activeUser.role,
+            waktu: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+          });
+        }
+      });
+  } catch (e) {
+    updateOnlineBadgeCount();
+  }
+}
+
+function updateOnlineBadgeCount() {
+  const badgeEl = document.getElementById("headerOnlineCountText");
+  const keys = Object.keys(onlineUsersMap || {});
+  const count = Math.max(1, keys.length);
+  if (badgeEl) {
+    badgeEl.textContent = `${count} Online`;
+  }
+}
+
+function openOnlineUsersModal() {
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-signal text-emerald-600 mr-1.5"></i> Pengguna yang Sedang Online`;
+
+  const users = [];
+  Object.values(onlineUsersMap || {}).forEach(arr => {
+    if (Array.isArray(arr) && arr[0]) users.push(arr[0]);
+  });
+
+  bodyEl.innerHTML = `
+    <div class="p-3.5 rounded-2xl bg-emerald-950 text-white flex items-center justify-between border border-emerald-500/40">
+      <div class="flex items-center gap-2.5">
+        <span class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+        <div>
+          <div class="text-xs font-extrabold">Total Aktif Saat Ini: ${Math.max(1, users.length)} Pengguna</div>
+          <div class="text-[10px] text-emerald-200">Terhubung secara realtime di aplikasi SIM-RAKOR</div>
+        </div>
+      </div>
+    </div>
+    <div class="space-y-2 max-h-80 overflow-y-auto pr-0.5 pt-1">
+      ${users.length === 0 ? `
+        <div class="p-4 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border">1 Pengguna Aktif (Anda)</div>
+      ` : users.map((u, i) => `
+        <div class="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="text-xs font-extrabold text-slate-900 truncate">${i + 1}. ${u.nama}</div>
+            <div class="text-[10px] text-slate-500 truncate">${u.unit}</div>
+          </div>
+          <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${u.role === 'panitia' ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'}">
+            ${u.role === 'panitia' ? 'Panitia' : 'Peserta'} • ${u.waktu || 'Aktif'}
+          </span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 export function bindUserProfileTrigger(activeUser, reloadCallback) {
   const avatarEl = document.getElementById("topUserAvatar");
   const nameEl = document.getElementById("topUserName");
   if (!avatarEl || !activeUser) return;
 
-  // Render widget Rekap Profil Kepsek (Hanya tampil jika yang login adalah Panitia)
+  setupOnlinePresenceTracker(activeUser);
   renderRekapProfilKepsekWidget(activeUser, reloadCallback);
 
   const headerEl = avatarEl.closest("header");
@@ -93,24 +194,47 @@ export function bindUserProfileTrigger(activeUser, reloadCallback) {
   `;
   avatarEl.onclick = () => openUserProfileModal(activeUser, reloadCallback);
 
+  // Hapus tombol Refresh di Header dan ganti dengan Indikator Jumlah Online Realtime
   const refreshBtn = document.getElementById("btnRefreshApp");
   const logoutBtn = document.getElementById("btnLogout");
-  if (refreshBtn && refreshBtn.parentElement) {
-    const actionWrap = refreshBtn.parentElement;
+  const actionWrap = (logoutBtn && logoutBtn.parentElement) || (refreshBtn && refreshBtn.parentElement);
+
+  if (refreshBtn) {
+    refreshBtn.remove(); // Hapus permanen ikon refresh dari header
+  }
+
+  if (actionWrap) {
     actionWrap.className = "flex items-center gap-1.5 shrink-0";
 
-    refreshBtn.className = "w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-xs text-slate-200 active:scale-95 transition";
-    if (logoutBtn) {
-      logoutBtn.className = "w-9 h-9 rounded-2xl bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/25 flex items-center justify-center text-xs text-rose-300 active:scale-95 transition";
+    // 1. Lencana Jumlah User Online Realtime
+    let onlineBadge = document.getElementById("btnHeaderOnlineUsers");
+    if (!onlineBadge) {
+      onlineBadge = document.createElement("button");
+      onlineBadge.id = "btnHeaderOnlineUsers";
+      onlineBadge.type = "button";
+      onlineBadge.title = "Ketuk untuk melihat siapa saja yang sedang online";
+      actionWrap.insertBefore(onlineBadge, actionWrap.firstChild);
     }
+    onlineBadge.className = "h-9 px-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-300 active:scale-95 transition shrink-0";
+    onlineBadge.innerHTML = `
+      <span class="relative flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+      </span>
+      <span id="headerOnlineCountText">1 Online</span>
+    `;
+    onlineBadge.onclick = () => openOnlineUsersModal();
+    updateOnlineBadgeCount();
 
+    // 2. Lonceng Notifikasi
     let bellBtn = document.getElementById("btnHeaderNotifBell");
     if (!bellBtn) {
       bellBtn = document.createElement("button");
       bellBtn.id = "btnHeaderNotifBell";
       bellBtn.type = "button";
       bellBtn.title = "Pusat Info & Notifikasi";
-      actionWrap.insertBefore(bellBtn, refreshBtn);
+      if (logoutBtn) actionWrap.insertBefore(bellBtn, logoutBtn);
+      else actionWrap.appendChild(bellBtn);
     }
     bellBtn.className = "w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center text-xs text-amber-300 relative active:scale-95 transition";
     bellBtn.innerHTML = `
@@ -119,6 +243,10 @@ export function bindUserProfileTrigger(activeUser, reloadCallback) {
       <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500"></span>
     `;
     bellBtn.onclick = () => openNotificationQuickModal(activeUser, reloadCallback);
+
+    if (logoutBtn) {
+      logoutBtn.className = "w-9 h-9 rounded-2xl bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/25 flex items-center justify-center text-xs text-rose-300 active:scale-95 transition";
+    }
   }
 
   if (!headerScrollBound && headerEl) {
