@@ -91,8 +91,8 @@ function updateStaticEventDatesToNov2026() {
         changed = true;
       }
 
-      if (t.includes("158")) {
-        t = t.replace(/158/g, String(totalCount));
+      if (t.includes("160")) {
+        t = t.replace(/160/g, String(totalCount));
         changed = true;
       }
 
