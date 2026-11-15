@@ -1,26 +1,45 @@
 // js/spj_bosp.js
+// Mencakup:
+// 1. Upload & Download Absensi Manual SPJ BOSP Per Sub Rayon (Peserta hanya bisa download Sub Rayon miliknya sendiri)
+// 2. Pusat Dokumen Laporan/LPJ (11 Kategori Scan Dokumen + Kontrol Hak Akses 3 Tingkat: Peserta, Panitia, Panitia Inti)
+// 3. Upgrade Card Meja Layanan & Otorisasi Pos + Pelacak Kehadiran Peserta
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
+
+// Daftar 12 Kategori Dokumen Resmi di Menu Laporan / LPJ
+export const LPJ_DOC_CATEGORIES = [
+  { code: 'absensi_manual', label: '1. Scan Dok Absensi Manual (Per Sub Rayon)', perRayon: true, defaultAccess: 'PESERTA', icon: 'fa-file-signature' },
+  { code: 'transport_peserta', label: '2. Scan Dok Transport Peserta Manual (Per Sub Rayon)', perRayon: true, defaultAccess: 'PESERTA', icon: 'fa-money-bill-transfer' },
+  { code: 'kit_peserta', label: '3. Scan Dok Bukti Terima Rakor Kit Manual (Per Sub Rayon)', perRayon: true, defaultAccess: 'PESERTA', icon: 'fa-briefcase' },
+  { code: 'transport_panitia', label: '4. Scan Dok Pembayaran Transport Panitia', perRayon: false, defaultAccess: 'PANITIA', icon: 'fa-van-shuttle' },
+  { code: 'lembur_panitia', label: '5. Scan Dok Lembur Panitia', perRayon: false, defaultAccess: 'PANITIA', icon: 'fa-user-clock' },
+  { code: 'pajak', label: '6. Scan Dok Pembayaran Pajak', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-Building-columns' },
+  { code: 'bayar_pemateri', label: '7. Scan Dok Bukti Pembayaran Pemateri', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-chalkboard-user' },
+  { code: 'bayar_moderator', label: '8. Scan Dok Bukti Pembayaran Moderator', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-microphone-lines' },
+  { code: 'bayar_lainnya', label: '9. Scan Dok Bukti Pembayaran Lainnya', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-file-invoice-dollar' },
+  { code: 'kwitansi_atk', label: '10. Scan Dok Kwitansi Pembelanjaan ATK', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-pen-ruler' },
+  { code: 'kwitansi_konsumsi', label: '11. Scan Dok Kwitansi Konsumsi', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-utensils' },
+  { code: 'lpj_utama', label: '12. Dokumen Utama Laporan / LPH Rakor 2026', perRayon: false, defaultAccess: 'PESERTA', icon: 'fa-book-bookmark' }
+];
 
 let spjLockState = {
   spj_absen: false,
   spj_kwitansi: false
 };
 
-let manualAbsenRecord = {
-  kode_menu: 'absensi_manual_spj',
-  judul: 'Dokumen Daftar Hadir Manual (Scan TTD Basah)',
-  deskripsi: 'File scan daftar hadir manual untuk lampiran SPJ BOSP.',
-  url_link: '',
-  status_tersedia: 'Belum Diunggah'
-};
-
+let allLayananRecords = [];
 let logoK3sImageObj = null;
 let selectedRekapDay = "H1";
 let selectedRekapRayon = "ALL";
 let selectedRekapStatus = "BELUM";
+let selectedUploadRayon = "Maulafa";
+let selectedLpjFilterAccess = "ALL";
 let mejaPosObserver = null;
+
+function srSlug(sr = "") {
+  return String(sr).toLowerCase().trim().replace(/\s+/g, "_");
+}
 
 function isUserSekretaris(activeUser) {
   return Boolean(
@@ -30,7 +49,8 @@ function isUserSekretaris(activeUser) {
   );
 }
 
-function canUploadManualAbsen(activeUser) {
+// Otoritas Upload Absensi Manual & Dokumen LPJ: Sekretaris & Seksi Kesekretariatan
+export function canManageSecretariatDocs(activeUser) {
   return Boolean(
     activeUser &&
     activeUser.role === 'panitia' &&
@@ -46,11 +66,51 @@ function isUserBendahara(activeUser) {
   );
 }
 
+function isUserPanitiaInti(activeUser) {
+  return Boolean(
+    activeUser &&
+    activeUser.role === 'panitia' &&
+    ['Penanggung Jawab', 'Ketua Panitia', 'Sekretaris', 'Bendahara'].includes(activeUser.profile?.divisi)
+  );
+}
+
+// Cek apakah pengguna berhak melihat & mengunduh dokumen LPJ berdasarkan kategori hak akses yang diatur Sekretaris
+function canUserViewLpjDoc(activeUser, accessLevel = "PESERTA", targetSubrayon = null) {
+  if (!activeUser) return false;
+  if (canManageSecretariatDocs(activeUser) || isUserPanitiaInti(activeUser)) return true;
+
+  const level = String(accessLevel || "PESERTA").toUpperCase();
+
+  if (level === "PANITIA_INTI") {
+    return isUserPanitiaInti(activeUser);
+  }
+  if (level === "PANITIA") {
+    return activeUser.role === "panitia";
+  }
+  // Jika level === "PESERTA" (Bisa diakses Peserta & Panitia)
+  if (activeUser.role === "peserta" && targetSubrayon) {
+    // Peserta hanya boleh melihat & mendownload dokumen Sub Rayon miliknya sendiri!
+    return activeUser.profile?.subrayon === targetSubrayon;
+  }
+  return true;
+}
+
+function getAccessBadgeLabel(level = "PESERTA") {
+  const u = String(level).toUpperCase();
+  if (u === "PANITIA_INTI") {
+    return { text: "Khusus Panitia Inti (PJ, Ketua, Sek, Ben)", cls: "bg-rose-100 text-rose-800 border-rose-300" };
+  }
+  if (u === "PANITIA") {
+    return { text: "Seluruh Panitia", cls: "bg-indigo-100 text-indigo-800 border-indigo-300" };
+  }
+  return { text: "Peserta (Sesuai Rayon) & Panitia", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+}
+
 async function fetchSpjLockAndManualDocState() {
   try {
     const [posRes, layRes] = await Promise.all([
       sb.from("pengaturan_pos").select("*").in("id_pos", ["spj_absen", "spj_kwitansi"]),
-      sb.from("info_layanan").select("*").eq("kode_menu", "absensi_manual_spj").maybeSingle()
+      sb.from("info_layanan").select("*")
     ]);
 
     if (posRes.data) {
@@ -59,9 +119,29 @@ async function fetchSpjLockAndManualDocState() {
       });
     }
     if (layRes.data) {
-      manualAbsenRecord = layRes.data;
+      allLayananRecords = layRes.data;
     }
   } catch (e) {}
+}
+
+// Ambil record Absensi Manual untuk Sub Rayon tertentu
+function getManualAbsenForSubrayon(subrayon) {
+  const keySpecific = `lpj_absensi_manual_${srSlug(subrayon)}`;
+  const keyLegacy = `absensi_manual_${srSlug(subrayon)}`;
+  return (
+    allLayananRecords.find(r => r.kode_menu === keySpecific && r.url_link) ||
+    allLayananRecords.find(r => r.kode_menu === keyLegacy && r.url_link) ||
+    null
+  );
+}
+
+// Ambil record dokumen LPJ berdasarkan kategori & subrayon
+function getLpjDocRecord(catCode, subrayon = null) {
+  const key = subrayon ? `lpj_${catCode}_${srSlug(subrayon)}` : `lpj_${catCode}`;
+  if (catCode === "absensi_manual" && subrayon) {
+    return getManualAbsenForSubrayon(subrayon) || allLayananRecords.find(r => r.kode_menu === key) || null;
+  }
+  return allLayananRecords.find(r => r.kode_menu === key) || null;
 }
 
 async function preloadK3sLogo() {
@@ -89,21 +169,49 @@ function ensureJsPdfLoaded() {
   });
 }
 
+// Fungsi Utama yang Dipanggil dari renderAllViews() di app.js
 export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList) {
   await fetchSpjLockAndManualDocState();
   injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList);
   injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList);
   upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList);
+  bindLaporanLpjCardInterceptor(activeUser, sekolahList, panitiaList);
 }
 
 // =========================================================================
-// 1. PANEL KONTROL AKTIVASI SPJ & UPLOAD ABSENSI MANUAL
+// INTERCEPTOR TOMBOL MENU "LAPORAN/LPH" DI GRID 9 MENU BERANDA
+// =========================================================================
+function bindLaporanLpjCardInterceptor(activeUser, sekolahList, panitiaList) {
+  const hookButtons = () => {
+    const btns = document.querySelectorAll(
+      '[data-service="laporan"], [data-service="lpj"], [data-service="lph"], [data-service="laporan_rakor"]'
+    );
+    btns.forEach(btn => {
+      // Gunakan capture listener agar menggantikan modal standar dengan Modal LPJ 11 Dokumen Lengkap
+      if (!btn.dataset.lpjCustomBound) {
+        btn.dataset.lpjCustomBound = "1";
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          openLaporanLpjCenterModal(activeUser, sekolahList, panitiaList);
+        }, true);
+      }
+    });
+  };
+
+  hookButtons();
+  setTimeout(hookButtons, 250);
+  setTimeout(hookButtons, 700);
+}
+
+// =========================================================================
+// 1. PANEL KONTROL AKTIVASI SPJ & UPLOAD ABSENSI MANUAL PER SUB RAYON
 // =========================================================================
 function injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList) {
   const existing = document.getElementById("panitiaSpjControlWidget");
   const isSek = isUserSekretaris(activeUser);
   const isBen = isUserBendahara(activeUser);
-  const canUpManual = canUploadManualAbsen(activeUser);
+  const canUpManual = canManageSecretariatDocs(activeUser);
 
   if (!isSek && !isBen && !canUpManual) {
     if (existing) existing.remove();
@@ -125,13 +233,13 @@ function injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList) {
   if (!target) return;
 
   const isOpen = isSek ? spjLockState.spj_absen : spjLockState.spj_kwitansi;
-  const hasManualFile = Boolean(manualAbsenRecord.url_link && manualAbsenRecord.url_link.trim() !== "");
+  const uploadedRayonCount = SUBRAYON_LIST.filter(sr => Boolean(getManualAbsenForSubrayon(sr)?.url_link)).length;
 
   let toggleSectionHtml = "";
   if (isSek || isBen) {
     const roleTitle = isSek ? "Otoritas Sekretaris: Daftar Hadir SPJ" : "Otoritas Bendahara: E-Kwitansi BOSP";
     const descText = isSek
-      ? "Aktifkan agar peserta dapat mengunduh PDF Daftar Hadir Individu, Kolektif Sub Rayon & Absensi Manual."
+      ? "Aktifkan agar peserta dapat mengunduh PDF Daftar Hadir Individu, Kolektif & Scan Absensi Manual sesuai Sub Rayon-nya."
       : "Aktifkan agar sekolah yang sudah LUNAS dapat mengunduh PDF E-Kwitansi Kontribusi Rp 2.000.000.";
 
     toggleSectionHtml = `
@@ -164,16 +272,22 @@ function injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList) {
         <div class="min-w-0">
           <div class="text-[10px] font-extrabold text-amber-300 flex items-center gap-1.5">
             <i class="fa-solid fa-file-signature"></i>
-            <span>Dokumen Absensi Manual (TTD Basah)</span>
+            <span>Upload Absensi Manual Per Sub Rayon</span>
           </div>
           <div class="text-[9px] text-slate-300 truncate">
-            Status: <b class="${hasManualFile ? 'text-emerald-400' : 'text-amber-300'}">${hasManualFile ? '✓ File Tersedia & Siap Diunduh' : 'Belum Diunggah'}</b>
+            Terunggah: <b class="text-emerald-400">${uploadedRayonCount} dari 6 Sub Rayon</b>
           </div>
         </div>
-        <button type="button" id="btnOpenUploadManualAbsenModal" class="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[10px] shrink-0 flex items-center gap-1.5 shadow">
-          <i class="fa-solid fa-cloud-arrow-up"></i>
-          <span>${hasManualFile ? 'Ganti File' : 'Upload File'}</span>
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" id="btnOpenUploadManualAbsenModal" class="px-2.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[10px] flex items-center gap-1 shadow">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Absen Rayon</span>
+          </button>
+          <button type="button" id="btnOpenLpjManagerFromSpj" class="px-2.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] flex items-center gap-1 shadow">
+            <i class="fa-solid fa-folder-open"></i>
+            <span>11 Dok LPJ</span>
+          </button>
+        </div>
       </div>
     `;
   }
@@ -205,10 +319,17 @@ function injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList) {
   document.getElementById("btnOpenUploadManualAbsenModal")?.addEventListener("click", () => {
     openUploadManualAbsenModal(activeUser, sekolahList, panitiaList);
   });
+
+  document.getElementById("btnOpenLpjManagerFromSpj")?.addEventListener("click", () => {
+    openLaporanLpjCenterModal(activeUser, sekolahList, panitiaList);
+  });
 }
 
+// =========================================================================
+// MODAL UPLOAD ABSENSI MANUAL PER SUB RAYON (KHUSUS SEKRETARIS & KESEKRETARIATAN)
+// =========================================================================
 export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList) {
-  if (!canUploadManualAbsen(activeUser)) {
+  if (!canManageSecretariatDocs(activeUser)) {
     return toast("Akses Ditolak: Hanya Sekretaris & Seksi Kesekretariatan yang dapat mengunggah Absensi Manual!");
   }
 
@@ -218,9 +339,14 @@ export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList)
   if (!modal || !titleEl || !bodyEl) return;
 
   modal.classList.remove("hidden");
-  titleEl.innerHTML = `<i class="fa-solid fa-file-signature text-blue-700 mr-1.5"></i> Upload Dokumen Absensi Manual`;
+  titleEl.innerHTML = `<i class="fa-solid fa-file-signature text-blue-700 mr-1.5"></i> Upload Absensi Manual Per Sub Rayon`;
 
-  const hasFile = Boolean(manualAbsenRecord.url_link && manualAbsenRecord.url_link.trim() !== "");
+  renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bodyEl);
+}
+
+function renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bodyEl) {
+  const currentRec = getManualAbsenForSubrayon(selectedUploadRayon);
+  const hasFile = Boolean(currentRec && currentRec.url_link);
 
   bodyEl.innerHTML = `
     <div class="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-2">
@@ -228,51 +354,100 @@ export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList)
         <span class="text-[10px] font-extrabold uppercase bg-blue-900 text-amber-300 px-2.5 py-0.5 rounded-full">
           Otoritas Sekretaris & Kesekretariatan
         </span>
-        <span class="text-[10px] font-extrabold ${hasFile ? 'text-emerald-700' : 'text-amber-700'}">
-          ${hasFile ? '✓ Sudah Diunggah' : 'Belum Ada File'}
+        <span class="text-[10px] font-extrabold text-blue-900">
+          Distribusi Per Sub Rayon
         </span>
       </div>
       <p class="text-[11px] text-slate-700 leading-relaxed">
-        Unggah file <b>Scan Daftar Hadir Manual (PDF / Gambar / ZIP)</b> yang telah ditandatangani peserta dan distempel basah agar dapat diunduh oleh Kepala Sekolah melalui tombol <b>"Download Absensi Manual"</b> di tab Absensi.
+        Unggah file <b>Scan Daftar Hadir Manual (TTD Basah)</b> untuk masing-masing Sub Rayon. Setiap Kepala Sekolah <b>hanya dapat melihat dan mengunduh file Absensi Manual milik Sub Rayon-nya sendiri</b>.
       </p>
+    </div>
+
+    <!-- Status 6 Sub Rayon (Ketuk untuk memilih Sub Rayon yang akan diupload) -->
+    <div class="space-y-1.5">
+      <div class="text-[10px] font-extrabold uppercase text-slate-600">
+        Pilih Sub Rayon Tujuan Upload:
+      </div>
+      <div class="grid grid-cols-3 gap-1.5">
+        ${SUBRAYON_LIST.map(sr => {
+          const rec = getManualAbsenForSubrayon(sr);
+          const uploaded = Boolean(rec && rec.url_link);
+          const isSel = selectedUploadRayon === sr;
+          return `
+            <button type="button" data-sr="${sr}" class="sr-manual-up-pill p-2.5 rounded-xl border text-left transition ${
+              isSel ? 'bg-blue-900 text-white border-blue-900 shadow ring-2 ring-blue-400/40' : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+            }">
+              <div class="text-[11px] font-extrabold truncate">${sr}</div>
+              <div class="text-[9px] font-bold mt-0.5 ${
+                isSel ? (uploaded ? 'text-emerald-300' : 'text-amber-300') : (uploaded ? 'text-emerald-700' : 'text-rose-600')
+              }">
+                ${uploaded ? '✓ Sudah Upload' : '⏳ Belum Ada'}
+              </div>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Form Upload untuk Sub Rayon Terpilih -->
+    <div class="p-4 rounded-2xl bg-slate-50 border-2 border-blue-200 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+        <div>
+          <span class="text-[10px] font-bold uppercase text-blue-800">Sub Rayon Terpilih:</span>
+          <h4 class="text-xs font-extrabold text-slate-900">Sub Rayon ${selectedUploadRayon}</h4>
+        </div>
+        <span class="text-[9px] font-extrabold px-2.5 py-1 rounded-full ${hasFile ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+          ${hasFile ? '✓ File Aktif' : 'Belum Diunggah'}
+        </span>
+      </div>
+
       ${hasFile ? `
-        <div class="pt-1">
-          <a href="${manualAbsenRecord.url_link}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-blue-800 hover:underline">
-            <i class="fa-solid fa-up-right-from-square"></i> Lihat File Absensi Manual Saat Ini
+        <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2">
+          <div class="text-[10px] text-emerald-900 font-bold truncate">
+            <i class="fa-solid fa-file-circle-check text-emerald-600 mr-1"></i>
+            ${currentRec.deskripsi || `Scan Absensi Manual Sub Rayon ${selectedUploadRayon}`}
+          </div>
+          <a href="${currentRec.url_link}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 rounded-lg bg-emerald-700 text-white font-extrabold text-[10px] shrink-0">
+            Lihat File
           </a>
         </div>
       ` : ''}
-    </div>
 
-    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
       <div>
-        <label class="block text-[10px] font-bold text-slate-700 mb-1">1. Pilih File Scan Absensi Manual (.PDF / .JPG / .PNG):</label>
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">1. Pilih File Scan Absensi Manual Sub Rayon ${selectedUploadRayon} (.PDF / Foto):</label>
         <input id="inpManualAbsenFile" type="file" accept=".pdf,image/*,.zip" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-900 file:text-white file:text-[11px] file:font-bold" />
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold text-slate-700 mb-1">Atau Tempel Link Google Drive (Opsional):</label>
-        <input id="inpManualAbsenUrl" type="url" value="${manualAbsenRecord.url_link || ''}" placeholder="https://drive.google.com/..." class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold" />
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">Atau Tempel Link Google Drive Sub Rayon ${selectedUploadRayon} (Opsional):</label>
+        <input id="inpManualAbsenUrl" type="url" value="${currentRec?.url_link || ''}" placeholder="https://drive.google.com/..." class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold" />
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold text-slate-700 mb-1">Keterangan Dokumen:</label>
-        <input id="inpManualAbsenDesc" type="text" value="${manualAbsenRecord.deskripsi || 'File scan daftar hadir manual berstempel basah (26–28 Nov 2026).'}" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold" />
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">Catatan / Keterangan Dokumen:</label>
+        <input id="inpManualAbsenDesc" type="text" value="${currentRec?.deskripsi || `Scan Daftar Hadir Manual Sub Rayon ${selectedUploadRayon} (26–28 Nov 2026)`}" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold" />
       </div>
 
       <div class="flex gap-2 pt-1">
         <button type="button" id="btnSaveManualAbsenNow" class="flex-1 py-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow flex items-center justify-center gap-2">
           <i class="fa-solid fa-cloud-arrow-up"></i>
-          <span>Simpan & Publikasikan Absensi Manual</span>
+          <span>Simpan Absensi Sub Rayon ${selectedUploadRayon}</span>
         </button>
         ${hasFile ? `
-          <button type="button" id="btnRemoveManualAbsenFile" class="px-3 py-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs">
+          <button type="button" id="btnRemoveManualAbsenFile" class="px-3.5 py-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs">
             Hapus
           </button>
         ` : ''}
       </div>
     </div>
   `;
+
+  bodyEl.querySelectorAll(".sr-manual-up-pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedUploadRayon = btn.dataset.sr;
+      renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bodyEl);
+    });
+  });
 
   document.getElementById("btnSaveManualAbsenNow")?.addEventListener("click", async () => {
     const file = document.getElementById("inpManualAbsenFile")?.files?.[0];
@@ -281,11 +456,11 @@ export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList)
 
     const btn = document.getElementById("btnSaveManualAbsenNow");
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Mengunggah Dokumen...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Mengunggah...`;
 
     if (file) {
       const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-      const fileName = `absensi_manual_rakor2026_${Date.now()}.${ext}`;
+      const fileName = `absensi_manual_${srSlug(selectedUploadRayon)}_${Date.now()}.${ext}`;
 
       const { error: upErr } = await sb.storage
         .from("dokumen_rakor")
@@ -293,7 +468,7 @@ export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList)
 
       if (upErr) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan & Publikasikan Absensi Manual`;
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan Absensi Sub Rayon ${selectedUploadRayon}`;
         return toast("Gagal mengunggah file ke server.");
       }
 
@@ -303,44 +478,46 @@ export function openUploadManualAbsenModal(activeUser, sekolahList, panitiaList)
 
     if (!finalUrl) {
       btn.disabled = false;
-      btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan & Publikasikan Absensi Manual`;
+      btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan Absensi Sub Rayon ${selectedUploadRayon}`;
       return toast("Pilih file dokumen atau masukkan link terlebih dahulu!");
     }
 
+    const kodeMenu = `lpj_absensi_manual_${srSlug(selectedUploadRayon)}`;
     const payload = {
-      kode_menu: 'absensi_manual_spj',
-      judul: 'Dokumen Daftar Hadir Manual (26–28 Nov 2026)',
+      kode_menu: kodeMenu,
+      judul: `Scan Dok Absensi Manual — Sub Rayon ${selectedUploadRayon}`,
       deskripsi,
       url_link: finalUrl,
-      status_tersedia: 'Tersedia'
+      status_tersedia: 'PESERTA' // Otomatis dapat diakses oleh Peserta di Sub Rayon tersebut & Panitia
     };
 
     await sb.from("info_layanan").upsert([payload]);
-    manualAbsenRecord = payload;
-    toast("Dokumen Absensi Manual berhasil dipublikasikan!");
-    modal.classList.add("hidden");
-    renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+    await fetchSpjLockAndManualDocState();
+    toast(`Absensi Manual Sub Rayon ${selectedUploadRayon} berhasil dipublikasikan!`);
+    renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bodyEl);
+    injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList);
   });
 
   document.getElementById("btnRemoveManualAbsenFile")?.addEventListener("click", async () => {
-    if (!confirm("Hapus file Absensi Manual saat ini?")) return;
-    const payload = {
-      kode_menu: 'absensi_manual_spj',
-      judul: 'Dokumen Daftar Hadir Manual (26–28 Nov 2026)',
-      deskripsi: manualAbsenRecord.deskripsi,
-      url_link: '',
-      status_tersedia: 'Belum Diunggah'
-    };
-    await sb.from("info_layanan").upsert([payload]);
-    manualAbsenRecord = payload;
-    toast("File Absensi Manual dihapus.");
-    modal.classList.add("hidden");
-    renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+    if (!confirm(`Hapus file Absensi Manual Sub Rayon ${selectedUploadRayon}?`)) return;
+    const kodeMenu = `lpj_absensi_manual_${srSlug(selectedUploadRayon)}`;
+    await sb.from("info_layanan").upsert([{
+      kode_menu: kodeMenu,
+      judul: `Scan Dok Absensi Manual — Sub Rayon ${selectedUploadRayon}`,
+      deskripsi: "",
+      url_link: "",
+      status_tersedia: "PESERTA"
+    }]);
+    await fetchSpjLockAndManualDocState();
+    toast(`File Absensi Manual Sub Rayon ${selectedUploadRayon} dihapus.`);
+    renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bodyEl);
+    injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList);
   });
 }
 
 // =========================================================================
 // 2. KARTU UNDUH PAKET DOKUMEN SPJ BOSP DI TAB ABSENSI PESERTA
+// (Hanya Mengunduh Absensi Manual Milik Sub Rayon Peserta Sendiri!)
 // =========================================================================
 function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
   if (!activeUser || activeUser.role !== 'peserta') return;
@@ -358,14 +535,17 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
   const isLunas = s.status_bayar === "Lunas";
   const canDownloadAbsen = Boolean(spjLockState.spj_absen);
   const canDownloadKwitansi = Boolean(spjLockState.spj_kwitansi && isLunas);
-  const hasManualAbsenUrl = Boolean(manualAbsenRecord.url_link && manualAbsenRecord.url_link.trim() !== "");
+
+  // Ambil khusus file Absensi Manual milik Sub Rayon sekolah ini saja!
+  const myRayonManualRec = getManualAbsenForSubrayon(s.subrayon);
+  const hasMyRayonManualUrl = Boolean(myRayonManualRec && myRayonManualRec.url_link && myRayonManualRec.url_link.trim() !== "");
 
   spjBox.className = "p-4 rounded-2xl bg-gradient-to-br from-blue-50 via-indigo-50/60 to-white border-2 border-blue-200 space-y-3 shadow-2xs mt-3";
   spjBox.innerHTML = `
     <div class="flex items-start justify-between gap-2 border-b border-blue-200/70 pb-2.5">
       <div>
         <span class="text-[9px] font-extrabold uppercase tracking-wider bg-blue-900 text-amber-300 px-2 py-0.5 rounded-md">
-          Dokumen Pertanggungjawaban BOSP
+          Dokumen Pertanggungjawaban BOSP • Sub Rayon ${s.subrayon}
         </span>
         <h4 class="font-extrabold text-xs text-slate-900 mt-1">Unduh Bukti Kehadiran & E-Kwitansi Resmi (PDF)</h4>
         <p class="text-[10px] text-slate-500">Dilengkapi Kop Resmi Panitia K3S Kota Kupang & QR Validasi</p>
@@ -395,17 +575,22 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
           </button>
         </div>
 
+        <!-- Tombol Download Absensi Manual KHUSUS Sub Rayon Peserta Sendiri -->
         <button type="button" id="btnDownloadAbsensiManual" class="w-full py-2.5 px-3 rounded-xl ${
-          hasManualAbsenUrl
+          hasMyRayonManualUrl
             ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
             : 'bg-slate-100 text-slate-500 border border-slate-200'
         } font-extrabold text-[11px] shadow-2xs flex items-center justify-center gap-2 transition mt-1.5">
-          <i class="fa-solid fa-file-signature ${hasManualAbsenUrl ? 'text-blue-950' : 'text-slate-400'}"></i>
-          <span>${hasManualAbsenUrl ? 'Download Absensi Manual (Scan Tanda Tangan)' : 'Download Absensi Manual (Menunggu Upload Sekretariat)'}</span>
+          <i class="fa-solid fa-file-signature ${hasMyRayonManualUrl ? 'text-blue-950' : 'text-slate-400'}"></i>
+          <span>${
+            hasMyRayonManualUrl
+              ? `Download Absensi Manual Sub Rayon ${s.subrayon}`
+              : `Absensi Manual Sub Rayon ${s.subrayon} (Menunggu Upload)`
+          }</span>
         </button>
       ` : `
         <p class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-200/80 text-center font-semibold">
-          <i class="fa-solid fa-lock mr-1 text-amber-600"></i> Unduhan Daftar Hadir Individu, Kolektif Sub Rayon & Absensi Manual akan terbuka setelah diaktifkan oleh <b>Sekretaris Panitia</b>.
+          <i class="fa-solid fa-lock mr-1 text-amber-600"></i> Unduhan Daftar Hadir Individu, Kolektif & Absensi Manual Sub Rayon <b>${s.subrayon}</b> akan terbuka setelah diaktifkan oleh <b>Sekretaris Panitia</b>.
         </p>
       `}
     </div>
@@ -447,10 +632,10 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
   });
 
   document.getElementById("btnDownloadAbsensiManual")?.addEventListener("click", () => {
-    if (!hasManualAbsenUrl) {
-      return toast("File Scan Absensi Manual sedang disiapkan oleh Sekretaris / Seksi Kesekretariatan.");
+    if (!hasMyRayonManualUrl) {
+      return toast(`File Scan Absensi Manual khusus Sub Rayon ${s.subrayon} belum diunggah oleh Sekretaris.`);
     }
-    window.open(manualAbsenRecord.url_link, "_blank", "noopener,noreferrer");
+    window.open(myRayonManualRec.url_link, "_blank", "noopener,noreferrer");
   });
 
   document.getElementById("btnDownloadSpjKwitansi")?.addEventListener("click", () => {
@@ -459,7 +644,390 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
 }
 
 // =========================================================================
-// 3. UPGRADE CARD "MEJA LAYANAN & OTORISASI POS" DI AKUN PANITIA (TEMA GELAP SEMULA)
+// 3. PUSAT DOKUMEN LAPORAN / LPJ & BUKTI FISIK (11 KATEGORI + HAK AKSES 3 TINGKAT)
+// =========================================================================
+export async function openLaporanLpjCenterModal(activeUser, sekolahList, panitiaList) {
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-file-contract text-rose-700 mr-1.5"></i> Laporan / LPJ & Bukti Fisik Rakor`;
+
+  bodyEl.innerHTML = `
+    <div class="p-6 text-center text-xs font-bold text-slate-500">
+      <i class="fa-solid fa-spinner animate-spin mr-1.5 text-rose-600"></i> Memuat arsip dokumen Laporan/LPJ sesuai hak akses Anda...
+    </div>
+  `;
+
+  await fetchSpjLockAndManualDocState();
+  renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl);
+}
+
+function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl) {
+  const isSecretariat = canManageSecretariatDocs(activeUser);
+  const isPeserta = activeUser?.role === "peserta";
+  const userRayon = isPeserta ? activeUser.profile?.subrayon : null;
+
+  // Bangun daftar seluruh item dokumen yang diizinkan tampil bagi pengguna yang sedang login
+  const visibleDocItems = [];
+
+  LPJ_DOC_CATEGORIES.forEach(cat => {
+    if (cat.perRayon) {
+      // Jika login Peserta: hanya cek Sub Rayon miliknya sendiri!
+      // Jika login Panitia: tampilkan ke-6 Sub Rayon
+      const rayonsToCheck = isPeserta && userRayon ? [userRayon] : SUBRAYON_LIST;
+      rayonsToCheck.forEach(sr => {
+        const rec = getLpjDocRecord(cat.code, sr);
+        const accessLevel = rec?.status_tersedia || cat.defaultAccess;
+        const hasUrl = Boolean(rec && rec.url_link && rec.url_link.trim() !== "");
+
+        if (isSecretariat || canUserViewLpjDoc(activeUser, accessLevel, sr)) {
+          visibleDocItems.push({
+            cat,
+            subrayon: sr,
+            kode_menu: `lpj_${cat.code}_${srSlug(sr)}`,
+            title: `${cat.label.replace(' (Per Sub Rayon)', '')} — Sub Rayon ${sr}`,
+            desc: rec?.deskripsi || `Dokumen resmi ${cat.label} untuk wilayah Sub Rayon ${sr}`,
+            url: rec?.url_link || "",
+            hasUrl,
+            accessLevel
+          });
+        }
+      });
+    } else {
+      const rec = getLpjDocRecord(cat.code, null);
+      const accessLevel = rec?.status_tersedia || cat.defaultAccess;
+      const hasUrl = Boolean(rec && rec.url_link && rec.url_link.trim() !== "");
+
+      if (isSecretariat || canUserViewLpjDoc(activeUser, accessLevel, null)) {
+        visibleDocItems.push({
+          cat,
+          subrayon: null,
+          kode_menu: `lpj_${cat.code}`,
+          title: cat.label,
+          desc: rec?.deskripsi || `Arsip scan dokumen ${cat.label} Rakor K3S 2026`,
+          url: rec?.url_link || "",
+          hasUrl,
+          accessLevel
+        });
+      }
+    }
+  });
+
+  const totalUploaded = visibleDocItems.filter(d => d.hasUrl).length;
+
+  bodyEl.innerHTML = `
+    <!-- Header Ringkasan Arsip LPJ -->
+    <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-rose-950 to-slate-900 text-white space-y-2.5 shadow-lg border border-rose-500/30">
+      <div class="flex items-center justify-between">
+        <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+          ${isSecretariat ? 'Mode Pengelola penuh (Sekretaris)' : (isPeserta ? `Akses Peserta • Sub Rayon ${userRayon}` : `Akses ${activeUser?.profile?.divisi || 'Panitia'}`)}
+        </span>
+        <span class="text-[10px] font-extrabold text-emerald-300">${totalUploaded}/${visibleDocItems.length} Tersedia</span>
+      </div>
+
+      <div>
+        <h4 class="text-sm font-extrabold text-white">Arsip Laporan / LPJ & Scan Bukti Pertanggungjawaban</h4>
+        <p class="text-[10px] text-rose-200 mt-0.5">
+          ${isSecretariat
+            ? 'Unggah ke-11 kategori dokumen scan LPJ dan atur hak akses (Peserta / Panitia / Panitia Inti) pada setiap dokumen.'
+            : 'Menampilkan daftar dokumen pertanggungjawaban yang diizinkan untuk akun Anda.'}
+        </p>
+      </div>
+
+      ${isSecretariat ? `
+        <div class="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
+          <span class="text-[10px] text-amber-300 font-bold">
+            <i class="fa-solid fa-plus-circle mr-1"></i> Kelola / Upload Dokumen LPJ:
+          </span>
+          <button type="button" id="btnToggleLpjUploadPanel" class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[11px] shadow">
+            + Upload / Atur Hak Akses Dokumen
+          </button>
+        </div>
+      ` : ''}
+    </div>
+
+    <!-- PANEL UPLOAD & PENGATURAN HAK AKSES 3 KATEGORI (KHUSUS SEKRETARIS & KESEKRETARIATAN) -->
+    <div id="secretariatLpjUploadBox" class="hidden p-4 rounded-2xl bg-blue-50 border-2 border-blue-300 space-y-3 shadow-sm">
+      <div class="flex items-center justify-between border-b border-blue-200 pb-2">
+        <span class="font-extrabold text-xs text-blue-950">
+          <i class="fa-solid fa-cloud-arrow-up text-blue-700 mr-1"></i> Upload Scan Dokumen LPJ & Atur Hak Akses
+        </span>
+        <span class="text-[9px] font-extrabold uppercase bg-blue-900 text-amber-300 px-2 py-0.5 rounded">Otoritas Sekretaris</span>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">1. Pilih Jenis Dokumen Laporan / LPJ:</label>
+        <select id="lpjInpCatCode" class="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-900">
+          ${LPJ_DOC_CATEGORIES.map(c => `<option value="${c.code}" data-perrayon="${c.perRayon ? '1' : '0'}" data-defaccess="${c.defaultAccess}">${c.label}</option>`).join('')}
+        </select>
+      </div>
+
+      <div id="lpjInpRayonWrapper">
+        <label class="block text-[10px] font-bold text-blue-950 mb-1">2. Pilih Wilayah Sub Rayon (Khusus Dokumen Per Sub Rayon):</label>
+        <select id="lpjInpSubrayon" class="w-full rounded-xl border-2 border-blue-400 bg-white px-3 py-2 text-xs font-extrabold text-blue-950">
+          ${SUBRAYON_LIST.map(sr => `<option value="${sr}">Sub Rayon ${sr}</option>`).join('')}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">3. Tentukan Kategori Hak Akses (Siapa yang Bisa Melihat & Download):</label>
+        <select id="lpjInpAccessLevel" class="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-extrabold text-emerald-900">
+          <option value="PESERTA">🟢 Peserta (Sesuai Sub Rayon) & Seluruh Panitia</option>
+          <option value="PANITIA">🔵 Hanya Panitia (Seluruh Anggota & Koordinator Panitia)</option>
+          <option value="PANITIA_INTI">🔴 Khusus Panitia Inti (Penanggung Jawab, Ketua, Sekretaris, Bendahara)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">4. Pilih File Scan Dokumen (.PDF / Foto / .ZIP):</label>
+        <input id="lpjInpFile" type="file" accept=".pdf,image/*,.zip,.xlsx,.docx" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:bg-blue-900 file:text-white file:text-[10px] file:font-extrabold" />
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">Atau Tempel Link File / Google Drive (Opsional):</label>
+        <input id="lpjInpUrl" type="url" placeholder="https://drive.google.com/..." class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold" />
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold text-slate-700 mb-1">Keterangan / Catatan Dokumen:</label>
+        <input id="lpjInpDesc" type="text" placeholder="Contoh: Scan bukti sah berstempel basah..." class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold" />
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button type="button" id="btnSaveLpjDocNow" class="flex-1 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white font-extrabold text-xs shadow flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>Simpan Dokumen & Hak Akses</span>
+        </button>
+        <button type="button" id="btnCloseLpjUploadPanel" class="px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-600 font-bold text-xs">
+          Tutup
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Kategori Dokumen -->
+    <div class="grid grid-cols-2 gap-2">
+      <select id="lpjFilterAccessSelect" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-slate-800">
+        <option value="ALL" ${selectedLpjFilterAccess === 'ALL' ? 'selected' : ''}>Semua Dokumen (${visibleDocItems.length})</option>
+        <option value="AVAILABLE" ${selectedLpjFilterAccess === 'AVAILABLE' ? 'selected' : ''}>✓ Sudah Diunggah (${totalUploaded})</option>
+        <option value="PESERTA" ${selectedLpjFilterAccess === 'PESERTA' ? 'selected' : ''}>Hak Akses: Peserta</option>
+        ${!isPeserta ? `<option value="PANITIA" ${selectedLpjFilterAccess === 'PANITIA' ? 'selected' : ''}>Hak Akses: Panitia</option>` : ''}
+        ${isUserPanitiaInti(activeUser) || isSecretariat ? `<option value="PANITIA_INTI" ${selectedLpjFilterAccess === 'PANITIA_INTI' ? 'selected' : ''}>Hak Akses: Panitia Inti</option>` : ''}
+      </select>
+      <input id="lpjSearchInput" type="text" placeholder="Cari nama dokumen / rayon..." class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold" />
+    </div>
+
+    <!-- Daftar Dokumen LPJ -->
+    <div id="lpjDocsListContainer" class="space-y-2 max-h-96 overflow-y-auto pr-0.5"></div>
+  `;
+
+  // sinkronisasi form upload Sekretaris saat memilih kategori
+  const catSel = document.getElementById("lpjInpCatCode");
+  const rayonWrap = document.getElementById("lpjInpRayonWrapper");
+  const rayonSel = document.getElementById("lpjInpSubrayon");
+  const accSel = document.getElementById("lpjInpAccessLevel");
+  const urlInp = document.getElementById("lpjInpUrl");
+  const descInp = document.getElementById("lpjInpDesc");
+
+  const syncFormWithExistingRecord = () => {
+    if (!catSel) return;
+    const code = catSel.value;
+    const catObj = LPJ_DOC_CATEGORIES.find(c => c.code === code);
+    if (!catObj) return;
+
+    if (catObj.perRayon) {
+      rayonWrap?.classList.remove("hidden");
+    } else {
+      rayonWrap?.classList.add("hidden");
+    }
+
+    const sr = catObj.perRayon ? (rayonSel?.value || "Maulafa") : null;
+    const existing = getLpjDocRecord(code, sr);
+    if (accSel) accSel.value = existing?.status_tersedia || catObj.defaultAccess;
+    if (urlInp) urlInp.value = existing?.url_link || "";
+    if (descInp) descInp.value = existing?.deskripsi || "";
+  };
+
+  catSel?.addEventListener("change", syncFormWithExistingRecord);
+  rayonSel?.addEventListener("change", syncFormWithExistingRecord);
+  syncFormWithExistingRecord();
+
+  document.getElementById("btnToggleLpjUploadPanel")?.addEventListener("click", () => {
+    document.getElementById("secretariatLpjUploadBox")?.classList.toggle("hidden");
+  });
+
+  document.getElementById("btnCloseLpjUploadPanel")?.addEventListener("click", () => {
+    document.getElementById("secretariatLpjUploadBox")?.classList.add("hidden");
+  });
+
+  document.getElementById("btnSaveLpjDocNow")?.addEventListener("click", async () => {
+    if (!isSecretariat) return;
+    const code = catSel.value;
+    const catObj = LPJ_DOC_CATEGORIES.find(c => c.code === code);
+    const sr = catObj?.perRayon ? rayonSel.value : null;
+    const accessLevel = accSel.value;
+    const file = document.getElementById("lpjInpFile")?.files?.[0];
+    let finalUrl = urlInp.value.trim();
+    const deskripsi = descInp.value.trim() || (sr ? `${catObj.label} — Sub Rayon ${sr}` : catObj.label);
+
+    const btn = document.getElementById("btnSaveLpjDocNow");
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Menyimpan...`;
+
+    if (file) {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+      const fileName = `lpj_${code}${sr ? '_' + srSlug(sr) : ''}_${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage
+        .from("dokumen_rakor")
+        .upload(fileName, file, { cacheControl: "3600", upsert: true });
+
+      if (upErr) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Simpan Dokumen & Hak Akses`;
+        return toast("Gagal mengunggah file dokumen.");
+      }
+
+      const { data: pub } = sb.storage.from("dokumen_rakor").getPublicUrl(fileName);
+      finalUrl = pub?.publicUrl || "";
+    }
+
+    const kodeMenu = sr ? `lpj_${code}_${srSlug(sr)}` : `lpj_${code}`;
+    const judul = sr
+      ? `${catObj.label.replace(' (Per Sub Rayon)', '')} — Sub Rayon ${sr}`
+      : catObj.label;
+
+    await sb.from("info_layanan").upsert([{
+      kode_menu: kodeMenu,
+      judul,
+      deskripsi,
+      url_link: finalUrl,
+      status_tersedia: accessLevel
+    }]);
+
+    await fetchSpjLockAndManualDocState();
+    toast("Dokumen LPJ & pengaturan hak akses berhasil disimpan!");
+    renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl);
+    injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList);
+    injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList);
+  });
+
+  const renderDocRows = () => {
+    const listBox = document.getElementById("lpjDocsListContainer");
+    if (!listBox) return;
+
+    const kw = (document.getElementById("lpjSearchInput")?.value || "").toLowerCase().trim();
+    let filtered = visibleDocItems;
+
+    if (selectedLpjFilterAccess === "AVAILABLE") {
+      filtered = filtered.filter(d => d.hasUrl);
+    } else if (["PESERTA", "PANITIA", "PANITIA_INTI"].includes(selectedLpjFilterAccess)) {
+      filtered = filtered.filter(d => d.accessLevel === selectedLpjFilterAccess);
+    }
+
+    if (kw) {
+      filtered = filtered.filter(d =>
+        d.title.toLowerCase().includes(kw) ||
+        d.desc.toLowerCase().includes(kw) ||
+        (d.subrayon || "").toLowerCase().includes(kw)
+      );
+    }
+
+    if (filtered.length === 0) {
+      listBox.innerHTML = `<div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">Tidak ada dokumen pada filter ini.</div>`;
+      return;
+    }
+
+    listBox.innerHTML = "";
+    filtered.forEach(item => {
+      const badge = getAccessBadgeLabel(item.accessLevel);
+      const card = document.createElement("div");
+      card.className = `p-3.5 rounded-2xl bg-white border ${item.hasUrl ? 'border-emerald-300' : 'border-slate-200'} shadow-2xs space-y-2`;
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[9px] font-extrabold px-2 py-0.5 rounded border ${badge.cls}">
+                <i class="fa-solid fa-shield-halved mr-0.5"></i>${badge.text}
+              </span>
+              ${item.subrayon ? `<span class="text-[9px] font-extrabold bg-blue-100 text-blue-900 px-2 py-0.5 rounded">Sub Rayon ${item.subrayon}</span>` : ''}
+            </div>
+            <h4 class="font-extrabold text-xs text-slate-900 mt-1.5">${item.title}</h4>
+            <p class="text-[10px] text-slate-500 mt-0.5">${item.desc}</p>
+          </div>
+          <span class="text-[9px] font-extrabold px-2 py-1 rounded-lg shrink-0 ${item.hasUrl ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}">
+            ${item.hasUrl ? '✓ Tersedia' : 'Belum Upload'}
+          </span>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
+          ${item.hasUrl ? `
+            <a href="${item.url}" target="_blank" rel="noopener noreferrer" download class="flex-1 py-2 px-3 rounded-xl bg-blue-900 hover:bg-blue-800 text-amber-300 font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow-2xs">
+              <i class="fa-solid fa-download"></i>
+              <span>Lihat / Download Dokumen</span>
+            </a>
+          ` : `
+            <div class="flex-1 py-2 px-3 rounded-xl bg-slate-50 text-slate-400 font-bold text-[10px] text-center border border-slate-200/70">
+              Menunggu unggahan dari Sekretaris / Kesekretariatan
+            </div>
+          `}
+
+          ${isSecretariat ? `
+            <button type="button" class="btn-edit-lpj-row px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-extrabold text-[10px] shrink-0 flex items-center gap-1">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>${item.hasUrl ? 'Edit / Akses' : 'Upload'}</span>
+            </button>
+            ${item.hasUrl ? `
+              <button type="button" class="btn-del-lpj-row px-2.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-[10px] shrink-0" title="Hapus File">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            ` : ''}
+          ` : ''}
+        </div>
+      `;
+
+      if (isSecretariat) {
+        card.querySelector(".btn-edit-lpj-row")?.addEventListener("click", () => {
+          const panel = document.getElementById("secretariatLpjUploadBox");
+          panel?.classList.remove("hidden");
+          if (catSel) catSel.value = item.cat.code;
+          if (item.subrayon && rayonSel) rayonSel.value = item.subrayon;
+          syncFormWithExistingRecord();
+          panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+
+        card.querySelector(".btn-del-lpj-row")?.addEventListener("click", async () => {
+          if (!confirm(`Hapus file "${item.title}"?`)) return;
+          await sb.from("info_layanan").upsert([{
+            kode_menu: item.kode_menu,
+            judul: item.title,
+            deskripsi: item.desc,
+            url_link: "",
+            status_tersedia: item.accessLevel
+          }]);
+          await fetchSpjLockAndManualDocState();
+          toast("File dokumen LPJ dihapus.");
+          renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl);
+        });
+      }
+
+      listBox.appendChild(card);
+    });
+  };
+
+  renderDocRows();
+
+  document.getElementById("lpjFilterAccessSelect")?.addEventListener("change", (e) => {
+    selectedLpjFilterAccess = e.target.value;
+    renderDocRows();
+  });
+
+  document.getElementById("lpjSearchInput")?.addEventListener("input", renderDocRows);
+}
+
+// =========================================================================
+// 4. UPGRADE CARD "MEJA LAYANAN & OTORISASI POS" DI AKUN PANITIA
 // =========================================================================
 function findMejaLayananCardElement() {
   const candidateIds = [
@@ -505,10 +1073,10 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     const kitCount = sekolahList.filter(s => s.ambil_kit).length;
     const transCount = sekolahList.filter(s => s.terima_transport).length;
 
-    const canUploadManual = canUploadManualAbsen(activeUser);
-    const hasManualFile = Boolean(manualAbsenRecord.url_link && manualAbsenRecord.url_link.trim() !== "");
+    const canUploadManual = canManageSecretariatDocs(activeUser);
+    const uploadedRayonCount = SUBRAYON_LIST.filter(sr => Boolean(getManualAbsenForSubrayon(sr)?.url_link)).length;
 
-    const currentSig = `${totalSek}|${h1Count}|${h2Count}|${h3Count}|${kitCount}|${transCount}|${canUploadManual}|${hasManualFile}`;
+    const currentSig = `${totalSek}|${h1Count}|${h2Count}|${h3Count}|${kitCount}|${transCount}|${canUploadManual}|${uploadedRayonCount}`;
     const existingUpgraded = box.querySelector("#upgradedMejaLayananStatsGrid");
     if (existingUpgraded && existingUpgraded.dataset.sig === currentSig) {
       return;
@@ -585,12 +1153,16 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
         </button>
 
         ${canUploadManual ? `
-          <button type="button" id="btnQuickUploadManualFromMeja" class="w-full py-2 px-3 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-amber-200 font-extrabold text-[11px] flex items-center justify-between transition">
-            <span><i class="fa-solid fa-file-signature text-amber-300 mr-1.5"></i>Upload Scan Absensi Manual (SPJ BOSP)</span>
-            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${hasManualFile ? 'bg-emerald-400 text-slate-950' : 'bg-amber-400 text-slate-950'}">
-              ${hasManualFile ? '✓ Terunggah' : 'Upload PDF'}
-            </span>
-          </button>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button type="button" id="btnQuickUploadManualFromMeja" class="py-2 px-2.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-amber-200 font-extrabold text-[10px] flex items-center justify-between transition">
+              <span class="truncate"><i class="fa-solid fa-file-signature text-amber-300 mr-1"></i>Absen Manual Rayon</span>
+              <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 shrink-0">${uploadedRayonCount}/6</span>
+            </button>
+            <button type="button" id="btnQuickOpenLpjFromMeja" class="py-2 px-2.5 rounded-xl bg-emerald-400/20 hover:bg-emerald-400/30 border border-emerald-400/40 text-emerald-200 font-extrabold text-[10px] flex items-center justify-between transition">
+              <span class="truncate"><i class="fa-solid fa-folder-open text-emerald-300 mr-1"></i>Upload 11 Dok LPJ</span>
+              <i class="fa-solid fa-chevron-right text-[9px]"></i>
+            </button>
+          </div>
         ` : ''}
       </div>
     `;
@@ -609,6 +1181,10 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
 
     targetSlot.querySelector("#btnQuickUploadManualFromMeja")?.addEventListener("click", () => {
       openUploadManualAbsenModal(activeUser, sekolahList, []);
+    });
+
+    targetSlot.querySelector("#btnQuickOpenLpjFromMeja")?.addEventListener("click", () => {
+      openLaporanLpjCenterModal(activeUser, sekolahList, []);
     });
   };
 
