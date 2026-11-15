@@ -881,6 +881,71 @@ function renderProkerListTab(activeUser, kategoriTarget, container, layananList,
     generatePdfMatriksProker(kategoriTarget, itemsInCategory);
   });
 
+  document.getElementById("btnToggleDraftDocUploadBox")?.addEventListener("click", () => {
+    document.getElementById("draftDocUploadFormBox")?.classList.toggle("hidden");
+  });
+
+  document.getElementById("btnSaveDraftMultiFileNow")?.addEventListener("click", async () => {
+    if (!isEditor) return;
+    const file = document.getElementById("inpDraftMultiFile")?.files?.[0];
+    let finalUrl = document.getElementById("inpDraftMultiUrl")?.value.trim() || "";
+    const deskripsi = document.getElementById("inpDraftMultiDesc")?.value.trim() || "Dokumen Draft Program Kerja 2027 (Word/Excel/Spreadsheet/PDF)";
+
+    const btn = document.getElementById("btnSaveDraftMultiFileNow");
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Mengunggah...`;
+
+    if (file) {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'docx';
+      const fileName = `draft_proker_2027_${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage
+        .from("dokumen_rakor")
+        .upload(fileName, file, { cacheControl: "3600", upsert: true });
+
+      if (upErr) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-floppy-disk mr-1"></i> Publikasikan File Draft`;
+        return toast("Gagal mengunggah file Draft.");
+      }
+      const { data: pubData } = sb.storage.from("dokumen_rakor").getPublicUrl(fileName);
+      finalUrl = pubData?.publicUrl || "";
+    }
+
+    if (!finalUrl) {
+      btn.disabled = false;
+      btn.innerHTML = `<i class="fa-solid fa-floppy-disk mr-1"></i> Publikasikan File Draft`;
+      return toast("Pilih file Word/Excel/PDF atau tempel link Spreadsheet terlebih dahulu!");
+    }
+
+    const updated = {
+      kode_menu: "draft_proker_file_2027",
+      judul: file ? `File Draft Proker 2027 (${file.name})` : "Dokumen Draft Program Kerja 2027 (Word/Excel/Spreadsheet)",
+      deskripsi,
+      url_link: finalUrl,
+      status_tersedia: "Tersedia"
+    };
+
+    await sb.from("info_layanan").upsert([updated]);
+    toast("File Draft Program Kerja 2027 berhasil dipublikasikan!");
+    if (reloadCallback) await reloadCallback();
+    openProdukRakorModal(activeUser, [updated, ...(layananList || []).filter(x => x.kode_menu !== "draft_proker_file_2027")], reloadCallback);
+  });
+
+  document.getElementById("btnRemoveDraftMultiFile")?.addEventListener("click", async () => {
+    if (!isEditor || !confirm("Hapus file lampiran Draft saat ini?")) return;
+    const updated = {
+      kode_menu: "draft_proker_file_2027",
+      judul: "File Dokumen Draft Program Kerja 2027",
+      deskripsi: draftFileRec.deskripsi,
+      url_link: "",
+      status_tersedia: "Segera Hadir"
+    };
+    await sb.from("info_layanan").upsert([updated]);
+    toast("File Draft dihapus.");
+    if (reloadCallback) await reloadCallback();
+    openProdukRakorModal(activeUser, [updated], reloadCallback);
+  });
+
   document.getElementById("btnSaveProkerItem")?.addEventListener("click", async () => {
     if (!isEditor) return;
     const kategori_dokumen = document.getElementById("prkInpKategori").value;
