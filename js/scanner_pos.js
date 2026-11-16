@@ -260,12 +260,13 @@ function renderPesertaPersonalRightsView(container, activeUser, sekolahList) {
 
 // B. TAMPILAN KHUSUS PANITIA: TEMA WARNA SEMULA (DARK NAVY & GOLD) DENGAN MENU LENGKAP
 function renderPanitiaMejaLayananAndIzinView(container, activeUser, sekolahList, reloadCallback) {
-  const totalSek = sekolahList.length || 160;
-  const h1Count = sekolahList.filter(s => s.hadir_h1).length;
-  const h2Count = sekolahList.filter(s => s.hadir_h2).length;
-  const h3Count = sekolahList.filter(s => s.hadir_h3).length;
-  const kitCount = sekolahList.filter(s => s.ambil_kit).length;
-  const transCount = sekolahList.filter(s => s.terima_transport).length;
+const ikutSchools = sekolahList.filter(s => s.status_ikut === "Ikut");
+const totalSek = ikutSchools.length;
+const h1Count = ikutSchools.filter(s => s.hadir_h1).length;
+const h2Count = ikutSchools.filter(s => s.hadir_h2).length;
+const h3Count = ikutSchools.filter(s => s.hadir_h3).length;
+const kitCount = ikutSchools.filter(s => s.ambil_kit).length;
+const transCount = ikutSchools.filter(s => s.terima_transport).length;
 
   const izinList = sekolahList.filter(s => s.status_izin && String(s.status_izin).trim() !== "" && s.status_izin !== "Hadir Penuh (Tanpa Izin)");
   const isSekretaris = activeUser.profile?.divisi === "Sekretaris";
@@ -671,6 +672,15 @@ async function processPosScanPayload(rawText, activeUser, sekolahList, reloadCal
       resBanner.textContent = `NPSN "${npsn}" tidak ditemukan dalam database 160 sekolah!`;
     }
     return toast("Data sekolah tidak ditemukan!");
+  }
+
+  // Tolak pencairan Rakor Kit, Transpor, atau Kamar jika sekolah terdata "Tidak Ikut"
+  if (!selectedPosId.startsWith("absen_") && school.status_ikut !== "Ikut") {
+    if (resBanner) {
+      resBanner.className = "p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-400 text-amber-950 text-xs font-extrabold";
+      resBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i> DITOLAK: <b>${school.nama_sekolah}</b> saat ini berstatus <u>${school.status_ikut || 'Belum Ikut'}</u>! Hanya peserta berstatus "Ikut" yang berhak menerima ${posObj.label}.`;
+    }
+    return toast(`Ditolak: ${school.nama_sekolah} belum terdata Ikut!`);
   }
 
   const updatePayload = {};
