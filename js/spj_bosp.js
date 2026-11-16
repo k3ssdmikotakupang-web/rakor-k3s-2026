@@ -4,6 +4,7 @@
 // 2. Koreksi Label "Laporan / LPJ"
 // 3. Upload & Download Absensi Manual SPJ BOSP Per Sub Rayon
 // 4. Pusat Dokumen Laporan/LPJ (Peserta hanya melihat dokumen hak dirinya/Sub Rayon-nya; Panitia sesuai 3 tingkat akses)
+// 5. Perhitungan Kehadiran, Rakor Kit, Transpor & Daftar Hadir Kolektif murni dari Sekolah yang Berstatus "Ikut"
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
@@ -28,7 +29,6 @@ let spjLockState = {
   spj_kwitansi: false
 };
 
-// Referensi sesi dinamis agar saat Logout & Login akun berbeda, data langsung berganti tanpa nyangkut di akun lama!
 let currentActiveUserRef = null;
 let currentSekolahListRef = [];
 let currentPanitiaListRef = [];
@@ -82,7 +82,6 @@ function isUserPanitiaInti(activeUser) {
 function canUserViewLpjDoc(activeUser, catObj, accessLevel = "PESERTA", targetSubrayon = null) {
   if (!activeUser) return false;
 
-  // 1. ATURAN KETAT PESERTA:
   if (activeUser.role === "peserta") {
     if (!catObj || !catObj.allowForPeserta) return false;
     const level = String(accessLevel || "PESERTA").toUpperCase();
@@ -96,7 +95,6 @@ function canUserViewLpjDoc(activeUser, catObj, accessLevel = "PESERTA", targetSu
     return true;
   }
 
-  // 2. ATURAN UNTUK PANITIA:
   if (canManageSecretariatDocs(activeUser) || isUserPanitiaInti(activeUser)) return true;
 
   const level = String(accessLevel || "PESERTA").toUpperCase();
@@ -182,7 +180,6 @@ function ensureJsPdfLoaded() {
 }
 
 export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList) {
-  // Selalu mutakhirkan referensi sesi aktif setiap kali renderAllViews dipanggil
   currentActiveUserRef = activeUser;
   currentSekolahListRef = sekolahList || [];
   currentPanitiaListRef = panitiaList || [];
@@ -191,7 +188,6 @@ export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList)
     ? `${activeUser.role}:${activeUser.profile?.id_sekolah || activeUser.profile?.id_panitia || ''}`
     : "GUEST";
 
-  // Jika pengguna baru saja ganti akun (Logout -> Login), bersihkan filter & tutup modal sisa sesi sebelumnya
   if (newSig !== lastSessionSignature) {
     lastSessionSignature = newSig;
     selectedLpjFilterAccess = "ALL";
@@ -206,14 +202,12 @@ export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList)
   bindLaporanLpjCardInterceptor();
 }
 
-// INTERCEPTOR TOMBOL MENU "LAPORAN/LPJ" (Selalu membaca currentActiveUserRef terbaru!)
 function bindLaporanLpjCardInterceptor() {
   const hookButtons = () => {
     const btns = document.querySelectorAll(
       '[data-service="laporan"], [data-service="lpj"], [data-service="lph"], [data-service="laporan_rakor"]'
     );
     btns.forEach(btn => {
-      // Gunakan properti onclick & capture listener yang membaca currentActiveUserRef secara dinamis
       btn.onclick = (e) => {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -672,8 +666,7 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
 }
 
 // =========================================================================
-// 3. PUSAT DOKUMEN LAPORAN / LPJ & BUKTI FISIK:
-// Selalu mengevaluasi currentActiveUserRef agar tidak pernah salah sesi!
+// 3. PUSAT DOKUMEN LAPORAN / LPJ & BUKTI FISIK
 // =========================================================================
 export async function openLaporanLpjCenterModal(activeUser, sekolahList, panitiaList) {
   const user = currentActiveUserRef || activeUser;
@@ -798,7 +791,7 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
               </span>
             </div>
             <div class="text-[11px] font-extrabold mt-1.5">Kolektif Rayon ${userRayon}</div>
-            <div class="text-[9px] opacity-75 truncate">Khusus Sub Rayon Anda</div>
+            <div class="text-[9px] opacity-75 truncate">Khusus Peserta Ikut</div>
           </button>
         </div>
 
@@ -940,7 +933,8 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
     });
     document.getElementById("lpjBtnMyKolektifPdf")?.addEventListener("click", () => {
       if (!spjLockState.spj_absen) return toast("Unduhan Daftar Hadir Kolektif sedang menunggu aktivasi Sekretaris Panitia.");
-      const srSchools = sekolahList.filter(x => x.subrayon === mySchool.subrayon);
+      // Kedua baris srSchools kini sudah memfilter khusus x.status_ikut === "Ikut"!
+      const srSchools = sekolahList.filter(x => x.subrayon === mySchool.subrayon && x.status_ikut === "Ikut");
       const ketua = (panitiaList || []).find(p => p.tugas_subrayon === mySchool.subrayon);
       generatePdfDaftarHadirKolektif(mySchool.subrayon, srSchools, ketua);
     });
@@ -1194,7 +1188,6 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     const box = findMejaLayananCardElement();
     if (!box) return;
 
-    // HANYA hitung dari sekolah yang berstatus "Ikut"!
     const ikutList = (sekolahList || []).filter(s => s.status_ikut === "Ikut");
     const totalIkut = ikutList.length;
     const h1Count = ikutList.filter(s => s.hadir_h1).length;
@@ -1376,7 +1369,6 @@ function getLabelByTrackKey(key) {
 }
 
 function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
-  // Filter hanya sekolah yang berstatus "Ikut"
   const ikutSchools = (sekolahList || []).filter(s => s.status_ikut === "Ikut");
   const totalIkut = ikutSchools.length;
   const sudahCount = ikutSchools.filter(s => getFieldByTrackKey(s, selectedRekapDay)).length;
@@ -1539,68 +1531,6 @@ function renderTrackedParticipantRows(ikutSchools) {
             <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
             <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
               ${isDone ? '✓ SUDAH TERCATAT' : '✕ BELUM TERCATAT'}
-            </span>
-            <span class="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">Rayon ${s.subrayon}</span>
-            ${hasIzin ? `<span class="text-[9px] font-extrabold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">Izin: ${s.status_izin}</span>` : ''}
-          </div>
-          <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
-          <p class="text-[10px] text-slate-600 mt-0.5">
-            Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • Kamar: <b>${s.nomor_kamar || '-'}</b>
-          </p>
-        </div>
-
-        <div class="flex flex-col items-end gap-1 shrink-0">
-          ${s.no_hp ? `
-            <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] flex items-center gap-1 shadow-2xs">
-              <i class="fa-brands fa-whatsapp"></i> Hubungi
-            </a>
-          ` : `<span class="text-[9px] text-slate-400">Tanpa No WA</span>`}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderTrackedParticipantRows(sekolahList) {
-  const box = document.getElementById("trackParticipantListContainer");
-  if (!box) return;
-
-  const kw = (document.getElementById("trackSearchSchoolInput")?.value || "").toLowerCase().trim();
-
-  let list = sekolahList;
-  if (selectedRekapRayon !== "ALL") {
-    list = list.filter(s => s.subrayon === selectedRekapRayon);
-  }
-  if (selectedRekapStatus === "BELUM") {
-    list = list.filter(s => !getFieldByTrackKey(s, selectedRekapDay));
-  } else if (selectedRekapStatus === "SUDAH") {
-    list = list.filter(s => getFieldByTrackKey(s, selectedRekapDay));
-  }
-  if (kw) {
-    list = list.filter(s =>
-      (s.nama_sekolah || "").toLowerCase().includes(kw) ||
-      (s.nama_kepsek || "").toLowerCase().includes(kw) ||
-      String(s.npsn || "").includes(kw)
-    );
-  }
-
-  if (list.length === 0) {
-    box.innerHTML = `<div class="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">Tidak ada peserta pada filter ini.</div>`;
-    return;
-  }
-
-  box.innerHTML = list.slice(0, 200).map((s, idx) => {
-    const isDone = getFieldByTrackKey(s, selectedRekapDay);
-    const waClean = String(s.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
-    const hasIzin = Boolean(s.status_izin && s.status_izin.trim() !== "");
-
-    return `
-      <div class="p-3 rounded-2xl bg-white border ${isDone ? 'border-emerald-300' : 'border-rose-200 bg-rose-50/20'} flex items-start justify-between gap-2 shadow-2xs">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
-            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-              ${isDone ? '✓ SUDAH ABSEN' : '✕ BELUM ABSEN'}
             </span>
             <span class="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">Rayon ${s.subrayon}</span>
             ${hasIzin ? `<span class="text-[9px] font-extrabold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">Izin: ${s.status_izin}</span>` : ''}
