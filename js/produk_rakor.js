@@ -294,7 +294,7 @@ export function renderProdukRakorAndUniformCards(activeUser, layananList, reload
   styleGridTile(btnProduk, "bg-emerald-700 text-amber-300", "fa-briefcase", "Produk Rakor", "Proker 2027", "bg-emerald-100 text-emerald-900");
 
   styleGridTile(btnSertifikat, "bg-amber-500 text-slate-950", "fa-award", "Sertifikat", "Pola 32 JP", "bg-amber-100 text-amber-900");
-  styleGridTile(btnLaporan, "bg-rose-700 text-white", "fa-file-contract", "Laporan/LPH", "Dokumen", "bg-rose-100 text-rose-900");
+  styleGridTile(btnLaporan, "bg-rose-700 text-white", "fa-file-contract", "Laporan/LPJ", "Dokumen", "bg-rose-100 text-rose-900");
   styleGridTile(btnTentang, "bg-slate-900 text-amber-300", "fa-mobile-screen-button", "Tentang Aplikasi", "Install & Paten", "bg-slate-200 text-slate-800");
 
   // Susun urutan tombol: Jika Panitia -> 3 Menu Panitia di Baris Pertama + 9 Menu Standar. Jika Peserta -> 9 Menu Standar.
