@@ -1,26 +1,29 @@
 // js/spj_bosp.js
 // Mencakup:
 // 1. Upload & Download Absensi Manual SPJ BOSP Per Sub Rayon (Peserta hanya bisa download Sub Rayon miliknya sendiri)
-// 2. Pusat Dokumen Laporan/LPJ (11 Kategori Scan Dokumen + Kontrol Hak Akses 3 Tingkat: Peserta, Panitia, Panitia Inti)
+// 2. Pusat Dokumen Laporan/LPJ:
+//    - User Peserta HANYA bisa melihat & mendownload dokumen hak peserta yang terkait langsung dengan dirinya / Sub Rayon-nya sendiri!
+//    - User Panitia & Panitia Inti melihat sesuai 3 tingkat hak akses yang diatur Sekretaris.
 // 3. Upgrade Card Meja Layanan & Otorisasi Pos + Pelacak Kehadiran Peserta
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
 // Daftar 12 Kategori Dokumen Resmi di Menu Laporan / LPJ
+// Flag allowForPeserta: true HANYA untuk dokumen yang berkaitan langsung dengan hak peserta / sub rayonnya
 export const LPJ_DOC_CATEGORIES = [
-  { code: 'absensi_manual', label: '1. Scan Dok Absensi Manual (Per Sub Rayon)', perRayon: true, defaultAccess: 'PESERTA', icon: 'fa-file-signature' },
-  { code: 'transport_peserta', label: '2. Scan Dok Transport Peserta Manual (Per Sub Rayon)', perRayon: true, defaultAccess: 'PESERTA', icon: 'fa-money-bill-transfer' },
-  { code: 'kit_peserta', label: '3. Scan Dok Bukti Terima Rakor Kit Manual (Per Sub Rayon)', perRayon: true, defaultAccess: 'PESERTA', icon: 'fa-briefcase' },
-  { code: 'transport_panitia', label: '4. Scan Dok Pembayaran Transport Panitia', perRayon: false, defaultAccess: 'PANITIA', icon: 'fa-van-shuttle' },
-  { code: 'lembur_panitia', label: '5. Scan Dok Lembur Panitia', perRayon: false, defaultAccess: 'PANITIA', icon: 'fa-user-clock' },
-  { code: 'pajak', label: '6. Scan Dok Pembayaran Pajak', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-Building-columns' },
-  { code: 'bayar_pemateri', label: '7. Scan Dok Bukti Pembayaran Pemateri', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-chalkboard-user' },
-  { code: 'bayar_moderator', label: '8. Scan Dok Bukti Pembayaran Moderator', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-microphone-lines' },
-  { code: 'bayar_lainnya', label: '9. Scan Dok Bukti Pembayaran Lainnya', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-file-invoice-dollar' },
-  { code: 'kwitansi_atk', label: '10. Scan Dok Kwitansi Pembelanjaan ATK', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-pen-ruler' },
-  { code: 'kwitansi_konsumsi', label: '11. Scan Dok Kwitansi Konsumsi', perRayon: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-utensils' },
-  { code: 'lpj_utama', label: '12. Dokumen Utama Laporan / LPH Rakor 2026', perRayon: false, defaultAccess: 'PESERTA', icon: 'fa-book-bookmark' }
+  { code: 'absensi_manual', label: '1. Scan Dok Absensi Manual (Per Sub Rayon)', perRayon: true, allowForPeserta: true, defaultAccess: 'PESERTA', icon: 'fa-file-signature' },
+  { code: 'transport_peserta', label: '2. Scan Dok Transport Peserta Manual (Per Sub Rayon)', perRayon: true, allowForPeserta: true, defaultAccess: 'PESERTA', icon: 'fa-money-bill-transfer' },
+  { code: 'kit_peserta', label: '3. Scan Dok Bukti Terima Rakor Kit Manual (Per Sub Rayon)', perRayon: true, allowForPeserta: true, defaultAccess: 'PESERTA', icon: 'fa-briefcase' },
+  { code: 'lpj_utama', label: '4. Dokumen Utama Laporan / LPH Rakor 2026', perRayon: false, allowForPeserta: true, defaultAccess: 'PESERTA', icon: 'fa-book-bookmark' },
+  { code: 'transport_panitia', label: '5. Scan Dok Pembayaran Transport Panitia', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA', icon: 'fa-van-shuttle' },
+  { code: 'lembur_panitia', label: '6. Scan Dok Lembur Panitia', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA', icon: 'fa-user-clock' },
+  { code: 'pajak', label: '7. Scan Dok Pembayaran Pajak', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-building-columns' },
+  { code: 'bayar_pemateri', label: '8. Scan Dok Bukti Pembayaran Pemateri', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-chalkboard-user' },
+  { code: 'bayar_moderator', label: '9. Scan Dok Bukti Pembayaran Moderator', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-microphone-lines' },
+  { code: 'bayar_lainnya', label: '10. Scan Dok Bukti Pembayaran Lainnya', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-file-invoice-dollar' },
+  { code: 'kwitansi_atk', label: '11. Scan Dok Kwitansi Pembelanjaan ATK', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-pen-ruler' },
+  { code: 'kwitansi_konsumsi', label: '12. Scan Dok Kwitansi Konsumsi', perRayon: false, allowForPeserta: false, defaultAccess: 'PANITIA_INTI', icon: 'fa-utensils' }
 ];
 
 let spjLockState = {
@@ -49,7 +52,6 @@ function isUserSekretaris(activeUser) {
   );
 }
 
-// Otoritas Upload Absensi Manual & Dokumen LPJ: Sekretaris & Seksi Kesekretariatan
 export function canManageSecretariatDocs(activeUser) {
   return Boolean(
     activeUser &&
@@ -74,36 +76,52 @@ function isUserPanitiaInti(activeUser) {
   );
 }
 
-// Cek apakah pengguna berhak melihat & mengunduh dokumen LPJ berdasarkan kategori hak akses yang diatur Sekretaris
-function canUserViewLpjDoc(activeUser, accessLevel = "PESERTA", targetSubrayon = null) {
+// Validasi Ketat Hak Akses Dokumen LPJ:
+// Peserta HANYA bisa melihat dokumen yang allowForPeserta === true, berstatus PESERTA, dan sesuai Sub Rayon-nya sendiri!
+function canUserViewLpjDoc(activeUser, catObj, accessLevel = "PESERTA", targetSubrayon = null) {
   if (!activeUser) return false;
+
+  // 1. ATURAN KHUSUS PESERTA (KEPALA SEKOLAH):
+  if (activeUser.role === "peserta") {
+    // Tolak mutlak jika kategori dokumen bukan hak peserta (misal dokumen panitia, pajak, honor, konsumsi, ATK)
+    if (!catObj || !catObj.allowForPeserta) return false;
+
+    // Tolak jika Sekretaris mengatur hak akses dokumen ini hanya untuk PANITIA atau PANITIA_INTI
+    const level = String(accessLevel || "PESERTA").toUpperCase();
+    if (level !== "PESERTA") return false;
+
+    // Jika dokumen berbasis Sub Rayon, WAJIB sama persis dengan Sub Rayon milik peserta yang sedang login!
+    if (catObj.perRayon || targetSubrayon) {
+      const myRayon = String(activeUser.profile?.subrayon || "").trim().toLowerCase();
+      const docRayon = String(targetSubrayon || "").trim().toLowerCase();
+      return Boolean(myRayon && myRayon === docRayon);
+    }
+
+    return true;
+  }
+
+  // 2. ATURAN UNTUK PANITIA:
   if (canManageSecretariatDocs(activeUser) || isUserPanitiaInti(activeUser)) return true;
 
   const level = String(accessLevel || "PESERTA").toUpperCase();
-
   if (level === "PANITIA_INTI") {
     return isUserPanitiaInti(activeUser);
   }
-  if (level === "PANITIA") {
-    return activeUser.role === "panitia";
-  }
-  // Jika level === "PESERTA" (Bisa diakses Peserta & Panitia)
-  if (activeUser.role === "peserta" && targetSubrayon) {
-    // Peserta hanya boleh melihat & mendownload dokumen Sub Rayon miliknya sendiri!
-    return activeUser.profile?.subrayon === targetSubrayon;
-  }
-  return true;
+  return true; // Level PANITIA atau PESERTA dapat dilihat oleh anggota panitia
 }
 
-function getAccessBadgeLabel(level = "PESERTA") {
+function getAccessBadgeLabel(level = "PESERTA", subrayon = null) {
   const u = String(level).toUpperCase();
   if (u === "PANITIA_INTI") {
     return { text: "Khusus Panitia Inti (PJ, Ketua, Sek, Ben)", cls: "bg-rose-100 text-rose-800 border-rose-300" };
   }
   if (u === "PANITIA") {
-    return { text: "Seluruh Panitia", cls: "bg-indigo-100 text-indigo-800 border-indigo-300" };
+    return { text: "Internal Panitia", cls: "bg-indigo-100 text-indigo-800 border-indigo-300" };
   }
-  return { text: "Peserta (Sesuai Rayon) & Panitia", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+  if (subrayon) {
+    return { text: `Hak Peserta Sub Rayon ${subrayon}`, cls: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+  }
+  return { text: "Dokumen Hak Peserta & Panitia", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" };
 }
 
 async function fetchSpjLockAndManualDocState() {
@@ -124,7 +142,6 @@ async function fetchSpjLockAndManualDocState() {
   } catch (e) {}
 }
 
-// Ambil record Absensi Manual untuk Sub Rayon tertentu
 function getManualAbsenForSubrayon(subrayon) {
   const keySpecific = `lpj_absensi_manual_${srSlug(subrayon)}`;
   const keyLegacy = `absensi_manual_${srSlug(subrayon)}`;
@@ -135,7 +152,6 @@ function getManualAbsenForSubrayon(subrayon) {
   );
 }
 
-// Ambil record dokumen LPJ berdasarkan kategori & subrayon
 function getLpjDocRecord(catCode, subrayon = null) {
   const key = subrayon ? `lpj_${catCode}_${srSlug(subrayon)}` : `lpj_${catCode}`;
   if (catCode === "absensi_manual" && subrayon) {
@@ -169,7 +185,6 @@ function ensureJsPdfLoaded() {
   });
 }
 
-// Fungsi Utama yang Dipanggil dari renderAllViews() di app.js
 export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList) {
   await fetchSpjLockAndManualDocState();
   injectPanitiaSpjControlCard(activeUser, sekolahList, panitiaList);
@@ -178,16 +193,17 @@ export async function renderSpjBospWidgets(activeUser, sekolahList, panitiaList)
   bindLaporanLpjCardInterceptor(activeUser, sekolahList, panitiaList);
 }
 
-// =========================================================================
-// INTERCEPTOR TOMBOL MENU "LAPORAN/LPH" DI GRID 9 MENU BERANDA
-// =========================================================================
 function bindLaporanLpjCardInterceptor(activeUser, sekolahList, panitiaList) {
   const hookButtons = () => {
     const btns = document.querySelectorAll(
       '[data-service="laporan"], [data-service="lpj"], [data-service="lph"], [data-service="laporan_rakor"]'
     );
     btns.forEach(btn => {
-      // Gunakan capture listener agar menggantikan modal standar dengan Modal LPJ 11 Dokumen Lengkap
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openLaporanLpjCenterModal(activeUser, sekolahList, panitiaList);
+      };
       if (!btn.dataset.lpjCustomBound) {
         btn.dataset.lpjCustomBound = "1";
         btn.addEventListener("click", (e) => {
@@ -363,7 +379,6 @@ function renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bo
       </p>
     </div>
 
-    <!-- Status 6 Sub Rayon (Ketuk untuk memilih Sub Rayon yang akan diupload) -->
     <div class="space-y-1.5">
       <div class="text-[10px] font-extrabold uppercase text-slate-600">
         Pilih Sub Rayon Tujuan Upload:
@@ -389,7 +404,6 @@ function renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bo
       </div>
     </div>
 
-    <!-- Form Upload untuk Sub Rayon Terpilih -->
     <div class="p-4 rounded-2xl bg-slate-50 border-2 border-blue-200 space-y-3">
       <div class="flex items-center justify-between border-b border-slate-200 pb-2">
         <div>
@@ -488,7 +502,7 @@ function renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bo
       judul: `Scan Dok Absensi Manual — Sub Rayon ${selectedUploadRayon}`,
       deskripsi,
       url_link: finalUrl,
-      status_tersedia: 'PESERTA' // Otomatis dapat diakses oleh Peserta di Sub Rayon tersebut & Panitia
+      status_tersedia: 'PESERTA'
     };
 
     await sb.from("info_layanan").upsert([payload]);
@@ -517,7 +531,6 @@ function renderUploadManualPerRayonBody(activeUser, sekolahList, panitiaList, bo
 
 // =========================================================================
 // 2. KARTU UNDUH PAKET DOKUMEN SPJ BOSP DI TAB ABSENSI PESERTA
-// (Hanya Mengunduh Absensi Manual Milik Sub Rayon Peserta Sendiri!)
 // =========================================================================
 function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
   if (!activeUser || activeUser.role !== 'peserta') return;
@@ -536,7 +549,6 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
   const canDownloadAbsen = Boolean(spjLockState.spj_absen);
   const canDownloadKwitansi = Boolean(spjLockState.spj_kwitansi && isLunas);
 
-  // Ambil khusus file Absensi Manual milik Sub Rayon sekolah ini saja!
   const myRayonManualRec = getManualAbsenForSubrayon(s.subrayon);
   const hasMyRayonManualUrl = Boolean(myRayonManualRec && myRayonManualRec.url_link && myRayonManualRec.url_link.trim() !== "");
 
@@ -575,7 +587,6 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
           </button>
         </div>
 
-        <!-- Tombol Download Absensi Manual KHUSUS Sub Rayon Peserta Sendiri -->
         <button type="button" id="btnDownloadAbsensiManual" class="w-full py-2.5 px-3 rounded-xl ${
           hasMyRayonManualUrl
             ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
@@ -644,7 +655,9 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
 }
 
 // =========================================================================
-// 3. PUSAT DOKUMEN LAPORAN / LPJ & BUKTI FISIK (11 KATEGORI + HAK AKSES 3 TINGKAT)
+// 3. PUSAT DOKUMEN LAPORAN / LPJ & BUKTI FISIK:
+// - USER PESERTA: HANYA MELIHAT & MENDOWNLOAD DOKUMEN HAK PESERTA MILIK DIRINYA & SUB RAYONNYA SENDIRI!
+// - USER PANITIA: MELIHAT SESUAI 3 TINGKAT HAK AKSES YANG DIATUR SEKRETARIS
 // =========================================================================
 export async function openLaporanLpjCenterModal(activeUser, sekolahList, panitiaList) {
   const modal = document.getElementById("serviceModal");
@@ -653,11 +666,14 @@ export async function openLaporanLpjCenterModal(activeUser, sekolahList, panitia
   if (!modal || !titleEl || !bodyEl) return;
 
   modal.classList.remove("hidden");
-  titleEl.innerHTML = `<i class="fa-solid fa-file-contract text-rose-700 mr-1.5"></i> Laporan / LPJ & Bukti Fisik Rakor`;
+  const isPeserta = activeUser?.role === "peserta";
+  titleEl.innerHTML = isPeserta
+    ? `<i class="fa-solid fa-file-shield text-rose-700 mr-1.5"></i> Dokumen Laporan & Bukti Hak Peserta`
+    : `<i class="fa-solid fa-file-contract text-rose-700 mr-1.5"></i> Laporan / LPJ & Bukti Fisik Rakor`;
 
   bodyEl.innerHTML = `
     <div class="p-6 text-center text-xs font-bold text-slate-500">
-      <i class="fa-solid fa-spinner animate-spin mr-1.5 text-rose-600"></i> Memuat arsip dokumen Laporan/LPJ sesuai hak akses Anda...
+      <i class="fa-solid fa-spinner animate-spin mr-1.5 text-rose-600"></i> Memuat dokumen sesuai otorisasi akun Anda...
     </div>
   `;
 
@@ -668,28 +684,34 @@ export async function openLaporanLpjCenterModal(activeUser, sekolahList, panitia
 function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl) {
   const isSecretariat = canManageSecretariatDocs(activeUser);
   const isPeserta = activeUser?.role === "peserta";
-  const userRayon = isPeserta ? activeUser.profile?.subrayon : null;
+  const mySchool = isPeserta
+    ? (sekolahList.find(x => x.id_sekolah === activeUser.profile?.id_sekolah) || activeUser.profile || {})
+    : null;
+  const userRayon = isPeserta ? (mySchool?.subrayon || "") : null;
 
-  // Bangun daftar seluruh item dokumen yang diizinkan tampil bagi pengguna yang sedang login
+  // Bangun daftar dokumen yang BISA dilihat oleh user yang sedang login
   const visibleDocItems = [];
 
   LPJ_DOC_CATEGORIES.forEach(cat => {
+    // Jika login Peserta dan kategori ini bukan hak peserta (misal Pajak/Honor/ATK/Konsumsi/Panitia), lewati mutlak!
+    if (isPeserta && !cat.allowForPeserta) return;
+
     if (cat.perRayon) {
-      // Jika login Peserta: hanya cek Sub Rayon miliknya sendiri!
-      // Jika login Panitia: tampilkan ke-6 Sub Rayon
-      const rayonsToCheck = isPeserta && userRayon ? [userRayon] : SUBRAYON_LIST;
+      // KUNCI UTAMA: Jika Peserta, HANYA periksa Sub Rayon miliknya sendiri! Sub Rayon lain tidak pernah dimuat.
+      const rayonsToCheck = isPeserta ? (userRayon ? [userRayon] : []) : SUBRAYON_LIST;
+
       rayonsToCheck.forEach(sr => {
         const rec = getLpjDocRecord(cat.code, sr);
         const accessLevel = rec?.status_tersedia || cat.defaultAccess;
         const hasUrl = Boolean(rec && rec.url_link && rec.url_link.trim() !== "");
 
-        if (isSecretariat || canUserViewLpjDoc(activeUser, accessLevel, sr)) {
+        if (isSecretariat || canUserViewLpjDoc(activeUser, cat, accessLevel, sr)) {
           visibleDocItems.push({
             cat,
             subrayon: sr,
             kode_menu: `lpj_${cat.code}_${srSlug(sr)}`,
-            title: `${cat.label.replace(' (Per Sub Rayon)', '')} — Sub Rayon ${sr}`,
-            desc: rec?.deskripsi || `Dokumen resmi ${cat.label} untuk wilayah Sub Rayon ${sr}`,
+            title: `${cat.label.replace(/^\d+\.\s*/, '').replace(' (Per Sub Rayon)', '')} — Sub Rayon ${sr}`,
+            desc: rec?.deskripsi || `Dokumen resmi bukti ${cat.label.replace(/^\d+\.\s*/, '').replace(' (Per Sub Rayon)', '')} khusus wilayah Sub Rayon ${sr}.`,
             url: rec?.url_link || "",
             hasUrl,
             accessLevel
@@ -701,13 +723,13 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
       const accessLevel = rec?.status_tersedia || cat.defaultAccess;
       const hasUrl = Boolean(rec && rec.url_link && rec.url_link.trim() !== "");
 
-      if (isSecretariat || canUserViewLpjDoc(activeUser, accessLevel, null)) {
+      if (isSecretariat || canUserViewLpjDoc(activeUser, cat, accessLevel, null)) {
         visibleDocItems.push({
           cat,
           subrayon: null,
           kode_menu: `lpj_${cat.code}`,
-          title: cat.label,
-          desc: rec?.deskripsi || `Arsip scan dokumen ${cat.label} Rakor K3S 2026`,
+          title: cat.label.replace(/^\d+\.\s*/, ''),
+          desc: rec?.deskripsi || `Arsip dokumen resmi ${cat.label.replace(/^\d+\.\s*/, '')} Rakor K3S 2026.`,
           url: rec?.url_link || "",
           hasUrl,
           accessLevel
@@ -718,28 +740,96 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
 
   const totalUploaded = visibleDocItems.filter(d => d.hasUrl).length;
 
+  // JIKA LOGIN PESERTA -> TAMPILKAN JUGA KARTU BUKTI PRIBADI SEKOLAHNYA (INDIVIDU, KOLEKTIF RAYONNYA, & KWITANSI SEKOLAHNYA)
+  let pesertaPersonalDocsCard = "";
+  if (isPeserta && mySchool) {
+    const canAbsenPdf = Boolean(spjLockState.spj_absen);
+    const canKwitansiPdf = Boolean(spjLockState.spj_kwitansi && mySchool.status_bayar === "Lunas");
+
+    pesertaPersonalDocsCard = `
+      <div class="p-4 rounded-3xl bg-blue-50/90 border-2 border-blue-200 space-y-2.5 shadow-2xs">
+        <div class="flex items-center justify-between border-b border-blue-200/80 pb-2">
+          <div>
+            <span class="text-[9px] font-extrabold uppercase bg-blue-900 text-amber-300 px-2 py-0.5 rounded">
+              Dokumen Pribadi Sekolah Anda
+            </span>
+            <h5 class="font-extrabold text-xs text-slate-900 mt-1">${mySchool.nama_sekolah} (Sub Rayon ${userRayon})</h5>
+          </div>
+          <i class="fa-solid fa-user-lock text-blue-800 text-base" title="Terkunci Khusus Sekolah Anda"></i>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="lpjBtnMyIndividuPdf" class="p-2.5 rounded-xl border text-left transition ${
+            canAbsenPdf ? 'bg-white hover:bg-blue-50 border-blue-300 text-blue-950 shadow-2xs' : 'bg-slate-100 border-slate-200 text-slate-400'
+          }">
+            <div class="flex items-center justify-between">
+              <i class="fa-solid fa-file-pdf ${canAbsenPdf ? 'text-rose-600' : 'text-slate-400'} text-sm"></i>
+              <span class="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded ${canAbsenPdf ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">
+                ${canAbsenPdf ? 'Siap Unduh' : 'Terkunci'}
+              </span>
+            </div>
+            <div class="text-[11px] font-extrabold mt-1.5">Daftar Hadir Individu</div>
+            <div class="text-[9px] opacity-75 truncate">${mySchool.nama_kepsek || mySchool.nama_sekolah}</div>
+          </button>
+
+          <button type="button" id="lpjBtnMyKolektifPdf" class="p-2.5 rounded-xl border text-left transition ${
+            canAbsenPdf ? 'bg-white hover:bg-indigo-50 border-indigo-300 text-indigo-950 shadow-2xs' : 'bg-slate-100 border-slate-200 text-slate-400'
+          }">
+            <div class="flex items-center justify-between">
+              <i class="fa-solid fa-users-rectangle ${canAbsenPdf ? 'text-indigo-700' : 'text-slate-400'} text-sm"></i>
+              <span class="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded ${canAbsenPdf ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">
+                ${canAbsenPdf ? 'Siap Unduh' : 'Terkunci'}
+              </span>
+            </div>
+            <div class="text-[11px] font-extrabold mt-1.5">Kolektif Rayon ${userRayon}</div>
+            <div class="text-[9px] opacity-75 truncate">Khusus Sub Rayon Anda</div>
+          </button>
+        </div>
+
+        <button type="button" id="lpjBtnMyKwitansiPdf" class="w-full py-2.5 px-3 rounded-xl border font-extrabold text-[11px] flex items-center justify-between transition ${
+          canKwitansiPdf ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow' : 'bg-slate-100 border-slate-200 text-slate-400'
+        }">
+          <span><i class="fa-solid fa-file-invoice-dollar mr-1.5"></i>E-Kwitansi BOSP ${mySchool.nama_sekolah}</span>
+          <span class="text-[9px] px-2 py-0.5 rounded ${canKwitansiPdf ? 'bg-amber-300 text-slate-950' : 'bg-slate-200 text-slate-500'}">
+            ${canKwitansiPdf ? 'Download PDF' : (mySchool.status_bayar || 'Menunggu Otorisasi')}
+          </span>
+        </button>
+      </div>
+    `;
+  }
+
   bodyEl.innerHTML = `
     <!-- Header Ringkasan Arsip LPJ -->
     <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-rose-950 to-slate-900 text-white space-y-2.5 shadow-lg border border-rose-500/30">
       <div class="flex items-center justify-between">
         <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
-          ${isSecretariat ? 'Mode Pengelola penuh (Sekretaris)' : (isPeserta ? `Akses Peserta • Sub Rayon ${userRayon}` : `Akses ${activeUser?.profile?.divisi || 'Panitia'}`)}
+          ${isSecretariat
+            ? 'Mode Pengelola Penuh (Sekretaris)'
+            : isPeserta
+            ? `Khusus Hak Peserta • Sub Rayon ${userRayon}`
+            : `Akses ${activeUser?.profile?.divisi || 'Panitia'}`}
         </span>
-        <span class="text-[10px] font-extrabold text-emerald-300">${totalUploaded}/${visibleDocItems.length} Tersedia</span>
+        <span class="text-[10px] font-extrabold text-emerald-300">${totalUploaded}/${visibleDocItems.length} Dokumen Tersedia</span>
       </div>
 
       <div>
-        <h4 class="text-sm font-extrabold text-white">Arsip Laporan / LPJ & Scan Bukti Pertanggungjawaban</h4>
-        <p class="text-[10px] text-rose-200 mt-0.5">
-          ${isSecretariat
-            ? 'Unggah ke-11 kategori dokumen scan LPJ dan atur hak akses (Peserta / Panitia / Panitia Inti) pada setiap dokumen.'
-            : 'Menampilkan daftar dokumen pertanggungjawaban yang diizinkan untuk akun Anda.'}
+        <h4 class="text-sm font-extrabold text-white">
+          ${isPeserta
+            ? `Dokumen Laporan & Bukti Hak Peserta — Sub Rayon ${userRayon}`
+            : 'Arsip Laporan / LPJ & Scan Bukti Pertanggungjawaban'}
+        </h4>
+        <p class="text-[10px] text-rose-200 mt-0.5 leading-relaxed">
+          ${isPeserta
+            ? `Menampilkan dokumen pertanggungjawaban yang terkait langsung dengan sekolah Anda dan wilayah <b>Sub Rayon ${userRayon}</b> (Dokumen peserta/sub rayon lain tidak ditampilkan).`
+            : isSecretariat
+            ? 'Unggah ke-12 kategori dokumen scan LPJ dan atur hak akses (Peserta / Panitia / Panitia Inti) pada setiap dokumen.'
+            : 'Menampilkan daftar dokumen pertanggungjawaban yang diizinkan untuk jabatan kepanitiaan Anda.'}
         </p>
       </div>
 
       ${isSecretariat ? `
         <div class="pt-1 border-t border-white/10 flex items-center justify-between gap-2">
-          <span class="text-[10px] text-amber-300 font-bold">
+          <span class="text-[10px] font-bold text-amber-300">
             <i class="fa-solid fa-plus-circle mr-1"></i> Kelola / Upload Dokumen LPJ:
           </span>
           <button type="button" id="btnToggleLpjUploadPanel" class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[11px] shadow">
@@ -748,6 +838,8 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
         </div>
       ` : ''}
     </div>
+
+    ${pesertaPersonalDocsCard}
 
     <!-- PANEL UPLOAD & PENGATURAN HAK AKSES 3 KATEGORI (KHUSUS SEKRETARIS & KESEKRETARIATAN) -->
     <div id="secretariatLpjUploadBox" class="hidden p-4 rounded-2xl bg-blue-50 border-2 border-blue-300 space-y-3 shadow-sm">
@@ -766,7 +858,7 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
       </div>
 
       <div id="lpjInpRayonWrapper">
-        <label class="block text-[10px] font-bold text-blue-950 mb-1">2. Pilih Wilayah Sub Rayon (Khusus Dokumen Per Sub Rayon):</label>
+        <label class="block text-[10px] font-bold text-blue-950 mb-1">2. Pilih Wilayah Sub Rayon (Peserta Hanya Bisa Melihat Sub Rayon-nya Sendiri):</label>
         <select id="lpjInpSubrayon" class="w-full rounded-xl border-2 border-blue-400 bg-white px-3 py-2 text-xs font-extrabold text-blue-950">
           ${SUBRAYON_LIST.map(sr => `<option value="${sr}">Sub Rayon ${sr}</option>`).join('')}
         </select>
@@ -775,7 +867,7 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
       <div>
         <label class="block text-[10px] font-bold text-slate-700 mb-1">3. Tentukan Kategori Hak Akses (Siapa yang Bisa Melihat & Download):</label>
         <select id="lpjInpAccessLevel" class="w-full rounded-xl border border-blue-300 bg-white px-3 py-2 text-xs font-extrabold text-emerald-900">
-          <option value="PESERTA">🟢 Peserta (Sesuai Sub Rayon) & Seluruh Panitia</option>
+          <option value="PESERTA">🟢 Peserta (Terkunci Hanya Sub Rayon Terkait) & Panitia</option>
           <option value="PANITIA">🔵 Hanya Panitia (Seluruh Anggota & Koordinator Panitia)</option>
           <option value="PANITIA_INTI">🔴 Khusus Panitia Inti (Penanggung Jawab, Ketua, Sekretaris, Bendahara)</option>
         </select>
@@ -807,23 +899,47 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
       </div>
     </div>
 
-    <!-- Filter Kategori Dokumen -->
-    <div class="grid grid-cols-2 gap-2">
-      <select id="lpjFilterAccessSelect" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-slate-800">
-        <option value="ALL" ${selectedLpjFilterAccess === 'ALL' ? 'selected' : ''}>Semua Dokumen (${visibleDocItems.length})</option>
-        <option value="AVAILABLE" ${selectedLpjFilterAccess === 'AVAILABLE' ? 'selected' : ''}>✓ Sudah Diunggah (${totalUploaded})</option>
-        <option value="PESERTA" ${selectedLpjFilterAccess === 'PESERTA' ? 'selected' : ''}>Hak Akses: Peserta</option>
-        ${!isPeserta ? `<option value="PANITIA" ${selectedLpjFilterAccess === 'PANITIA' ? 'selected' : ''}>Hak Akses: Panitia</option>` : ''}
-        ${isUserPanitiaInti(activeUser) || isSecretariat ? `<option value="PANITIA_INTI" ${selectedLpjFilterAccess === 'PANITIA_INTI' ? 'selected' : ''}>Hak Akses: Panitia Inti</option>` : ''}
-      </select>
-      <input id="lpjSearchInput" type="text" placeholder="Cari nama dokumen / rayon..." class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold" />
-    </div>
+    <!-- Filter & Pencarian (Disederhanakan untuk Peserta agar fokus pada dokumen Sub Rayon-nya) -->
+    ${!isPeserta ? `
+      <div class="grid grid-cols-2 gap-2">
+        <select id="lpjFilterAccessSelect" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-slate-800">
+          <option value="ALL" ${selectedLpjFilterAccess === 'ALL' ? 'selected' : ''}>Semua Dokumen (${visibleDocItems.length})</option>
+          <option value="AVAILABLE" ${selectedLpjFilterAccess === 'AVAILABLE' ? 'selected' : ''}>✓ Sudah Diunggah (${totalUploaded})</option>
+          <option value="PESERTA" ${selectedLpjFilterAccess === 'PESERTA' ? 'selected' : ''}>Hak Akses: Peserta</option>
+          <option value="PANITIA" ${selectedLpjFilterAccess === 'PANITIA' ? 'selected' : ''}>Hak Akses: Panitia</option>
+          ${isUserPanitiaInti(activeUser) || isSecretariat ? `<option value="PANITIA_INTI" ${selectedLpjFilterAccess === 'PANITIA_INTI' ? 'selected' : ''}>Hak Akses: Panitia Inti</option>` : ''}
+        </select>
+        <input id="lpjSearchInput" type="text" placeholder="Cari nama dokumen / rayon..." class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold" />
+      </div>
+    ` : `
+      <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 px-1">
+        Daftar Dokumen Scan Bukti Fisik Sub Rayon ${userRayon} (${visibleDocItems.length} Dokumen):
+      </div>
+    `}
 
     <!-- Daftar Dokumen LPJ -->
     <div id="lpjDocsListContainer" class="space-y-2 max-h-96 overflow-y-auto pr-0.5"></div>
   `;
 
-  // sinkronisasi form upload Sekretaris saat memilih kategori
+  // Event Listener untuk Kartu Dokumen Pribadi Peserta (Jika Login Peserta)
+  if (isPeserta && mySchool) {
+    document.getElementById("lpjBtnMyIndividuPdf")?.addEventListener("click", () => {
+      if (!spjLockState.spj_absen) return toast("Unduhan Daftar Hadir sedang menunggu aktivasi Sekretaris Panitia.");
+      generatePdfDaftarHadirIndividu(mySchool);
+    });
+    document.getElementById("lpjBtnMyKolektifPdf")?.addEventListener("click", () => {
+      if (!spjLockState.spj_absen) return toast("Unduhan Daftar Hadir Kolektif sedang menunggu aktivasi Sekretaris Panitia.");
+      const srSchools = sekolahList.filter(x => x.subrayon === mySchool.subrayon);
+      const ketua = (panitiaList || []).find(p => p.tugas_subrayon === mySchool.subrayon);
+      generatePdfDaftarHadirKolektif(mySchool.subrayon, srSchools, ketua);
+    });
+    document.getElementById("lpjBtnMyKwitansiPdf")?.addEventListener("click", () => {
+      if (!spjLockState.spj_kwitansi) return toast("Unduhan E-Kwitansi sedang menunggu aktivasi Bendahara Panitia.");
+      if (mySchool.status_bayar !== "Lunas") return toast("E-Kwitansi hanya dapat diunduh setelah status kontribusi sekolah Anda tercatat LUNAS.");
+      generatePdfEKwitansiBosp(mySchool);
+    });
+  }
+
   const catSel = document.getElementById("lpjInpCatCode");
   const rayonWrap = document.getElementById("lpjInpRayonWrapper");
   const rayonSel = document.getElementById("lpjInpSubrayon");
@@ -895,8 +1011,8 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
 
     const kodeMenu = sr ? `lpj_${code}_${srSlug(sr)}` : `lpj_${code}`;
     const judul = sr
-      ? `${catObj.label.replace(' (Per Sub Rayon)', '')} — Sub Rayon ${sr}`
-      : catObj.label;
+      ? `${catObj.label.replace(/^\d+\.\s*/, '').replace(' (Per Sub Rayon)', '')} — Sub Rayon ${sr}`
+      : catObj.label.replace(/^\d+\.\s*/, '');
 
     await sb.from("info_layanan").upsert([{
       kode_menu: kodeMenu,
@@ -920,28 +1036,29 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
     const kw = (document.getElementById("lpjSearchInput")?.value || "").toLowerCase().trim();
     let filtered = visibleDocItems;
 
-    if (selectedLpjFilterAccess === "AVAILABLE") {
-      filtered = filtered.filter(d => d.hasUrl);
-    } else if (["PESERTA", "PANITIA", "PANITIA_INTI"].includes(selectedLpjFilterAccess)) {
-      filtered = filtered.filter(d => d.accessLevel === selectedLpjFilterAccess);
-    }
-
-    if (kw) {
-      filtered = filtered.filter(d =>
-        d.title.toLowerCase().includes(kw) ||
-        d.desc.toLowerCase().includes(kw) ||
-        (d.subrayon || "").toLowerCase().includes(kw)
-      );
+    if (!isPeserta) {
+      if (selectedLpjFilterAccess === "AVAILABLE") {
+        filtered = filtered.filter(d => d.hasUrl);
+      } else if (["PESERTA", "PANITIA", "PANITIA_INTI"].includes(selectedLpjFilterAccess)) {
+        filtered = filtered.filter(d => d.accessLevel === selectedLpjFilterAccess);
+      }
+      if (kw) {
+        filtered = filtered.filter(d =>
+          d.title.toLowerCase().includes(kw) ||
+          d.desc.toLowerCase().includes(kw) ||
+          (d.subrayon || "").toLowerCase().includes(kw)
+        );
+      }
     }
 
     if (filtered.length === 0) {
-      listBox.innerHTML = `<div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">Tidak ada dokumen pada filter ini.</div>`;
+      listBox.innerHTML = `<div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">Belum ada dokumen yang tersedia untuk wilayah Anda.</div>`;
       return;
     }
 
     listBox.innerHTML = "";
     filtered.forEach(item => {
-      const badge = getAccessBadgeLabel(item.accessLevel);
+      const badge = getAccessBadgeLabel(item.accessLevel, item.subrayon);
       const card = document.createElement("div");
       card.className = `p-3.5 rounded-2xl bg-white border ${item.hasUrl ? 'border-emerald-300' : 'border-slate-200'} shadow-2xs space-y-2`;
       card.innerHTML = `
@@ -969,7 +1086,7 @@ function renderLaporanLpjCenterBody(activeUser, sekolahList, panitiaList, bodyEl
             </a>
           ` : `
             <div class="flex-1 py-2 px-3 rounded-xl bg-slate-50 text-slate-400 font-bold text-[10px] text-center border border-slate-200/70">
-              Menunggu unggahan dari Sekretaris / Kesekretariatan
+              Menunggu unggahan dari Sekretaris Panitia
             </div>
           `}
 
