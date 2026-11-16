@@ -654,7 +654,7 @@ function injectPesertaSpjDownloadCard(activeUser, sekolahList, panitiaList) {
   });
 
   document.getElementById("btnDownloadSpjKolektif")?.addEventListener("click", () => {
-    const srSchools = sekolahList.filter(x => x.subrayon === s.subrayon);
+    const srSchools = sekolahList.filter(x => x.subrayon === s.subrayon && x.status_ikut === "Ikut");
     const ketua = panitiaList.find(p => p.tugas_subrayon === s.subrayon);
     generatePdfDaftarHadirKolektif(s.subrayon, srSchools, ketua);
   });
@@ -1194,17 +1194,19 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     const box = findMejaLayananCardElement();
     if (!box) return;
 
-    const totalSek = sekolahList.length || 160;
-    const h1Count = sekolahList.filter(s => s.hadir_h1).length;
-    const h2Count = sekolahList.filter(s => s.hadir_h2).length;
-    const h3Count = sekolahList.filter(s => s.hadir_h3).length;
-    const kitCount = sekolahList.filter(s => s.ambil_kit).length;
-    const transCount = sekolahList.filter(s => s.terima_transport).length;
+    // HANYA hitung dari sekolah yang berstatus "Ikut"!
+    const ikutList = (sekolahList || []).filter(s => s.status_ikut === "Ikut");
+    const totalIkut = ikutList.length;
+    const h1Count = ikutList.filter(s => s.hadir_h1).length;
+    const h2Count = ikutList.filter(s => s.hadir_h2).length;
+    const h3Count = ikutList.filter(s => s.hadir_h3).length;
+    const kitCount = ikutList.filter(s => s.ambil_kit).length;
+    const transCount = ikutList.filter(s => s.terima_transport).length;
 
     const canUploadManual = canManageSecretariatDocs(activeUser);
     const uploadedRayonCount = SUBRAYON_LIST.filter(sr => Boolean(getManualAbsenForSubrayon(sr)?.url_link)).length;
 
-    const currentSig = `${activeUser.profile?.id_panitia || ''}|${totalSek}|${h1Count}|${h2Count}|${h3Count}|${kitCount}|${transCount}|${canUploadManual}|${uploadedRayonCount}`;
+    const currentSig = `${activeUser.profile?.id_panitia || ''}|${totalIkut}|${h1Count}|${h2Count}|${h3Count}|${kitCount}|${transCount}|${canUploadManual}|${uploadedRayonCount}`;
     const existingUpgraded = box.querySelector("#upgradedMejaLayananStatsGrid");
     if (existingUpgraded && existingUpgraded.dataset.sig === currentSig) {
       return;
@@ -1238,36 +1240,36 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
     targetSlot.innerHTML = `
       <div class="grid grid-cols-3 gap-2 text-center">
         <div data-trackday="H1" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 cursor-pointer transition">
-          <div class="text-sm font-extrabold text-amber-300">${h1Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-amber-300">${h1Count}<span class="text-[10px] font-normal text-slate-300">/${totalIkut}</span></div>
           <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H1 (26/11)</div>
-          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h1Count}</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${Math.max(0, totalIkut - h1Count)}</div>
         </div>
         <div data-trackday="H2" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 cursor-pointer transition">
-          <div class="text-sm font-extrabold text-amber-300">${h2Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-amber-300">${h2Count}<span class="text-[10px] font-normal text-slate-300">/${totalIkut}</span></div>
           <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H2 (27/11)</div>
-          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h2Count}</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${Math.max(0, totalIkut - h2Count)}</div>
         </div>
         <div data-trackday="H3" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 cursor-pointer transition">
-          <div class="text-sm font-extrabold text-amber-300">${h3Count}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-amber-300">${h3Count}<span class="text-[10px] font-normal text-slate-300">/${totalIkut}</span></div>
           <div class="text-[9px] font-bold text-blue-200 uppercase">Hadir H3 (28/11)</div>
-          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${totalSek - h3Count}</div>
+          <div class="text-[8px] font-bold text-rose-300 mt-0.5">Belum: ${Math.max(0, totalIkut - h3Count)}</div>
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2 text-center">
         <div data-trackday="KIT" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 flex items-center justify-between px-3 cursor-pointer transition">
           <div class="text-left">
-            <div class="text-[9px] font-bold text-emerald-200 uppercase">Rakor Kit</div>
-            <div class="text-[8px] font-bold text-rose-300">Belum: ${totalSek - kitCount}</div>
+            <div class="text-[9px] font-bold text-emerald-200 uppercase">Rakor Kit (Ikut)</div>
+            <div class="text-[8px] font-bold text-rose-300">Belum: ${Math.max(0, totalIkut - kitCount)}</div>
           </div>
-          <div class="text-sm font-extrabold text-emerald-300">${kitCount}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-emerald-300">${kitCount}<span class="text-[10px] font-normal text-slate-300">/${totalIkut}</span></div>
         </div>
         <div data-trackday="TRANS" class="btn-quick-track-day bg-white/10 hover:bg-white/15 rounded-2xl p-2 border border-white/10 flex items-center justify-between px-3 cursor-pointer transition">
           <div class="text-left">
-            <div class="text-[9px] font-bold text-sky-200 uppercase">Transpor</div>
-            <div class="text-[8px] font-bold text-rose-300">Belum: ${totalSek - transCount}</div>
+            <div class="text-[9px] font-bold text-sky-200 uppercase">Transpor (Ikut)</div>
+            <div class="text-[8px] font-bold text-rose-300">Belum: ${Math.max(0, totalIkut - transCount)}</div>
           </div>
-          <div class="text-sm font-extrabold text-sky-300">${transCount}<span class="text-[10px] font-normal text-slate-300">/${totalSek}</span></div>
+          <div class="text-sm font-extrabold text-sky-300">${transCount}<span class="text-[10px] font-normal text-slate-300">/${totalIkut}</span></div>
         </div>
       </div>
 
@@ -1275,7 +1277,7 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
         <button type="button" id="btnOpenAttendanceTrackerModal" class="w-full py-2.5 px-3 rounded-2xl bg-white/15 hover:bg-white/25 border border-amber-400/40 text-white font-extrabold text-xs shadow flex items-center justify-between active:scale-[0.99] transition">
           <div class="flex items-center gap-2">
             <i class="fa-solid fa-user-clock text-amber-300"></i>
-            <span>Rekap Kehadiran & Lacak Peserta Belum Absen</span>
+            <span>Rekap Kehadiran & Lacak Peserta Ikut (${totalIkut} Sekolah)</span>
           </div>
           <span class="text-[9px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-extrabold">Lacak</span>
         </button>
@@ -1333,7 +1335,7 @@ function upgradeMejaLayananCardWithAttendanceTracker(activeUser, sekolahList) {
 }
 
 // =========================================================================
-// MODAL PELACAK KEHADIRAN PESERTA
+// MODAL PELACAK KEHADIRAN PESERTA (KHUSUS SEKOLAH YANG TERDATA "IKUT")
 // =========================================================================
 export function openAttendanceTrackerModal(activeUser, sekolahList) {
   const user = currentActiveUserRef || activeUser;
@@ -1346,7 +1348,7 @@ export function openAttendanceTrackerModal(activeUser, sekolahList) {
   if (!modal || !titleEl || !bodyEl) return;
 
   modal.classList.remove("hidden");
-  titleEl.innerHTML = `<i class="fa-solid fa-user-clock text-blue-700 mr-1.5"></i> Pelacak Kehadiran & Layanan Peserta`;
+  titleEl.innerHTML = `<i class="fa-solid fa-user-clock text-blue-700 mr-1.5"></i> Pelacak Kehadiran & Layanan Peserta (Ikut)`;
 
   if (user.profile?.tugas_subrayon && selectedRekapRayon === "ALL") {
     selectedRekapRayon = user.profile.tugas_subrayon;
@@ -1368,16 +1370,18 @@ function getLabelByTrackKey(key) {
   if (key === "H1") return "Absensi Hari Ke-1 (Kamis, 26 Nov 2026)";
   if (key === "H2") return "Absensi Hari Ke-2 (Jumat, 27 Nov 2026)";
   if (key === "H3") return "Absensi Hari Ke-3 (Sabtu, 28 Nov 2026)";
-  if (key === "KIT") return "Pengambilan Rakor Kit";
-  if (key === "TRANS") return "Penerimaan Uang Transpor";
-  return "Absensi Peserta";
+  if (key === "KIT") return "Pengambilan Rakor Kit (Peserta Ikut)";
+  if (key === "TRANS") return "Penerimaan Uang Transpor (Peserta Ikut)";
+  return "Absensi Peserta Aktif";
 }
 
 function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
-  const totalSek = sekolahList.length || 160;
-  const sudahCount = sekolahList.filter(s => getFieldByTrackKey(s, selectedRekapDay)).length;
-  const belumCount = totalSek - sudahCount;
-  const pct = totalSek > 0 ? Math.round((sudahCount / totalSek) * 100) : 0;
+  // Filter hanya sekolah yang berstatus "Ikut"
+  const ikutSchools = (sekolahList || []).filter(s => s.status_ikut === "Ikut");
+  const totalIkut = ikutSchools.length;
+  const sudahCount = ikutSchools.filter(s => getFieldByTrackKey(s, selectedRekapDay)).length;
+  const belumCount = Math.max(0, totalIkut - sudahCount);
+  const pct = totalIkut > 0 ? Math.round((sudahCount / totalIkut) * 100) : 0;
 
   bodyEl.innerHTML = `
     <div class="grid grid-cols-5 gap-1 bg-slate-100 p-1 rounded-2xl text-center">
@@ -1399,7 +1403,7 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
         <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
           ${getLabelByTrackKey(selectedRekapDay)}
         </span>
-        <span class="text-xs font-extrabold text-emerald-300">${pct}% Selesai</span>
+        <span class="text-xs font-extrabold text-emerald-300">${pct}% dari Peserta Ikut</span>
       </div>
 
       <div class="w-full bg-white/15 h-2 rounded-full overflow-hidden">
@@ -1411,34 +1415,34 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
           selectedRekapStatus === 'BELUM' ? 'bg-rose-600 border-amber-300 text-white ring-2 ring-amber-300/40' : 'bg-rose-500/20 border-rose-400/30 text-rose-200'
         }">
           <div class="text-sm font-extrabold">${belumCount}</div>
-          <div class="text-[9px] font-bold uppercase">Belum Absen</div>
+          <div class="text-[9px] font-bold uppercase">Belum (Ikut)</div>
         </button>
         <button type="button" data-st="SUDAH" class="track-status-btn p-2 rounded-2xl border transition ${
           selectedRekapStatus === 'SUDAH' ? 'bg-emerald-600 border-amber-300 text-white ring-2 ring-amber-300/40' : 'bg-emerald-500/20 border-emerald-400/30 text-emerald-200'
         }">
           <div class="text-sm font-extrabold">${sudahCount}</div>
-          <div class="text-[9px] font-bold uppercase">Sudah Absen</div>
+          <div class="text-[9px] font-bold uppercase">Sudah Selesai</div>
         </button>
         <button type="button" data-st="ALL" class="track-status-btn p-2 rounded-2xl border transition ${
           selectedRekapStatus === 'ALL' ? 'bg-blue-600 border-amber-300 text-white ring-2 ring-amber-300/40' : 'bg-white/10 border-white/15 text-slate-200'
         }">
-          <div class="text-sm font-extrabold">${totalSek}</div>
-          <div class="text-[9px] font-bold uppercase">Semua</div>
+          <div class="text-sm font-extrabold">${totalIkut}</div>
+          <div class="text-[9px] font-bold uppercase">Total Ikut</div>
         </button>
       </div>
     </div>
 
     <div class="grid grid-cols-3 gap-1.5">
       ${SUBRAYON_LIST.map(sr => {
-        const srList = sekolahList.filter(s => s.subrayon === sr);
+        const srList = ikutSchools.filter(s => s.subrayon === sr);
         const srSudah = srList.filter(s => getFieldByTrackKey(s, selectedRekapDay)).length;
-        const srBelum = srList.length - srSudah;
+        const srBelum = Math.max(0, srList.length - srSudah);
         const activeSr = selectedRekapRayon === sr;
         return `
           <div data-sr="${sr}" class="track-sr-pill p-2 rounded-xl border cursor-pointer text-center transition ${
             activeSr ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-500/20' : 'bg-slate-50 border-slate-200 hover:bg-white'
           }">
-            <div class="text-[10px] font-extrabold text-slate-900 truncate">${sr}</div>
+            <div class="text-[10px] font-extrabold text-slate-900 truncate">${sr} (${srList.length})</div>
             <div class="text-[9px] font-bold mt-0.5">
               <span class="text-emerald-700">${srSudah}✓</span> • <span class="text-rose-600 font-extrabold">${srBelum}✕</span>
             </div>
@@ -1449,8 +1453,11 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
 
     <div class="grid grid-cols-2 gap-2">
       <select id="trackFilterRayonSelect" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-blue-950">
-        <option value="ALL" ${selectedRekapRayon === 'ALL' ? 'selected' : ''}>Semua Sub Rayon (${totalSek})</option>
-        ${SUBRAYON_LIST.map(sr => `<option value="${sr}" ${selectedRekapRayon === sr ? 'selected' : ''}>Sub Rayon ${sr}</option>`).join('')}
+        <option value="ALL" ${selectedRekapRayon === 'ALL' ? 'selected' : ''}>Semua Sub Rayon (${totalIkut} Ikut)</option>
+        ${SUBRAYON_LIST.map(sr => {
+          const c = ikutSchools.filter(x => x.subrayon === sr).length;
+          return `<option value="${sr}" ${selectedRekapRayon === sr ? 'selected' : ''}>Rayon ${sr} (${c} Ikut)</option>`;
+        }).join('')}
       </select>
       <input id="trackSearchSchoolInput" type="text" placeholder="Cari sekolah / Kepsek..." class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold" />
     </div>
@@ -1486,10 +1493,72 @@ function renderAttendanceTrackerBody(activeUser, sekolahList, bodyEl) {
   });
 
   document.getElementById("trackSearchSchoolInput")?.addEventListener("input", () => {
-    renderTrackedParticipantRows(sekolahList);
+    renderTrackedParticipantRows(ikutSchools);
   });
 
-  renderTrackedParticipantRows(sekolahList);
+  renderTrackedParticipantRows(ikutSchools);
+}
+
+function renderTrackedParticipantRows(ikutSchools) {
+  const box = document.getElementById("trackParticipantListContainer");
+  if (!box) return;
+
+  const kw = (document.getElementById("trackSearchSchoolInput")?.value || "").toLowerCase().trim();
+
+  let list = ikutSchools;
+  if (selectedRekapRayon !== "ALL") {
+    list = list.filter(s => s.subrayon === selectedRekapRayon);
+  }
+  if (selectedRekapStatus === "BELUM") {
+    list = list.filter(s => !getFieldByTrackKey(s, selectedRekapDay));
+  } else if (selectedRekapStatus === "SUDAH") {
+    list = list.filter(s => getFieldByTrackKey(s, selectedRekapDay));
+  }
+  if (kw) {
+    list = list.filter(s =>
+      (s.nama_sekolah || "").toLowerCase().includes(kw) ||
+      (s.nama_kepsek || "").toLowerCase().includes(kw) ||
+      String(s.npsn || "").includes(kw)
+    );
+  }
+
+  if (list.length === 0) {
+    box.innerHTML = `<div class="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">Tidak ada peserta aktif (Ikut) pada filter ini.</div>`;
+    return;
+  }
+
+  box.innerHTML = list.slice(0, 200).map((s, idx) => {
+    const isDone = getFieldByTrackKey(s, selectedRekapDay);
+    const waClean = String(s.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
+    const hasIzin = Boolean(s.status_izin && s.status_izin.trim() !== "" && s.status_izin !== "Hadir Penuh (Tanpa Izin)");
+
+    return `
+      <div class="p-3 rounded-2xl bg-white border ${isDone ? 'border-emerald-300' : 'border-rose-200 bg-rose-50/20'} flex items-start justify-between gap-2 shadow-2xs">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
+            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${isDone ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+              ${isDone ? '✓ SUDAH TERCATAT' : '✕ BELUM TERCATAT'}
+            </span>
+            <span class="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">Rayon ${s.subrayon}</span>
+            ${hasIzin ? `<span class="text-[9px] font-extrabold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">Izin: ${s.status_izin}</span>` : ''}
+          </div>
+          <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
+          <p class="text-[10px] text-slate-600 mt-0.5">
+            Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • Kamar: <b>${s.nomor_kamar || '-'}</b>
+          </p>
+        </div>
+
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          ${s.no_hp ? `
+            <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] flex items-center gap-1 shadow-2xs">
+              <i class="fa-brands fa-whatsapp"></i> Hubungi
+            </a>
+          ` : `<span class="text-[9px] text-slate-400">Tanpa No WA</span>`}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderTrackedParticipantRows(sekolahList) {
