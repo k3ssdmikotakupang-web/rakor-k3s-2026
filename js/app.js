@@ -1,4 +1,5 @@
 // js/app.js
+// js/app.js
 import { sb, toast } from './supabase.js';
 import { initLogin } from './login.js';
 import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from './jadwal.js';
@@ -9,7 +10,6 @@ import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifik
 import { renderPosScannerWidgets } from './scanner_pos.js';
 import { renderCatatanPanitiaWidget } from './catatan.js';
 import {
-  TARIF_KONTRIBUSI_DEFAULT,
   formatRupiah,
   canAccessInfoKeuangan,
   canEditPaymentAndParticipation,
@@ -23,6 +23,9 @@ import { applyK3sLogoBranding, renderK3sMusicPlayerWidget } from './branding_aud
 import { renderSpjBospWidgets } from './spj_bosp.js';
 import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
 import { renderProdukRakorAndUniformCards } from './produk_rakor.js';
+
+// Tetapkan nilai default tarif kontribusi Rp 2.000.000 secara mandiri di sini
+const TARIF_KONTRIBUSI_DEFAULT = 2000000;
 
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
