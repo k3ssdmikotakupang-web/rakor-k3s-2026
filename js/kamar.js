@@ -1,27 +1,32 @@
 // js/kamar.js
-// Sistem Manajemen Kamar Hotel Rakor K3S 2026 (Peserta & Khusus Panitia):
-// 1. Peserta: Hanya melihat kamarnya sendiri dan teman sekamarnya.
-// 2. Ketua Panitia: Menginput nomor kamar, kapasitas, & peruntukan (Kamar Peserta / Kamar Khusus Panitia) dengan validasi anti-ganda.
-// 3. Panitia Inti (PJ, Ketua, Sekretaris, Bendahara): Melihat data rekapitulasi jumlah kamar hotel (Peserta & Panitia).
-// 4. Ketua Sub Rayon (+ Ketua & Sekretaris): Menentukan penghuni kamar peserta (validasi anti-melebihi kapasitas).
-// 5. Ketua Panitia & Sekretaris: Mengatur penghuni Kamar Khusus Panitia + Download Dokumen Rekapan Kamar (PDF & Spreadsheet Excel/CSV).
+// Sistem Manajemen Kamar Hotel Rakor K3S 2026 (Validasi Ketat Hanya untuk Peserta Berstatus "Ikut"):
+// 1. Hanya sekolah yang berstatus "Ikut" yang dapat dialokasikan ke dalam kamar hotel.
+// 2. Peserta: Hanya melihat kamarnya sendiri dan teman sekamarnya.
+// 3. Ketua Panitia: Menginput nomor kamar, kapasitas, & peruntukan (Kamar Peserta / Kamar Khusus Panitia) anti-ganda.
+// 4. Panitia Inti (PJ, Ketua, Sekretaris, Bendahara): Melihat data rekapitulasi jumlah kamar hotel.
+// 5. Ketua Sub Rayon (+ Ketua & Sekretaris): Menentukan penghuni kamar khusus peserta yang berstatus "Ikut".
+// 6. Ketua Panitia & Sekretaris: Download Dokumen Rekapan Kamar (PDF & Excel/CSV) khusus peserta yang "Ikut" & Panitia.
 
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
 let masterRoomsList = []; // Array of { nomor: "101", kapasitas: 2, kategori: "PESERTA" | "PANITIA" }
-let panitiaRoomMap = {};  // Map { [id_panitia]: "P-01" } disimpan di info_layanan (kode_menu = 'penempatan_kamar_panitia')
+let panitiaRoomMap = {};  // Map { [id_panitia]: "P-01" }
 let cachedPanitiaList = [];
 
 let activeRoomTab = "pembagian"; // 'pembagian' | 'kamar_panitia' | 'master_kamar'
 let selectedFilterRayon = "ALL";
-let selectedFilterKamarStatus = "ALL";
+let selectedFilterKamarStatus = "IKUT_ALL";
 let selectedFilterDivisiPanitia = "ALL";
 let logoK3sCache = null;
 
 function normalizeRoomNo(val = "") {
   return String(val || "").trim().toUpperCase();
+}
+
+function isSchoolParticipating(s) {
+  return Boolean(s && s.status_ikut === "Ikut");
 }
 
 export function isKetuaPanitia(activeUser) {
@@ -32,7 +37,6 @@ export function isKetuaPanitia(activeUser) {
   );
 }
 
-// Hak Download Rekapan Kamar & Atur Kamar Panitia: HANYA Ketua Panitia dan Sekretaris
 export function isKetuaOrSekretaris(activeUser) {
   return Boolean(
     activeUser &&
@@ -42,7 +46,6 @@ export function isKetuaOrSekretaris(activeUser) {
   );
 }
 
-// Hak Melihat Rekap Jumlah Kamar Master: Panitia Inti (PJ, Ketua, Sekretaris, Bendahara)
 export function isPanitiaInti(activeUser) {
   return Boolean(
     activeUser &&
@@ -52,7 +55,6 @@ export function isPanitiaInti(activeUser) {
   );
 }
 
-// Hak Menentukan Penghuni Kamar Peserta: Ketua Sub Rayon, Ketua Panitia, dan Sekretaris
 export function canAssignOccupants(activeUser) {
   if (!activeUser || activeUser.role !== "panitia" || !activeUser.profile) return false;
   const p = activeUser.profile;
@@ -86,7 +88,6 @@ function ensureJsPdfLoaded() {
   });
 }
 
-// Muat konfigurasi Master Kamar, Penempatan Kamar Panitia, & Daftar Panitia
 async function loadMasterRoomsAndPanitiaConfig(sekolahList) {
   masterRoomsList = [];
   panitiaRoomMap = {};
@@ -131,10 +132,10 @@ async function loadMasterRoomsAndPanitiaConfig(sekolahList) {
     }
   } catch (e) {}
 
-  // Pastikan kamar yang sudah terpakai di db_sekolah tetap masuk di daftar master sebagai kategori PESERTA
+  // Hanya hitung kamar yang ditempati oleh sekolah berstatus "Ikut"
   const existingSet = new Set(masterRoomsList.map(r => normalizeRoomNo(r.nomor)));
   const countPesertaRoom = {};
-  (sekolahList || []).forEach(s => {
+  (sekolahList || []).filter(isSchoolParticipating).forEach(s => {
     const rNo = normalizeRoomNo(s.nomor_kamar);
     if (rNo && rNo !== "BELUM DITENTUKAN") {
       countPesertaRoom[rNo] = (countPesertaRoom[rNo] || 0) + 1;
@@ -152,7 +153,6 @@ async function loadMasterRoomsAndPanitiaConfig(sekolahList) {
     }
   });
 
-  // Pastikan kamar yang sudah terpakai di panitiaRoomMap juga tercatat sebagai kategori PANITIA
   const countPanitiaRoom = {};
   Object.values(panitiaRoomMap).forEach(val => {
     const rNo = normalizeRoomNo(val);
@@ -215,10 +215,13 @@ async function savePanitiaRoomAssignmentMap() {
   }]);
 }
 
+// HANYA menghitung penghuni dari sekolah yang berstatus "Ikut"
 function getPesertaRoomOccupants(sekolahList, nomorKamar) {
   const target = normalizeRoomNo(nomorKamar);
   if (!target || target === "BELUM DITENTUKAN") return [];
-  return (sekolahList || []).filter(s => normalizeRoomNo(s.nomor_kamar) === target);
+  return (sekolahList || []).filter(
+    s => isSchoolParticipating(s) && normalizeRoomNo(s.nomor_kamar) === target
+  );
 }
 
 function getPanitiaRoomOccupants(nomorKamar) {
@@ -247,13 +250,12 @@ export async function openRoomManagerModal(activeUser, sekolahList, reloadCallba
 
   bodyEl.innerHTML = `
     <div class="p-6 text-center text-xs font-bold text-slate-500">
-      <i class="fa-solid fa-spinner animate-spin mr-1.5 text-violet-600"></i> Memuat data kamar peserta & panitia...
+      <i class="fa-solid fa-spinner animate-spin mr-1.5 text-violet-600"></i> Memuat data kamar peserta aktif & panitia...
     </div>
   `;
 
   await loadMasterRoomsAndPanitiaConfig(sekolahList);
 
-  // PEDOMAN 1: Jika user adalah PESERTA -> HANYA bisa melihat kamarnya sendiri dan teman sekamarnya saja!
   if (!activeUser || activeUser.role === "peserta") {
     renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl);
     return;
@@ -271,12 +273,13 @@ export async function openRoomManagerModal(activeUser, sekolahList, reloadCallba
 // =========================================================================
 function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
   const mySchool = sekolahList.find(x => x.id_sekolah === activeUser?.profile?.id_sekolah) || activeUser?.profile || {};
-  const myRoomNo = (mySchool.nomor_kamar && normalizeRoomNo(mySchool.nomor_kamar) !== "BELUM DITENTUKAN")
+  const isIkut = isSchoolParticipating(mySchool);
+  const myRoomNo = (isIkut && mySchool.nomor_kamar && normalizeRoomNo(mySchool.nomor_kamar) !== "BELUM DITENTUKAN")
     ? normalizeRoomNo(mySchool.nomor_kamar)
     : "";
 
   const roommates = myRoomNo
-    ? sekolahList.filter(x => normalizeRoomNo(x.nomor_kamar) === myRoomNo && x.id_sekolah !== mySchool.id_sekolah)
+    ? sekolahList.filter(x => isSchoolParticipating(x) && normalizeRoomNo(x.nomor_kamar) === myRoomNo && x.id_sekolah !== mySchool.id_sekolah)
     : [];
 
   const roomMeta = myRoomNo ? masterRoomsList.find(r => normalizeRoomNo(r.nomor) === myRoomNo) : null;
@@ -296,70 +299,82 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
         <p class="text-[11px] text-violet-200">${mySchool.nama_kepsek || 'Kepala Sekolah'}</p>
       </div>
 
-      <div class="p-4 rounded-2xl bg-white/10 border border-white/15">
-        <div class="text-[10px] uppercase tracking-wider text-violet-200 font-bold">Nomor Kamar Hotel Anda</div>
-        <div class="text-2xl font-extrabold ${myRoomNo ? 'text-amber-300' : 'text-slate-300'} mt-1">
-          ${myRoomNo ? `Kamar ${myRoomNo}` : 'Belum Ditentukan'}
+      ${!isIkut ? `
+        <div class="p-4 rounded-2xl bg-rose-500/20 border border-rose-400/40 text-center space-y-1">
+          <div class="text-xs font-extrabold text-amber-300 uppercase">Status Keikutsertaan: ${mySchool.status_ikut || 'Belum Konfirmasi'}</div>
+          <p class="text-[11px] text-rose-100 leading-relaxed">
+            Penempatan kamar hotel hanya diberikan kepada sekolah yang telah terdata <b>"Ikut"</b> kegiatan Rakor. Silakan hubungi Ketua Sub Rayon ${mySchool.subrayon || ''} untuk validasi keikutsertaan.
+          </p>
         </div>
-        ${myRoomNo ? `
-          <div class="text-[10px] text-emerald-300 font-semibold mt-0.5">
-            Kapasitas Kamar: ${roomCap} Orang (Terisi ${roommates.length + 1} Peserta)
+      ` : `
+        <div class="p-4 rounded-2xl bg-white/10 border border-white/15">
+          <div class="text-[10px] uppercase tracking-wider text-violet-200 font-bold">Nomor Kamar Hotel Anda</div>
+          <div class="text-2xl font-extrabold ${myRoomNo ? 'text-amber-300' : 'text-slate-300'} mt-1">
+            ${myRoomNo ? `Kamar ${myRoomNo}` : 'Belum Ditentukan'}
           </div>
-        ` : `
-          <div class="text-[10px] text-amber-200/90 mt-1">
-            Penempatan kamar Anda sedang diatur oleh Ketua Sub Rayon ${mySchool.subrayon || ''}.
-          </div>
-        `}
-      </div>
-
-      <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-left space-y-2">
-        <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-          <i class="fa-solid fa-user-group"></i>
-          <span>Teman Sekamar Anda (${roommates.length} Orang):</span>
+          ${myRoomNo ? `
+            <div class="text-[10px] text-emerald-300 font-semibold mt-0.5">
+              Kapasitas Kamar: ${roomCap} Orang (Terisi ${roommates.length + 1} Peserta)
+            </div>
+          ` : `
+            <div class="text-[10px] text-amber-200/90 mt-1">
+              Penempatan kamar Anda sedang diatur oleh Ketua Sub Rayon ${mySchool.subrayon || ''}.
+            </div>
+          `}
         </div>
 
-        ${!myRoomNo ? `
-          <div class="text-[11px] text-slate-300 italic">
-            Teman sekamar akan tampil otomatis setelah nomor kamar Anda ditetapkan.
+        <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-left space-y-2">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-user-group"></i>
+            <span>Teman Sekamar Anda (${roommates.length} Orang):</span>
           </div>
-        ` : roommates.length === 0 ? `
-          <div class="text-[11px] text-emerald-200 font-semibold">
-            Saat ini belum ada teman sekamar lain yang ditempatkan di Kamar ${myRoomNo}.
-          </div>
-        ` : `
-          <div class="space-y-2">
-            ${roommates.map(rm => {
-              const waClean = String(rm.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
-              return `
-                <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/10 flex items-center justify-between gap-2">
-                  <div class="min-w-0">
-                    <div class="text-xs font-extrabold text-white truncate">${rm.nama_kepsek || 'Kepala Sekolah'}</div>
-                    <div class="text-[10px] text-violet-200 truncate">${rm.nama_sekolah}</div>
-                    <div class="text-[9px] font-bold text-amber-300 mt-0.5">Sub Rayon ${rm.subrayon}</div>
+
+          ${!myRoomNo ? `
+            <div class="text-[11px] text-slate-300 italic">
+              Teman sekamar akan tampil otomatis setelah nomor kamar Anda ditetapkan.
+            </div>
+          ` : roommates.length === 0 ? `
+            <div class="text-[11px] text-emerald-200 font-semibold">
+              Saat ini belum ada teman sekamar lain yang ditempatkan di Kamar ${myRoomNo}.
+            </div>
+          ` : `
+            <div class="space-y-2">
+              ${roommates.map(rm => {
+                const waClean = String(rm.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
+                return `
+                  <div class="p-2.5 rounded-xl bg-slate-950/60 border border-white/10 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                      <div class="text-xs font-extrabold text-white truncate">${rm.nama_kepsek || 'Kepala Sekolah'}</div>
+                      <div class="text-[10px] text-violet-200 truncate">${rm.nama_sekolah}</div>
+                      <div class="text-[9px] font-bold text-amber-300 mt-0.5">Sub Rayon ${rm.subrayon}</div>
+                    </div>
+                    ${rm.no_hp ? `
+                      <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10px] shrink-0 flex items-center gap-1 shadow">
+                        <i class="fa-brands fa-whatsapp"></i> Chat
+                      </a>
+                    ` : ''}
                   </div>
-                  ${rm.no_hp ? `
-                    <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10px] shrink-0 flex items-center gap-1 shadow">
-                      <i class="fa-brands fa-whatsapp"></i> Chat
-                    </a>
-                  ` : ''}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `}
-      </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      `}
     </div>
   `;
 }
 
 // =========================================================================
-// 2. TAMPILAN PANITIA (PANITIA INTI, KETUA SUB RAYON, & ANGGOTA PANITIA)
+// 2. TAMPILAN PANITIA (HANYA MENGHITUNG PESERTA BERSTATUS "IKUT")
 // =========================================================================
 function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback) {
-  const showMasterRoomStats = isPanitiaInti(activeUser);     // HANYA PJ, Ketua, Sekretaris, Bendahara
-  const canInputMasterRooms = isKetuaPanitia(activeUser);    // HANYA Ketua Panitia
-  const canDownloadAndManagePanitia = isKetuaOrSekretaris(activeUser); // HANYA Ketua Panitia & Sekretaris
+  const showMasterRoomStats = isPanitiaInti(activeUser);
+  const canInputMasterRooms = isKetuaPanitia(activeUser);
+  const canDownloadAndManagePanitia = isKetuaOrSekretaris(activeUser);
   const canSetPesertaOccupants = canAssignOccupants(activeUser);
+
+  const participatingSchools = (sekolahList || []).filter(isSchoolParticipating);
+  const nonParticipatingCount = (sekolahList || []).length - participatingSchools.length;
 
   const pesertaRooms = masterRoomsList.filter(r => r.kategori !== "PANITIA");
   const panitiaRooms = masterRoomsList.filter(r => r.kategori === "PANITIA");
@@ -371,14 +386,15 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
   const usedPesertaRooms = pesertaRooms.filter(r => getPesertaRoomOccupants(sekolahList, r.nomor).length > 0).length;
   const usedPanitiaRooms = panitiaRooms.filter(r => getPanitiaRoomOccupants(r.nomor).length > 0).length;
 
-  const assignedPesertaCount = sekolahList.filter(
+  const assignedPesertaCount = participatingSchools.filter(
     s => s.nomor_kamar && normalizeRoomNo(s.nomor_kamar) !== "BELUM DITENTUKAN"
   ).length;
+  const unassignedIkutCount = participatingSchools.length - assignedPesertaCount;
+
   const assignedPanitiaCount = cachedPanitiaList.filter(
     p => Boolean(getPanitiaAssignedRoom(p.id_panitia))
   ).length;
 
-  // Kartu Data Jumlah Kamar Hotel (KHUSUS PANITIA INTI: PJ, Ketua, Sekretaris, Bendahara)
   let panitiaIntiSummaryCard = "";
   if (showMasterRoomStats) {
     panitiaIntiSummaryCard = `
@@ -395,11 +411,14 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
         <div class="grid grid-cols-2 gap-2 text-left">
           <div class="bg-white/10 rounded-2xl p-2.5 border border-white/15 space-y-1">
             <div class="flex items-center justify-between">
-              <span class="text-[9px] font-extrabold uppercase text-amber-300">Kamar Peserta</span>
+              <span class="text-[9px] font-extrabold uppercase text-amber-300">Kamar Peserta (Ikut)</span>
               <span class="text-xs font-extrabold text-white">${pesertaRooms.length} Ruang</span>
             </div>
             <div class="text-[10px] text-violet-200">
-              Terisi: <b class="text-emerald-300">${usedPesertaRooms} Kamar</b> (${assignedPesertaCount}/${totalPesertaBeds} Bed)
+              Terisi: <b class="text-emerald-300">${usedPesertaRooms} Kamar</b> (${assignedPesertaCount}/${participatingSchools.length} Kepsek Ikut)
+            </div>
+            <div class="text-[9px] text-rose-300 font-bold">
+              Belum Dapat Kamar: ${unassignedIkutCount} Kepsek Ikut
             </div>
           </div>
 
@@ -409,15 +428,22 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
               <span class="text-xs font-extrabold text-white">${panitiaRooms.length} Ruang</span>
             </div>
             <div class="text-[10px] text-indigo-100">
-              Terisi: <b class="text-emerald-300">${usedPanitiaRooms} Kamar</b> (${assignedPanitiaCount}/${totalPanitiaBeds} Bed)
+              Terisi: <b class="text-emerald-300">${usedPanitiaRooms} Kamar</b> (${assignedPanitiaCount}/${cachedPanitiaList.length} Panitia)
+            </div>
+            <div class="text-[9px] text-indigo-200 font-semibold">
+              Kapasitas Bed Panitia: ${totalPanitiaBeds} Kursi
             </div>
           </div>
+        </div>
+
+        <div class="text-[9px] text-slate-300 flex items-center justify-between pt-1 border-t border-white/10">
+          <span>Peserta Terdata Ikut: <b class="text-emerald-300">${participatingSchools.length} Sekolah</b></span>
+          <span>Tidak Ikut (Dikecualikan): <b class="text-rose-300">${nonParticipatingCount} Sekolah</b></span>
         </div>
       </div>
     `;
   }
 
-  // Bar Unduh Rekapan Kamar (KHUSUS KETUA PANITIA & SEKRETARIS)
   let downloadBarHtml = "";
   if (canDownloadAndManagePanitia) {
     downloadBarHtml = `
@@ -426,7 +452,7 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
           <div class="text-[9px] font-extrabold uppercase text-amber-300">
             <i class="fa-solid fa-file-arrow-down mr-1"></i>Otoritas Ketua Panitia & Sekretaris
           </div>
-          <div class="text-[11px] font-extrabold text-white truncate">Download Dokumen Rekapan Kamar</div>
+          <div class="text-[11px] font-extrabold text-white truncate">Download Rekapan Kamar (Peserta Ikut & Panitia)</div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
           <button type="button" id="btnExportRoomCsv" class="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10px] shadow flex items-center gap-1">
@@ -446,12 +472,11 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
     ${panitiaIntiSummaryCard}
     ${downloadBarHtml}
 
-    <!-- Navigasi Tab Kamar -->
     <div class="grid ${canInputMasterRooms ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5 bg-slate-100 p-1 rounded-2xl">
       <button type="button" id="tabBtnKamarDivide" class="py-2 px-1 rounded-xl text-[10px] font-extrabold transition ${
         activeRoomTab === 'pembagian' ? 'bg-violet-900 text-amber-300 shadow' : 'text-slate-600'
       }">
-        <i class="fa-solid fa-school mr-1"></i>Kamar Peserta
+        <i class="fa-solid fa-school mr-1"></i>Kamar Peserta (${participatingSchools.length})
       </button>
       <button type="button" id="tabBtnKamarPanitia" class="py-2 px-1 rounded-xl text-[10px] font-extrabold transition ${
         activeRoomTab === 'kamar_panitia' ? 'bg-violet-900 text-amber-300 shadow' : 'text-slate-600'
@@ -527,7 +552,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
       <div>
         <label class="block text-[10px] font-bold text-slate-700 mb-1">1. Peruntukan Kamar:</label>
         <select id="inpNewRoomCategory" class="w-full rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-extrabold text-violet-950">
-          <option value="PESERTA">🏫 Kamar Peserta (Kepala Sekolah SD/MI)</option>
+          <option value="PESERTA">🏫 Kamar Peserta (Kepala Sekolah SD/MI yang Ikut)</option>
           <option value="PANITIA">🛡️ Kamar Khusus Panitia Rakor</option>
         </select>
       </div>
@@ -662,7 +687,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
 }
 
 // =========================================================================
-// SUB-TAB B: KAMAR KHUSUS PANITIA (INFO KAMAR PANITIA & PENEMPATAN OLEH KETUA / SEKRETARIS)
+// SUB-TAB B: KAMAR KHUSUS PANITIA
 // =========================================================================
 function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahList, container, bodyEl, reloadCallback) {
   const myPanitiaId = activeUser?.profile?.id_panitia;
@@ -675,7 +700,6 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
   const divisiSet = [...new Set(cachedPanitiaList.map(p => p.divisi).filter(Boolean))];
 
   container.innerHTML = `
-    <!-- Kartu Info Kamar Pribadi Panitia yang Sedang Login -->
     <div class="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white border border-indigo-400/30 flex items-center justify-between gap-3 shadow-sm">
       <div class="min-w-0">
         <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded">
@@ -694,14 +718,6 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
       </div>
     </div>
 
-    ${canManagePanitiaRooms && panitiaRoomsOnly.length === 0 ? `
-      <div class="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-[10px] text-amber-950 font-semibold">
-        <i class="fa-solid fa-circle-info text-amber-600 mr-1"></i>
-        <b>Catatan Ketua Panitia:</b> Silakan tambahkan nomor kamar dengan peruntukan <b>"Kamar Khusus Panitia"</b> pada tab <b>Input Kamar</b> terlebih dahulu.
-      </div>
-    ` : ''}
-
-    <!-- Filter Divisi & Pencarian Panitia -->
     <div class="grid grid-cols-2 gap-2">
       <select id="panRoomFilterDivisi" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-indigo-950">
         <option value="ALL" ${selectedFilterDivisiPanitia === 'ALL' ? 'selected' : ''}>Semua Seksi / Divisi (${cachedPanitiaList.length})</option>
@@ -741,7 +757,6 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
       const roomCap = roomMeta ? Number(roomMeta.kapasitas) || 2 : 2;
 
       let optionsHtml = `<option value="" ${!currentRoom ? 'selected' : ''}>-- Belum Ditentukan --</option>`;
-      // Utamakan kamar berlabel PANITIA, namun jika belum ada tampilkan semua kamar kosong
       const candidateRooms = panitiaRoomsOnly.length > 0 ? panitiaRoomsOnly : masterRoomsList;
       candidateRooms.forEach(rm => {
         const rNo = normalizeRoomNo(rm.nomor);
@@ -831,16 +846,18 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
 }
 
 // =========================================================================
-// SUB-TAB C: PEMBAGIAN KAMAR PESERTA PER SUB RAYON (DENGAN VALIDASI KAPASITAS)
+// SUB-TAB C: PEMBAGIAN KAMAR PESERTA PER SUB RAYON (HANYA SEKOLAH BERSTATUS "IKUT")
 // =========================================================================
 function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolahList, container, bodyEl, reloadCallback) {
-  const totalSek = sekolahList.length || 160;
+  const participatingSchools = (sekolahList || []).filter(isSchoolParticipating);
+  const nonParticipatingSchools = (sekolahList || []).filter(s => !isSchoolParticipating(s));
   const isRayonCoord = Boolean(activeUser?.profile?.tugas_subrayon);
   const pesertaRoomsOnly = masterRoomsList.filter(r => r.kategori !== "PANITIA");
 
+  // Rekap Per Sub Rayon HANYA menghitung sekolah yang berstatus "Ikut"!
   const rayonCardsHtml = SUBRAYON_LIST.map(sr => {
-    const srList = sekolahList.filter(s => s.subrayon === sr);
-    const srHasRoom = srList.filter(s => s.nomor_kamar && normalizeRoomNo(s.nomor_kamar) !== "BELUM DITENTUKAN").length;
+    const srIkutList = participatingSchools.filter(s => s.subrayon === sr);
+    const srHasRoom = srIkutList.filter(s => s.nomor_kamar && normalizeRoomNo(s.nomor_kamar) !== "BELUM DITENTUKAN").length;
     const isSel = selectedFilterRayon === sr;
     return `
       <button type="button" data-sr="${sr}" class="kamar-sr-pill p-2 rounded-xl border text-center transition ${
@@ -848,7 +865,7 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
       }">
         <div class="text-[10px] font-extrabold truncate">${sr}</div>
         <div class="text-[9px] font-bold mt-0.5 ${isSel ? 'text-amber-300' : 'text-violet-700'}">
-          ${srHasRoom}/${srList.length} Dapat Kamar
+          ${srHasRoom}/${srIkutList.length} Peserta Ikut
         </div>
       </button>
     `;
@@ -858,15 +875,15 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
     ${canSetOccupants ? `
       <div class="p-3 rounded-2xl bg-violet-50 border border-violet-200 flex items-center gap-2.5">
         <div class="w-8 h-8 rounded-xl bg-violet-800 text-amber-300 flex items-center justify-center text-xs font-extrabold shrink-0">
-          <i class="fa-solid fa-shield-check"></i>
+          <i class="fa-solid fa-user-check"></i>
         </div>
         <div class="text-[10px] text-violet-950 leading-snug">
-          <b>Otoritas Penentuan Penghuni (${isRayonCoord ? 'Ketua Rayon ' + activeUser.profile.tugas_subrayon : activeUser.profile?.divisi}):</b> Pilih kamar peserta di bawah. Sistem otomatis menolak jika kamar melebihi kapasitas ruangan.
+          <b>Validasi Peserta Aktif (${isRayonCoord ? 'Ketua Rayon ' + activeUser.profile.tugas_subrayon : activeUser.profile?.divisi}):</b> Hanya sekolah yang terdata <b>"Ikut" (${participatingSchools.length} sekolah)</b> yang dapat diberikan kamar hotel.
         </div>
       </div>
     ` : `
       <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-600 text-center font-semibold">
-        Menampilkan Data Pembagian Kamar Peserta Per Sub Rayon
+        Menampilkan Data Pembagian Kamar Peserta yang Terdata Ikut (${participatingSchools.length} Sekolah)
       </div>
     `}
 
@@ -876,14 +893,18 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
 
     <div class="grid grid-cols-2 gap-2">
       <select id="kamarFilterRayonSelect" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-violet-950">
-        <option value="ALL" ${selectedFilterRayon === 'ALL' ? 'selected' : ''}>Semua Sub Rayon (${totalSek})</option>
-        ${SUBRAYON_LIST.map(sr => `<option value="${sr}" ${selectedFilterRayon === sr ? 'selected' : ''}>Sub Rayon ${sr}</option>`).join('')}
+        <option value="ALL" ${selectedFilterRayon === 'ALL' ? 'selected' : ''}>Semua Rayon (${participatingSchools.length} Ikut)</option>
+        ${SUBRAYON_LIST.map(sr => {
+          const cnt = participatingSchools.filter(x => x.subrayon === sr).length;
+          return `<option value="${sr}" ${selectedFilterRayon === sr ? 'selected' : ''}>Rayon ${sr} (${cnt} Ikut)</option>`;
+        }).join('')}
       </select>
 
       <select id="kamarFilterStatusSelect" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-800">
-        <option value="ALL" ${selectedFilterKamarStatus === 'ALL' ? 'selected' : ''}>Semua Peserta</option>
-        <option value="SUDAH" ${selectedFilterKamarStatus === 'SUDAH' ? 'selected' : ''}>✓ Sudah Ada Kamar</option>
-        <option value="BELUM" ${selectedFilterKamarStatus === 'BELUM' ? 'selected' : ''}>⏳ Belum Ada Kamar</option>
+        <option value="IKUT_ALL" ${selectedFilterKamarStatus === 'IKUT_ALL' ? 'selected' : ''}>Semua Peserta Ikut (${participatingSchools.length})</option>
+        <option value="SUDAH" ${selectedFilterKamarStatus === 'SUDAH' ? 'selected' : ''}>✓ Ikut & Sudah Ada Kamar</option>
+        <option value="BELUM" ${selectedFilterKamarStatus === 'BELUM' ? 'selected' : ''}>⏳ Ikut & Belum Ada Kamar</option>
+        <option value="TIDAK_IKUT" ${selectedFilterKamarStatus === 'TIDAK_IKUT' ? 'selected' : ''}>✕ Tidak Ikut (${nonParticipatingSchools.length})</option>
       </select>
     </div>
 
@@ -905,7 +926,11 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
     if (!listBox) return;
 
     const kw = (document.getElementById("kamarSearchSchoolInput")?.value || "").toLowerCase().trim();
-    let list = sekolahList;
+
+    // Secara default HANYA tampilkan sekolah yang berstatus "Ikut"
+    let list = selectedFilterKamarStatus === "TIDAK_IKUT"
+      ? nonParticipatingSchools
+      : participatingSchools;
 
     if (selectedFilterRayon !== "ALL") {
       list = list.filter(s => s.subrayon === selectedFilterRayon);
@@ -931,12 +956,13 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
 
     listBox.innerHTML = "";
     list.slice(0, 200).forEach((s, idx) => {
-      const currentRoom = (s.nomor_kamar && normalizeRoomNo(s.nomor_kamar) !== "BELUM DITENTUKAN")
+      const isIkut = isSchoolParticipating(s);
+      const currentRoom = (isIkut && s.nomor_kamar && normalizeRoomNo(s.nomor_kamar) !== "BELUM DITENTUKAN")
         ? normalizeRoomNo(s.nomor_kamar)
         : "";
 
       const roommates = currentRoom
-        ? sekolahList.filter(x => normalizeRoomNo(x.nomor_kamar) === currentRoom && x.id_sekolah !== s.id_sekolah)
+        ? participatingSchools.filter(x => normalizeRoomNo(x.nomor_kamar) === currentRoom && x.id_sekolah !== s.id_sekolah)
         : [];
 
       const roomConfig = currentRoom ? masterRoomsList.find(r => normalizeRoomNo(r.nomor) === currentRoom) : null;
@@ -963,15 +989,18 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
       });
 
       const row = document.createElement("div");
-      row.className = `p-3 rounded-2xl bg-white border ${currentRoom ? 'border-violet-300 bg-violet-50/20' : 'border-slate-200'} space-y-2 shadow-2xs`;
+      row.className = `p-3 rounded-2xl bg-white border ${!isIkut ? 'border-rose-200 bg-rose-50/30 opacity-80' : currentRoom ? 'border-violet-300 bg-violet-50/20' : 'border-slate-200'} space-y-2 shadow-2xs`;
       row.innerHTML = `
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
               <span class="text-[9px] font-extrabold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">Rayon ${s.subrayon}</span>
+              <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${isIkut ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${isIkut ? '✓ IKUT' : `✕ ${s.status_ikut || 'Tidak Ikut'}`}
+              </span>
               ${currentRoom ? `
-                <span class="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                <span class="text-[9px] font-extrabold bg-violet-100 text-violet-900 px-1.5 py-0.5 rounded">
                   Kamar ${currentRoom} (${currentTotalInRoom}/${roomCap} Org)
                 </span>
               ` : ''}
@@ -986,7 +1015,11 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
             ` : ''}
           </div>
 
-          ${canSetOccupants ? `
+          ${!isIkut ? `
+            <span class="text-[9px] font-extrabold px-2.5 py-1.5 rounded-xl bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
+              <i class="fa-solid fa-ban mr-1"></i>Tidak Ikut
+            </span>
+          ` : canSetOccupants ? `
             <div class="shrink-0">
               <select class="sel-assign-room rounded-xl border-2 ${currentRoom ? 'border-violet-600 bg-violet-50 text-violet-950' : 'border-slate-300 bg-slate-50 text-slate-800'} px-2 py-1.5 text-[11px] font-extrabold max-w-[145px]">
                 ${roomOptionsHtml}
@@ -1002,15 +1035,22 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
         </div>
       `;
 
-      if (canSetOccupants) {
+      if (canSetOccupants && isIkut) {
         row.querySelector(".sel-assign-room")?.addEventListener("change", async (e) => {
+          // Validasi ganda: pastikan sekolah berstatus Ikut
+          if (!isSchoolParticipating(s)) {
+            toast(`Ditolak: ${s.nama_sekolah} tidak terdata Ikut kegiatan!`);
+            e.target.value = "Belum Ditentukan";
+            return;
+          }
+
           const chosenRoom = e.target.value;
 
           if (chosenRoom !== "Belum Ditentukan") {
             const targetNorm = normalizeRoomNo(chosenRoom);
             const rmObj = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === targetNorm);
             const maxCap = rmObj ? (Number(rmObj.kapasitas) || 2) : 2;
-            const currentOccupants = sekolahList.filter(
+            const currentOccupants = participatingSchools.filter(
               x => normalizeRoomNo(x.nomor_kamar) === targetNorm && x.id_sekolah !== s.id_sekolah
             );
 
@@ -1053,8 +1093,7 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
 }
 
 // =========================================================================
-// EXPORT 1: DOWNLOAD SPREADSHEET (.CSV EXCEL) REKAPAN KAMAR PESERTA & PANITIA
-// (KHUSUS KETUA PANITIA & SEKRETARIS)
+// EXPORT 1: DOWNLOAD SPREADSHEET (.CSV) KHUSUS PESERTA YANG "IKUT" & PANITIA
 // =========================================================================
 export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
   if (!isKetuaOrSekretaris(activeUser)) {
@@ -1079,8 +1118,9 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
   const rows = [];
   let counter = 1;
 
-  // 1. Urutkan Peserta berdasarkan Nomor Kamar lalu Sub Rayon
-  const sortedPeserta = [...(sekolahList || [])].sort((a, b) => {
+  // HANYA sertakan sekolah yang terdata "Ikut"
+  const participatingOnly = (sekolahList || []).filter(isSchoolParticipating);
+  const sortedPeserta = [...participatingOnly].sort((a, b) => {
     const rA = (a.nomor_kamar && a.nomor_kamar !== "Belum Ditentukan") ? a.nomor_kamar : "ZZZ";
     const rB = (b.nomor_kamar && b.nomor_kamar !== "Belum Ditentukan") ? b.nomor_kamar : "ZZZ";
     const cmp = String(rA).localeCompare(String(rB), undefined, { numeric: true });
@@ -1095,7 +1135,7 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
     const rmObj = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === rNo);
     const cap = rmObj ? `${rmObj.kapasitas} Orang` : "-";
     const mates = rNo !== "Belum Ditentukan"
-      ? sekolahList
+      ? participatingOnly
           .filter(x => normalizeRoomNo(x.nomor_kamar) === rNo && x.id_sekolah !== s.id_sekolah)
           .map(x => `${x.nama_kepsek || x.nama_sekolah} (${x.subrayon})`)
           .join("; ")
@@ -1103,7 +1143,7 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
 
     rows.push([
       counter++,
-      "PESERTA (KEPSEK)",
+      "PESERTA (IKUT)",
       rNo,
       cap,
       `Sub Rayon ${s.subrayon || '-'}`,
@@ -1115,7 +1155,6 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
     ].map(escapeCsv).join(","));
   });
 
-  // 2. Tambahkan Data Kamar Khusus Panitia
   const sortedPanitia = [...(cachedPanitiaList || [])].sort((a, b) => {
     const rA = getPanitiaAssignedRoom(a.id_panitia) || "ZZZ";
     const rB = getPanitiaAssignedRoom(b.id_panitia) || "ZZZ";
@@ -1154,7 +1193,7 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Rekapan_Kamar_Hotel_Peserta_dan_Panitia_Rakor2026.csv`;
+  a.download = `Rekapan_Kamar_Hotel_Peserta_Aktif_dan_Panitia_Rakor2026.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1165,7 +1204,6 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
 
 // =========================================================================
 // EXPORT 2: DOWNLOAD DOKUMEN PDF RESMI REKAPAN KAMAR HOTEL BER-KOP K3S
-// (KHUSUS KETUA PANITIA & SEKRETARIS)
 // =========================================================================
 export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
   if (!isKetuaOrSekretaris(activeUser)) {
@@ -1176,7 +1214,6 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
   await ensureJsPdfLoaded();
   const logoImg = await preloadLogo();
 
-  // Susun daftar per kamar yang sudah ada penghuninya (maupun semua kamar terdaftar)
   const roomEntries = masterRoomsList.map((rm, idx) => {
     const isPan = rm.kategori === "PANITIA";
     const occ = isPan
@@ -1193,13 +1230,12 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
     return {
       no: idx + 1,
       nomor: rm.nomor,
-      kategori: isPan ? "KHUSUS PANITIA" : "PESERTA",
+      kategori: isPan ? "KHUSUS PANITIA" : "PESERTA (IKUT)",
       kapasitas: `${occ.length} / ${rm.kapasitas || 2} Org`,
       penghuni: penghuniText
     };
   });
 
-  // Jika masterRoomsList masih kosong, bangun dari sekolah yang sudah punya nomor kamar
   if (roomEntries.length === 0) {
     return toast("Belum ada nomor kamar yang diinput pada sistem!");
   }
@@ -1220,7 +1256,6 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Kop Surat K3S
     if (logoImg) {
       ctx.drawImage(logoImg, 45, 24, 100, 100);
     }
@@ -1249,7 +1284,7 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
     const startX = 40;
     let y = 172;
     const colW = [38, 85, 110, 75, 406];
-    const headers = ["No", "No. Kamar", "Peruntukan", "Terisi/Kap", "Nama Penghuni Kamar (Kepala Sekolah / Panitia)"];
+    const headers = ["No", "No. Kamar", "Peruntukan", "Terisi/Kap", "Nama Penghuni Kamar (Kepala Sekolah Aktif / Panitia)"];
 
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(startX, y, 714, 28);
@@ -1301,7 +1336,7 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
 
       ctx.fillText("Kupang, 26 November 2026", 500, signY);
       ctx.fillText("Sekretaris Panitia,", 500, signY + 16);
-      ctx.fillText("Emanuel Nata Huler, S.Pd., Gr.", 500, signY + 75);
+      ctx.fillText("Emanuel Nata Huler, S.Pd., Gr.", 500, signY + 16 + 59);
     }
 
     pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 794, 1123);
