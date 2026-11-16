@@ -1115,11 +1115,28 @@ async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
   if (!canEditPaymentAndParticipation(activeUser, targetSubrayon)) {
     return toast("Akses Ditolak: Hanya Ketua Sub Rayon wilayah ini dan Bendahara yang berwenang!");
   }
-  await sb.from("db_sekolah").update({
+
+  const updatePayload = {
     status_ikut: statusBaru,
     waktu_registrasi: new Date().toLocaleString("id-ID")
-  }).eq("id_sekolah", idSekolah);
-  toast(`Status keikutsertaan: ${statusBaru}`);
+  };
+
+  // Jika sekolah ditandai "Tidak Ikut", otomatis kosongkan kamar & reset layanan agar tidak memakan kuota peserta aktif
+  if (statusBaru === "Tidak Ikut") {
+    updatePayload.nomor_kamar = "Belum Ditentukan";
+    updatePayload.hadir_h1 = false;
+    updatePayload.hadir_h2 = false;
+    updatePayload.hadir_h3 = false;
+    updatePayload.ambil_kit = false;
+    updatePayload.terima_transport = false;
+  }
+
+  await sb.from("db_sekolah").update(updatePayload).eq("id_sekolah", idSekolah);
+  toast(
+    statusBaru === "Tidak Ikut"
+      ? "Status diubah ke Tidak Ikut & alokasi kamar dikosongkan."
+      : `Status keikutsertaan: ${statusBaru}`
+  );
   await loadAllDatabase(false);
 }
 
