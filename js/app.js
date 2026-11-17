@@ -16,6 +16,7 @@ import { renderSpjBospWidgets } from './spj_bosp.js';
 import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
 import { renderProdukRakorAndUniformCards } from './produk_rakor.js';
 
+// Definisikan seluruh fungsi helper keuangan secara mandiri agar bebas error modul
 const TARIF_KONTRIBUSI_DEFAULT = 2000000;
 
 function formatRupiah(num) {
@@ -34,7 +35,9 @@ function canEditPaymentAndParticipation(user, targetSubrayon) {
   return false;
 }
 
-function renderInfoKeuanganWidget() {}
+function renderInfoKeuanganWidget() {
+  // Widget informasi keuangan pendukung
+}
 
 function openInfoKeuanganModal(activeUser, sekolahList) {
   const modal = document.getElementById("serviceModal");
@@ -45,7 +48,7 @@ function openInfoKeuanganModal(activeUser, sekolahList) {
   modal.classList.remove("hidden");
   titleEl.innerHTML = `<i class="fa-solid fa-sack-dollar text-emerald-700 mr-1.5"></i> Informasi Keuangan & Kontribusi`;
 
-  const totalSekolah = (sekolahList || []).length || 158; // Sebaran 158 SD/MI per Sub Rayon
+  const totalSekolah = (sekolahList || []).length || 158;
   const lunasList = (sekolahList || []).filter(s => s.status_bayar === "Lunas");
   const totalKasMasuk = lunasList.length * TARIF_KONTRIBUSI_DEFAULT;
 
@@ -93,7 +96,10 @@ const DIVISI_LIST = [
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
 
-initApp();
+// Pastikan fungsi berjalan dengan aman setelah halaman dimuat!
+document.addEventListener("DOMContentLoaded", () => {
+  initApp();
+});
 
 async function initApp() {
   initModernDropdowns();
@@ -114,7 +120,7 @@ async function initApp() {
 }
 
 function updateStaticEventDatesToNov2026() {
-  const totalCount = (sekolahList && sekolahList.length > 0) ? sekolahList.length : 158; // Sebaran 158 SD/MI per Sub Rayon
+  const totalCount = (sekolahList && sekolahList.length > 0) ? sekolahList.length : 158;
   document.querySelectorAll("span, p, div, h3, h4, button, option").forEach(el => {
     if (el.children.length === 0 && el.textContent) {
       let t = el.textContent;
@@ -369,7 +375,7 @@ function renderAllViews() {
 }
 
 function renderBerandaView() {
-  const totalSek = sekolahList.length || 158; // Sebaran 158 SD/MI per Sub Rayon
+  const totalSek = sekolahList.length || 158;
   const ikutSek = sekolahList.filter(s => s.status_ikut === "Ikut").length;
 
   const elTot = document.getElementById("homeMetricTotalSekolah");
