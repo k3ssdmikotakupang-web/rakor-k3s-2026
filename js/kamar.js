@@ -388,7 +388,7 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
               <i class="fa-solid fa-user-group"></i>
               <span>Teman Sekamar Anda (${roommates.length} Orang):</span>
             </div>
-            ${roommates.length > 0 ? `<span class="text-[9px] font-bold text-violet-200"><i class="fa-solid fa-magnifying-glass-plus mr-0.5 text-amber-300"></i>Ketuk foto utk perbesar</span>` : ''}
+            
           </div>
 
           ${!myRoomNo ? `
