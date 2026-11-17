@@ -8,6 +8,14 @@ import { openDokumentasiModal } from './dokumentasi.js';
 import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifikat.js';
 import { renderPosScannerWidgets } from './scanner_pos.js';
 import { renderCatatanPanitiaWidget } from './catatan.js';
+import {
+  TARIF_KONTRIBUSI_DEFAULT,
+  formatRupiah,
+  canAccessInfoKeuangan,
+  canEditPaymentAndParticipation,
+  renderInfoKeuanganWidget,
+  openInfoKeuanganModal
+} from './keuangan.js';
 import { renderStatistikSekolahWidget } from './statistik_sekolah.js';
 import { bindUserProfileTrigger } from './profil.js';
 import { initModernDropdowns } from './dropdown_ui.js';
@@ -16,58 +24,7 @@ import { renderSpjBospWidgets } from './spj_bosp.js';
 import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
 import { renderProdukRakorAndUniformCards } from './produk_rakor.js';
 
-// Definisikan seluruh fungsi helper keuangan secara mandiri agar bebas error modul
-const TARIF_KONTRIBUSI_DEFAULT = 2000000;
-
-function formatRupiah(num) {
-  return "Rp " + Number(num || 0).toLocaleString("id-ID");
-}
-
-function canAccessInfoKeuangan(user) {
-  return Boolean(user && user.role === "panitia");
-}
-
-function canEditPaymentAndParticipation(user, targetSubrayon) {
-  if (!user || user.role !== "panitia" || !user.profile) return false;
-  const p = user.profile;
-  if (["Bendahara", "Ketua Panitia", "Sekretaris"].includes(p.divisi)) return true;
-  if (p.tugas_subrayon && String(p.tugas_subrayon).trim() === String(targetSubrayon).trim()) return true;
-  return false;
-}
-
-function renderInfoKeuanganWidget() {
-  // Widget informasi keuangan pendukung
-}
-
-function openInfoKeuanganModal(activeUser, sekolahList) {
-  const modal = document.getElementById("serviceModal");
-  const titleEl = document.getElementById("serviceModalTitle");
-  const bodyEl = document.getElementById("serviceModalBody");
-  if (!modal || !titleEl || !bodyEl) return;
-
-  modal.classList.remove("hidden");
-  titleEl.innerHTML = `<i class="fa-solid fa-sack-dollar text-emerald-700 mr-1.5"></i> Informasi Keuangan & Kontribusi`;
-
-  const totalSekolah = (sekolahList || []).length || 158;
-  const lunasList = (sekolahList || []).filter(s => s.status_bayar === "Lunas");
-  const totalKasMasuk = lunasList.length * TARIF_KONTRIBUSI_DEFAULT;
-
-  bodyEl.innerHTML = `
-    <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white space-y-2.5 shadow-lg border border-emerald-400/40">
-      <div class="flex items-center justify-between">
-        <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
-          Rekapitulasi Kas Kontribusi BOSP
-        </span>
-        <span class="text-xs font-extrabold text-emerald-300">${lunasList.length}/${totalSekolah} Lunas</span>
-      </div>
-      <div>
-        <h4 class="text-sm font-extrabold text-white">Total Kas Masuk: ${formatRupiah(totalKasMasuk)}</h4>
-        <p class="text-[10px] text-emerald-200">Kontribusi peserta Rakor K3S 2026 sebesar Rp 2.000.000 per satuan pendidikan.</p>
-      </div>
-    </div>
-  `;
-}
-
+// Pasang favicon otomatis agar tidak muncul error 404 favicon.ico di Console
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
   link.rel = "icon";
