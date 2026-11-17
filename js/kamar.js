@@ -1,6 +1,6 @@
 // js/kamar.js
 // Sistem Manajemen Kamar Hotel Rakor K3S 2026:
-// 1. Peserta: Melihat kamarnya sendiri & rekan sekamarnya (Lengkap: Nama Kepsek, Asal Sekolah, Sub Rayon, No HP/WA)
+// 1. Peserta: Melihat kamarnya sendiri & rekan sekamarnya (Lengkap: Foto Profil yang bisa di-zoom, Nama Kepsek, Asal Sekolah, Sub Rayon, No HP/WA)
 // 2. Ketua Panitia: Menginput nomor kamar, kapasitas, & peruntukan (Kamar Peserta / Kamar Khusus Panitia).
 // 3. Panitia Inti (PJ, Ketua, Sekretaris, Bendahara): Melihat data rekapitulasi jumlah kamar hotel.
 // 4. Ketua Sub Rayon (+ Ketua & Sekretaris): Menentukan penghuni kamar peserta (validasi anti-melebihi kapasitas).
@@ -23,6 +23,91 @@ function normalizeRoomNo(val = "") {
 
 function isSchoolParticipating(s) {
   return Boolean(s && s.status_ikut === "Ikut");
+}
+
+function getPersonPhotoUrl(record, fallbackName = "Peserta") {
+  if (record) {
+    const candidates = [
+      record.foto_url,
+      record.foto_profil,
+      record.foto_kepsek,
+      record.foto,
+      record.avatar_url,
+      record.photo_url,
+      record.url_foto
+    ];
+    for (const url of candidates) {
+      if (url && typeof url === "string" && url.trim() !== "") {
+        return url.trim();
+      }
+    }
+  }
+  const cleanName = encodeURIComponent(String(fallbackName || "K3S").trim());
+  return `https://ui-avatars.com/api/?name=${cleanName}&background=1e1b4b&color=fcd34d&bold=true&size=300`;
+}
+
+function openRoommatePhotoZoomModal(photoUrl, nameText, schoolText, subrayonText, phoneText, roomNo) {
+  let zoomModal = document.getElementById("roommatePhotoZoomOverlay");
+  if (!zoomModal) {
+    zoomModal = document.createElement("div");
+    zoomModal.id = "roommatePhotoZoomOverlay";
+    document.body.appendChild(zoomModal);
+  }
+
+  const waClean = String(phoneText || "").replace(/\D/g, "").replace(/^0/, "62");
+  const phoneClean = String(phoneText || "").replace(/\D/g, "");
+  const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameText || "Kepsek")}&background=1e1b4b&color=fcd34d&bold=true&size=400`;
+
+  zoomModal.className = "fixed inset-0 z-[70] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-5 animate-view";
+  zoomModal.innerHTML = `
+    <div class="w-full max-w-xs bg-gradient-to-b from-slate-900 via-violet-950 to-slate-900 text-white rounded-3xl p-5 text-center space-y-4 shadow-2xl border-2 border-amber-400/70 relative">
+      <button type="button" id="btnCloseRoommateZoomTop" class="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-white/10 hover:bg-rose-500/30 text-white font-extrabold flex items-center justify-center text-sm transition">
+        &times;
+      </button>
+
+      <div class="inline-flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-3 py-1 rounded-full shadow">
+        <i class="fa-solid fa-bed"></i>
+        <span>Rekan Sekamar • Kamar ${roomNo || '-'}</span>
+      </div>
+
+      <div class="w-52 h-52 mx-auto rounded-3xl overflow-hidden border-4 border-amber-400 shadow-2xl bg-slate-800 flex items-center justify-center">
+        <img src="${photoUrl}" alt="${nameText}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='${fallbackAvatar}';" />
+      </div>
+
+      <div class="space-y-1 px-1">
+        <h3 class="text-sm font-extrabold text-white leading-snug">${nameText || 'Kepala Sekolah'}</h3>
+        <p class="text-xs font-bold text-amber-300">${schoolText || '-'}</p>
+        <p class="text-[11px] font-semibold text-violet-200">${subrayonText || ''}</p>
+      </div>
+
+      ${phoneClean ? `
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <a href="tel:${phoneClean}" class="py-2.5 px-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow transition">
+            <i class="fa-solid fa-phone"></i>
+            <span>Telepon</span>
+          </a>
+          <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" class="py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow transition">
+            <i class="fa-brands fa-whatsapp text-sm"></i>
+            <span>WhatsApp</span>
+          </a>
+        </div>
+      ` : ''}
+
+      <button type="button" id="btnCloseRoommateZoomBottom" class="w-full py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-200 font-extrabold text-xs transition">
+        Tutup Foto
+      </button>
+    </div>
+  `;
+
+  zoomModal.onclick = (e) => {
+    if (
+      e.target === zoomModal ||
+      e.target.closest("#btnCloseRoommateZoomTop") ||
+      e.target.closest("#btnCloseRoommateZoomBottom")
+    ) {
+      zoomModal.classList.add("hidden");
+    }
+  };
 }
 
 export function isKetuaPanitia(activeUser) {
@@ -246,6 +331,9 @@ export async function openRoomManagerModal(activeUser, sekolahList, reloadCallba
   renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback);
 }
 
+// =========================================================================
+// 1. TAMPILAN KHUSUS PESERTA (DILENGKAPI FOTO PROFIL TEMAN SEKAMAR + ZOOM)
+// =========================================================================
 function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
   const mySchool = sekolahList.find(x => x.id_sekolah === activeUser?.profile?.id_sekolah) || activeUser?.profile || {};
   const isIkut = isSchoolParticipating(mySchool);
@@ -293,11 +381,16 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
             </div>
           `}
         </div>
+
         <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-left space-y-2.5">
-          <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-            <i class="fa-solid fa-user-group"></i>
-            <span>Teman Sekamar Anda (${roommates.length} Orang):</span>
+          <div class="flex items-center justify-between">
+            <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-user-group"></i>
+              <span>Teman Sekamar Anda (${roommates.length} Orang):</span>
+            </div>
+            ${roommates.length > 0 ? `<span class="text-[9px] font-bold text-violet-200"><i class="fa-solid fa-magnifying-glass-plus mr-0.5 text-amber-300"></i>Ketuk foto utk perbesar</span>` : ''}
           </div>
+
           ${!myRoomNo ? `
             <div class="text-[11px] text-slate-300 italic">
               Teman sekamar akan tampil otomatis setelah nomor kamar Anda ditetapkan.
@@ -307,23 +400,53 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
               Saat ini belum ada teman sekamar lain yang ditempatkan di Kamar ${myRoomNo}.
             </div>
           ` : `
-            <div class="space-y-2">
-              ${roommates.map(rm => {
+            <div class="space-y-2.5">
+              ${roommates.map((rm, rIdx) => {
+                const displayName = rm.nama_kepsek && String(rm.nama_kepsek).trim() !== ""
+                  ? rm.nama_kepsek
+                  : `Kepala ${rm.nama_sekolah || 'Sekolah'}`;
+                const photoUrl = getPersonPhotoUrl(rm, displayName);
+                const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1e1b4b&color=fcd34d&bold=true&size=200`;
                 const waClean = String(rm.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
                 const phoneClean = String(rm.no_hp || "").replace(/\D/g, "");
+
                 return `
-                  <div class="p-3 rounded-2xl bg-slate-950/70 border border-white/15 flex items-center justify-between gap-2">
-                    <div class="min-w-0 flex-1">
-                      <div class="text-xs font-extrabold text-white truncate">${rm.nama_kepsek || 'Kepala Sekolah'}</div>
-                      <div class="text-[10px] text-violet-200 truncate">${rm.nama_sekolah}</div>
-                      <div class="text-[9px] font-bold text-amber-300 mt-0.5">Sub Rayon ${rm.subrayon} • Telp/WA: ${rm.no_hp || '-'}</div>
+                  <div class="p-3 rounded-2xl bg-slate-950/75 border border-white/15 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <div
+                        data-rm-idx="${rIdx}"
+                        title="Ketuk untuk memperbesar foto ${displayName}"
+                        class="btn-zoom-roommate-photo relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-amber-400 shrink-0 cursor-pointer group shadow-md transition-transform duration-200 hover:scale-110 active:scale-95 bg-slate-800"
+                      >
+                        <img
+                          src="${photoUrl}"
+                          alt="${displayName}"
+                          class="w-full h-full object-cover"
+                          onerror="this.onerror=null;this.src='${fallbackAvatar}';"
+                        />
+                        <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <i class="fa-solid fa-magnifying-glass-plus text-white text-xs"></i>
+                        </div>
+                        <span class="absolute bottom-0 right-0 bg-amber-400 text-slate-950 text-[8px] font-extrabold px-1 rounded-tl-md leading-tight">
+                          <i class="fa-solid fa-expand"></i>
+                        </span>
+                      </div>
+
+                      <div class="min-w-0 flex-1">
+                        <div class="text-xs font-extrabold text-white leading-snug truncate">${displayName}</div>
+                        <div class="text-[10px] font-semibold text-violet-200 truncate mt-0.5">${rm.nama_sekolah || '-'}</div>
+                        <div class="text-[9px] font-bold text-amber-300 mt-0.5">
+                          Sub Rayon ${rm.subrayon || '-'} • WA: ${rm.no_hp || 'Belum diisi'}
+                        </div>
+                      </div>
                     </div>
+
                     <div class="flex items-center gap-1.5 shrink-0">
                       ${rm.no_hp ? `
-                        <a href="tel:${phoneClean}" title="Telepon Langsung" class="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center text-xs transition">
+                        <a href="tel:${phoneClean}" title="Telepon Langsung" class="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center text-xs transition shadow">
                           <i class="fa-solid fa-phone"></i>
                         </a>
-                        <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" title="Chat WhatsApp" class="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-sm transition">
+                        <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" title="Chat WhatsApp" class="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-sm transition shadow">
                           <i class="fa-brands fa-whatsapp"></i>
                         </a>
                       ` : ''}
@@ -337,8 +460,31 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
       `}
     </div>
   `;
+
+  bodyEl.querySelectorAll(".btn-zoom-roommate-photo").forEach(el => {
+    el.addEventListener("click", () => {
+      const idx = parseInt(el.dataset.rmIdx, 10);
+      const rm = roommates[idx];
+      if (!rm) return;
+      const displayName = rm.nama_kepsek && String(rm.nama_kepsek).trim() !== ""
+        ? rm.nama_kepsek
+        : `Kepala ${rm.nama_sekolah || 'Sekolah'}`;
+      const photoUrl = getPersonPhotoUrl(rm, displayName);
+      openRoommatePhotoZoomModal(
+        photoUrl,
+        displayName,
+        rm.nama_sekolah,
+        `Sub Rayon ${rm.subrayon || '-'}`,
+        rm.no_hp,
+        myRoomNo
+      );
+    });
+  });
 }
 
+// =========================================================================
+// 2. TAMPILAN PANITIA
+// =========================================================================
 function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback) {
   const showMasterRoomStats = isPanitiaInti(activeUser);
   const canInputMasterRooms = isKetuaPanitia(activeUser);
@@ -697,6 +843,8 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
       const roomCap = roomMeta ? Number(roomMeta.kapasitas) || 2 : 2;
       const waClean = String(p.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
       const phoneClean = String(p.no_hp || "").replace(/\D/g, "");
+      const photoUrl = getPersonPhotoUrl(p, p.nama_panitia);
+      const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.nama_panitia || "Panitia")}&background=1e1b4b&color=fcd34d&bold=true&size=200`;
 
       let optionsHtml = `<option value="" ${!currentRoom ? 'selected' : ''}>-- Belum Ditentukan --</option>`;
       const candidateRooms = panitiaRoomsOnly.length > 0 ? panitiaRoomsOnly : masterRoomsList;
@@ -714,25 +862,30 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
       });
 
       const card = document.createElement("div");
-      card.className = `p-3 rounded-2xl bg-white border ${currentRoom ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200'} flex items-center justify-between gap-2 shadow-2xs`;
+      card.className = `p-3 rounded-2xl bg-white border ${currentRoom ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200'} flex items-center justify-between gap-2.5 shadow-2xs`;
       card.innerHTML = `
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-[9px] font-extrabold text-slate-400">#${p.no || (idx + 1)}</span>
-            <span class="text-[9px] font-extrabold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">${p.divisi}</span>
-            ${currentRoom ? `
-              <span class="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                Kamar ${currentRoom} (${roommates.length + 1}/${roomCap})
-              </span>
+        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+          <div class="btn-zoom-panitia-photo w-11 h-11 rounded-2xl overflow-hidden border-2 border-indigo-300 shrink-0 cursor-pointer hover:scale-110 transition-transform bg-slate-100" title="Klik untuk memperbesar foto">
+            <img src="${photoUrl}" alt="${p.nama_panitia}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='${fallbackAvatar}';" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[9px] font-extrabold text-slate-400">#${p.no || (idx + 1)}</span>
+              <span class="text-[9px] font-extrabold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">${p.divisi}</span>
+              ${currentRoom ? `
+                <span class="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                  Kamar ${currentRoom} (${roommates.length + 1}/${roomCap})
+                </span>
+              ` : ''}
+            </div>
+            <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${p.nama_panitia}</h4>
+            <div class="text-[10px] text-slate-500 mt-0.5">Telp/WA: ${p.no_hp || 'Tidak ada'}</div>
+            ${roommates.length > 0 ? `
+              <div class="text-[9px] font-bold text-indigo-800 mt-1">
+                <i class="fa-solid fa-user-group mr-1"></i>Sekamar dgn: ${roommates.map(m => m.nama_panitia).join(', ')}
+              </div>
             ` : ''}
           </div>
-          <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${p.nama_panitia}</h4>
-          <div class="text-[10px] text-slate-500 mt-0.5">Telp/WA: ${p.no_hp || 'Tidak ada'}</div>
-          ${roommates.length > 0 ? `
-            <div class="text-[9px] font-bold text-indigo-800 mt-1">
-              <i class="fa-solid fa-user-group mr-1"></i>Sekamar dgn: ${roommates.map(m => m.nama_panitia).join(', ')}
-            </div>
-          ` : ''}
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
           ${p.no_hp ? `
@@ -756,6 +909,10 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
           `}
         </div>
       `;
+
+      card.querySelector(".btn-zoom-panitia-photo")?.addEventListener("click", () => {
+        openRoommatePhotoZoomModal(photoUrl, p.nama_panitia, p.divisi, p.jabatan || "Panitia Rakor", p.no_hp, currentRoom);
+      });
 
       if (canManagePanitiaRooms) {
         card.querySelector(".sel-panitia-room")?.addEventListener("change", async (e) => {
@@ -902,6 +1059,9 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
       const currentTotalInRoom = currentRoom ? (roommates.length + 1) : 0;
       const waClean = String(s.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
       const phoneClean = String(s.no_hp || "").replace(/\D/g, "");
+      const displayName = s.nama_kepsek || s.nama_sekolah;
+      const photoUrl = getPersonPhotoUrl(s, displayName);
+      const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1e1b4b&color=fcd34d&bold=true&size=200`;
 
       let roomOptionsHtml = `<option value="Belum Ditentukan" ${!currentRoom ? 'selected' : ''}>-- Belum Ditentukan --</option>`;
       pesertaRoomsOnly.forEach(rm => {
@@ -923,27 +1083,32 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
       const row = document.createElement("div");
       row.className = `p-3 rounded-2xl bg-white border ${!isIkut ? 'border-rose-200 bg-rose-50/30 opacity-80' : currentRoom ? 'border-violet-300 bg-violet-50/20' : 'border-slate-200'} shadow-2xs`;
       row.innerHTML = `
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
-              <span class="text-[9px] font-extrabold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">Rayon ${s.subrayon || '-'}</span>
-              <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${isIkut ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-                ${isIkut ? '✓ IKUT' : `✕ ${s.status_ikut || 'Tidak Ikut'}`}
-              </span>
-              ${currentRoom ? `
-                <span class="text-[9px] font-extrabold bg-violet-100 text-violet-900 px-1.5 py-0.5 rounded">
-                  Kamar ${currentRoom} (${currentTotalInRoom}/${roomCap} Org)
+        <div class="flex items-start justify-between gap-2.5">
+          <div class="flex items-start gap-2.5 min-w-0 flex-1">
+            <div class="btn-zoom-school-photo w-11 h-11 rounded-2xl overflow-hidden border-2 border-violet-300 shrink-0 cursor-pointer hover:scale-110 transition-transform bg-slate-100 mt-0.5" title="Klik untuk memperbesar foto">
+              <img src="${photoUrl}" alt="${displayName}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='${fallbackAvatar}';" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
+                <span class="text-[9px] font-extrabold bg-indigo-100 text-indigo-900 px-1.5 py-0.5 rounded">Rayon ${s.subrayon || '-'}</span>
+                <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${isIkut ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                  ${isIkut ? '✓ IKUT' : `✕ ${s.status_ikut || 'Tidak Ikut'}`}
                 </span>
+                ${currentRoom ? `
+                  <span class="text-[9px] font-extrabold bg-violet-100 text-violet-900 px-1.5 py-0.5 rounded">
+                    Kamar ${currentRoom} (${currentTotalInRoom}/${roomCap} Org)
+                  </span>
+                ` : ''}
+              </div>
+              <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
+              <p class="text-[10px] text-slate-600 truncate">Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • Telp/WA: ${s.no_hp || '-'}</p>
+              ${roommates.length > 0 ? `
+                <div class="text-[9px] font-bold text-violet-900 mt-1 bg-violet-100/80 px-2 py-0.5 rounded-md inline-block">
+                  <i class="fa-solid fa-user-group mr-1 text-violet-700"></i>Teman Sekamar: ${roommates.map(o => `${o.nama_kepsek || o.nama_sekolah} (${o.subrayon})`).join(', ')}
+                </div>
               ` : ''}
             </div>
-            <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
-            <p class="text-[10px] text-slate-600 truncate">Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • Telp/WA: ${s.no_hp || '-'}</p>
-            ${roommates.length > 0 ? `
-              <div class="text-[9px] font-bold text-violet-900 mt-1 bg-violet-100/80 px-2 py-0.5 rounded-md inline-block">
-                <i class="fa-solid fa-user-group mr-1 text-violet-700"></i>Teman Sekamar: ${roommates.map(o => `${o.nama_kepsek || o.nama_sekolah} (${o.subrayon})`).join(', ')}
-              </div>
-            ` : ''}
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             ${s.no_hp ? `
@@ -972,6 +1137,10 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
           </div>
         </div>
       `;
+
+      row.querySelector(".btn-zoom-school-photo")?.addEventListener("click", () => {
+        openRoommatePhotoZoomModal(photoUrl, s.nama_kepsek || "Kepala Sekolah", s.nama_sekolah, `Sub Rayon ${s.subrayon || '-'}`, s.no_hp, currentRoom);
+      });
 
       if (canSetOccupants && isIkut) {
         row.querySelector(".sel-assign-room")?.addEventListener("change", async (e) => {
@@ -1105,7 +1274,8 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
     ].map(escapeCsv).join(","));
   });
 
-  const csvContent = [headers.map(escapeCsv).join(","), ...rows].join("\r\n");
+  const lineBreak = String.fromCharCode(13, 10);
+  const csvContent = [headers.map(escapeCsv).join(","), ...rows].join(lineBreak);
   const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
   const blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
