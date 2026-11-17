@@ -8,10 +8,10 @@
 import { sb, toast } from './supabase.js';
 
 const SUBRAYON_LIST = ["Maulafa", "Alak", "Kota Raja", "Oebobo", "Kelapa Lima", "Kota Lama"];
-let masterRoomsList = []; // Array of { nomor: "101", kapasitas: 2, kategori: "PESERTA" | "PANITIA" }
-let panitiaRoomMap = {};  // Map { [id_panitia]: "P-01" }
+let masterRoomsList = [];
+let panitiaRoomMap = {};
 let cachedPanitiaList = [];
-let activeRoomTab = "pembagian"; // 'pembagian' | 'kamar_panitia' | 'master_kamar'
+let activeRoomTab = "pembagian";
 let selectedFilterRayon = "ALL";
 let selectedFilterKamarStatus = "IKUT_ALL";
 let selectedFilterDivisiPanitia = "ALL";
@@ -223,9 +223,6 @@ function getPanitiaAssignedRoom(idPanitia) {
   return norm && norm !== "BELUM DITENTUKAN" ? norm : "";
 }
 
-// =========================================================================
-// FUNGSI UTAMA PEMBUKA MODAL INFO KAMAR
-// =========================================================================
 export async function openRoomManagerModal(activeUser, sekolahList, reloadCallback) {
   const modal = document.getElementById("serviceModal");
   const titleEl = document.getElementById("serviceModalTitle");
@@ -249,9 +246,6 @@ export async function openRoomManagerModal(activeUser, sekolahList, reloadCallba
   renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback);
 }
 
-// =========================================================================
-// 1. TAMPILAN KHUSUS PESERTA
-// =========================================================================
 function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
   const mySchool = sekolahList.find(x => x.id_sekolah === activeUser?.profile?.id_sekolah) || activeUser?.profile || {};
   const isIkut = isSchoolParticipating(mySchool);
@@ -345,9 +339,6 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
   `;
 }
 
-// =========================================================================
-// 2. TAMPILAN PANITIA
-// =========================================================================
 function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback) {
   const showMasterRoomStats = isPanitiaInti(activeUser);
   const canInputMasterRooms = isKetuaPanitia(activeUser);
@@ -501,9 +492,6 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
   }
 }
 
-// =========================================================================
-// SUB-TAB A: INPUT MASTER KAMAR
-// =========================================================================
 function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, bodyEl, reloadCallback) {
   container.innerHTML = `
     <div class="p-4 rounded-2xl bg-violet-50 border-2 border-violet-300 space-y-3 shadow-2xs">
@@ -647,9 +635,6 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
   });
 }
 
-// =========================================================================
-// SUB-TAB B: KAMAR KHUSUS PANITIA
-// =========================================================================
 function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahList, container, bodyEl, reloadCallback) {
   const myPanitiaId = activeUser?.profile?.id_panitia;
   const myPanitiaRoom = myPanitiaId ? getPanitiaAssignedRoom(myPanitiaId) : "";
@@ -807,9 +792,6 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
   document.getElementById("panRoomSearchInput")?.addEventListener("input", renderPanitiaRows);
 }
 
-// =========================================================================
-// SUB-TAB C: PEMBAGIAN KAMAR PESERTA PER SUB RAYON
-// =========================================================================
 function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolahList, container, bodyEl, reloadCallback) {
   const participatingSchools = (sekolahList || []).filter(isSchoolParticipating);
   const nonParticipatingCount = (sekolahList || []).length - participatingSchools.length;
@@ -1039,9 +1021,6 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
   document.getElementById("kamarSearchSchoolInput")?.addEventListener("input", renderOccupantRows);
 }
 
-// =========================================================================
-// EXPORT 1: DOWNLOAD SPREADSHEET (.CSV)
-// =========================================================================
 export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
   if (!isKetuaOrSekretaris(activeUser)) {
     return toast("Akses Ditolak: Hanya Ketua Panitia & Sekretaris yang dapat mengunduh Dokumen Rekapan Kamar!");
@@ -1126,8 +1105,7 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
     ].map(escapeCsv).join(","));
   });
 
-  const csvContent = [headers.map(escapeCsv).join(","), ...rows].join("
-");
+  const csvContent = [headers.map(escapeCsv).join(","), ...rows].join("\r\n");
   const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
   const blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -1141,9 +1119,6 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
   toast("File Spreadsheet Rekapan Kamar berhasil diunduh!");
 }
 
-// =========================================================================
-// EXPORT 2: DOWNLOAD DOKUMEN PDF RESMI REKAPAN KAMAR HOTEL
-// =========================================================================
 export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
   if (!isKetuaOrSekretaris(activeUser)) {
     return toast("Akses Ditolak: Hanya Ketua Panitia & Sekretaris yang dapat mengunduh PDF Rekapan Kamar!");
