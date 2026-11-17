@@ -1275,17 +1275,21 @@ async function saveTaskModal() {
   await loadAllDatabase(false);
 }
 
+
 // =========================================================================
-// PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (RUNNING TEXT + 8 MENU KOTAK)
-// 1. Running Text tampil di bagian atas tepat di atas grid menu Khusus Panitia
-// 2. Rekap Profil Kepsek & Infografis Sekolah menjadi menu kotak sendiri
-// 3. Menu Catatan & Evaluasi memiliki Form Input & Riwayat Mandiri yang Pasti Muncul
+// PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (AMAN UNTUK BERANDA PESERTA)
+// - Saat Login PESERTA: Semua info card, Running Text, & menu peserta tampil utuh 100%
+// - Saat Login PANITIA: Menampilkan Card Khusus Panitia (Running Text + 8 Menu Kotak)
 // =========================================================================
 
 let hiddenPanitiaWidgetsHolder = null;
 let cachedCatatanElement = null;
 let cachedScannerElement = null;
 let cachedRunningTextElement = null;
+let cachedRunningTextOriginalParent = null;
+let cachedRunningTextNextSibling = null;
+let hiddenForPanitiaElements = [];
+
 let origSkBtnRef = null;
 let origJobBtnRef = null;
 let origMeetBtnRef = null;
@@ -1344,9 +1348,49 @@ function cleanUpHeaderClutter() {
   });
 }
 
-// =========================================================================
-// MODAL MURNI CATATAN & EVALUASI KEGIATAN (FORM INPUT TEMUAN & DAFTAR RIWAYAT)
-// =========================================================================
+// Fungsi untuk memulihkan seluruh kartu & Running Text saat login sebagai PESERTA
+function restorePesertaBerandaCards() {
+  document.getElementById("panitiaUnifiedWorkspaceCard")?.classList.add("hidden");
+
+  // Kembalikan Running Text ke posisi aslinya di Beranda Peserta
+  if (cachedRunningTextElement && cachedRunningTextOriginalParent) {
+    cachedRunningTextElement.classList.remove("hidden");
+    cachedRunningTextElement.style.display = "";
+    if (cachedRunningTextElement.parentElement !== cachedRunningTextOriginalParent) {
+      if (cachedRunningTextNextSibling && cachedRunningTextNextSibling.parentElement === cachedRunningTextOriginalParent) {
+        cachedRunningTextOriginalParent.insertBefore(cachedRunningTextElement, cachedRunningTextNextSibling);
+      } else {
+        cachedRunningTextOriginalParent.prepend(cachedRunningTextElement);
+      }
+    }
+  }
+
+  // Tampilkan kembali semua kartu info Beranda yang sebelumnya disembunyikan saat mode Panitia
+  hiddenForPanitiaElements.forEach(el => {
+    if (el) {
+      el.classList.remove("hidden");
+      el.style.display = "";
+    }
+  });
+  hiddenForPanitiaElements = [];
+
+  // Pastikan di Kartu Layanan Peserta semua tombol peserta tampil normal (hanya SK, Jobdesk, Meeting Panitia yang disembunyikan untuk Peserta)
+  const tabBeranda = document.getElementById("tabContentBeranda");
+  const generalServiceCard = tabBeranda?.querySelector(".service-menu-btn")?.closest(".bg-white");
+  if (generalServiceCard) {
+    generalServiceCard.querySelectorAll("button, a").forEach(btn => {
+      const t = (btn.textContent || "").toLowerCase();
+      if (t.includes("sk panitia") || t.includes("job deskripsi") || t.includes("jobdesk") || t.includes("meeting panitia")) {
+        btn.classList.add("hidden");
+        btn.style.display = "none";
+      } else {
+        btn.classList.remove("hidden");
+        btn.style.display = "";
+      }
+    });
+  }
+}
+
 async function openDedicatedCatatanEvaluasiModal() {
   rescueWidgetsBeforeModalOverwrite();
 
@@ -1358,30 +1402,6 @@ async function openDedicatedCatatanEvaluasiModal() {
   modal.classList.remove("hidden");
   titleEl.innerHTML = `<i class="fa-solid fa-clipboard-list text-rose-600 mr-1.5"></i> Catatan & Evaluasi Kegiatan`;
 
-  // Cek apakah widget asli dari catatan.js memiliki textarea form yang utuh
-  if (cachedCatatanElement) {
-    // Pulihkan semua elemen form di dalam cachedCatatanElement yang mungkin sempat tersembunyi
-    cachedCatatanElement.classList.remove("hidden");
-    cachedCatatanElement.style.display = "";
-    cachedCatatanElement.querySelectorAll("form, textarea, input, select, button, div").forEach(el => {
-      const t = (el.textContent || "").toLowerCase();
-      const isNonCatatan =
-        (t.includes("rekap profil kepsek") || (t.includes("infografis") && t.includes("sekolah"))) &&
-        !el.querySelector("textarea");
-      if (!isNonCatatan) {
-        if (el.style.display === "none") el.style.display = "";
-        el.classList.remove("hidden");
-      }
-    });
-
-    if (cachedCatatanElement.querySelector("textarea, input[type='text']")) {
-      bodyEl.innerHTML = "";
-      bodyEl.appendChild(cachedCatatanElement);
-      return;
-    }
-  }
-
-  // Render Form Input Catatan & Evaluasi Murni (Langsung Tersimpan ke Database Supabase)
   const myName = activeUser?.profile?.nama_panitia || "Panitia";
   const myDivisi = activeUser?.profile?.divisi || "Panitia";
   const canDeleteAny = ["Ketua Panitia", "Sekretaris", "Penanggung Jawab"].includes(myDivisi);
@@ -1749,6 +1769,10 @@ function extractMisplacedItemsFromCatatan() {
     root.querySelectorAll("marquee, [id*='running'], [id*='marquee'], [id*='ticker'], [class*='marquee']").forEach(mq => {
       const bannerBox = mq.closest(".rounded-2xl, .rounded-3xl, .p-2, .p-2\\.5, .p-3") || mq.parentElement;
       if (bannerBox && !bannerBox.closest("#panitiaRunningTextSlot")) {
+        if (!cachedRunningTextOriginalParent) {
+          cachedRunningTextOriginalParent = bannerBox.parentElement;
+          cachedRunningTextNextSibling = bannerBox.nextElementSibling;
+        }
         cachedRunningTextElement = bannerBox;
       }
     });
@@ -1772,6 +1796,13 @@ function reorganizePanitiaWorkspaceCards() {
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (!tabBeranda) return;
 
+  // JIKA LOGIN SEBAGAI PESERTA (ATAU BELUM LOGIN): Pulihkan semua kartu & menu Beranda Peserta!
+  if (!activeUser || activeUser.role !== "panitia") {
+    restorePesertaBerandaCards();
+    return;
+  }
+
+  // JIKA LOGIN SEBAGAI PANITIA:
   const generalServiceCard = tabBeranda.querySelector(".service-menu-btn")?.closest(".bg-white");
   if (generalServiceCard) {
     generalServiceCard.querySelectorAll("button, a").forEach(btn => {
@@ -1801,11 +1832,6 @@ function reorganizePanitiaWorkspaceCards() {
     });
   }
 
-  if (!activeUser || activeUser.role !== "panitia") {
-    document.getElementById("panitiaUnifiedWorkspaceCard")?.classList.add("hidden");
-    return;
-  }
-
   const holder = ensureHiddenHolder();
 
   Array.from(tabBeranda.children).forEach(el => {
@@ -1815,9 +1841,9 @@ function reorganizePanitiaWorkspaceCards() {
     if (txt.includes("khusus panitia & akses khusus") && !txt.includes("layanan scanner")) {
       el.classList.add("hidden");
       el.style.display = "none";
+      if (!hiddenForPanitiaElements.includes(el)) hiddenForPanitiaElements.push(el);
     }
 
-    // Hanya tangkap sebagai cachedCatatanElement jika benar-benar berisi form catatan (bukan kartu gabungan fitur_ekstra)
     if (
       (txt.includes("catatan & evaluasi") || txt.includes("catatan panitia") || el.id?.toLowerCase().includes("catatan")) &&
       !txt.includes("layanan scanner") &&
@@ -1848,6 +1874,7 @@ function reorganizePanitiaWorkspaceCards() {
       });
       el.classList.add("hidden");
       el.style.display = "none";
+      if (!hiddenForPanitiaElements.includes(el)) hiddenForPanitiaElements.push(el);
     }
   });
 
