@@ -1,6 +1,6 @@
 // js/kamar.js
-// Sistem Manajemen Kamar Hotel Rakor K3S 2026 (Dilengkapi Kontak WA & Telepon Teman Sekamar):
-// 1. Peserta: Melihat kamarnya sendiri & rekan sekamarnya lengkap dengan tombol WhatsApp/Telepon.
+// Sistem Manajemen Kamar Hotel Rakor K3S 2026:
+// 1. Peserta: Melihat kamarnya sendiri & rekan sekamarnya (Lengkap: Nama Kepsek, Asal Sekolah, Sub Rayon, No HP/WA, & Tombol Call/WhatsApp).
 // 2. Ketua Panitia: Menginput nomor kamar, kapasitas, & peruntukan (Kamar Peserta / Kamar Khusus Panitia).
 // 3. Panitia Inti (PJ, Ketua, Sekretaris, Bendahara): Melihat data rekapitulasi jumlah kamar hotel.
 // 4. Ketua Sub Rayon (+ Ketua & Sekretaris): Menentukan penghuni kamar peserta (validasi anti-melebihi kapasitas).
@@ -266,7 +266,7 @@ export async function openRoomManagerModal(activeUser, sekolahList, reloadCallba
 }
 
 // =========================================================================
-// 1. TAMPILAN KHUSUS PESERTA (DILENGKAPI TOMBOL WHATSAPP & TELEPON REKAN SEKAMAR)
+// 1. TAMPILAN KHUSUS PESERTA (LENGKAP: NAMA KEPSEK, ASAL SEKOLAH, SUB RAYON, NO HP/WA, & TOMBOL WA/TELP)
 // =========================================================================
 function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
   const mySchool = sekolahList.find(x => x.id_sekolah === activeUser?.profile?.id_sekolah) || activeUser?.profile || {};
@@ -293,7 +293,7 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
           Informasi Kamar Peserta • Sub Rayon ${mySchool.subrayon || '-'}
         </span>
         <h4 class="text-sm font-extrabold mt-1.5">${mySchool.nama_sekolah || 'Sekolah Peserta'}</h4>
-        <p class="text-[11px] text-violet-200">${mySchool.nama_kepsek || 'Kepala Sekolah'}</p>
+        <p class="text-[11px] text-violet-200">Kepala Sekolah: <b>${mySchool.nama_kepsek || 'Belum Diisi'}</b></p>
       </div>
 
       ${!isIkut ? `
@@ -863,7 +863,7 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
 }
 
 // =========================================================================
-// SUB-TAB C: PEMBAGIAN KAMAR PESERTA PER SUB RAYON (DILENGKAPI TOMBOL WA & TELEPON)
+// SUB-TAB C: PEMBAGIAN KAMAR PESERTA PER SUB RAYON
 // =========================================================================
 function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolahList, container, bodyEl, reloadCallback) {
   const participatingSchools = (sekolahList || []).filter(isSchoolParticipating);
