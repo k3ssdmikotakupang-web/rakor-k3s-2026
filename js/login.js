@@ -1,9 +1,7 @@
 // js/login.js
-// Disesuaikan 100% dengan ID elemen pada index.html:
-// - btnRolePeserta & btnRolePanitia
-// - loginSubrayonSelect, loginSchoolSelect, loginNpsnPassword, togglePswdBtn, btnSubmitPeserta
-// - loginPanitiaSelect, loginPinInput (dikosongkan otomatis, PIN 123321 + ikon mata), btnSubmitPanitia
-// - btnOpenScanner, qrScannerModal, qrReader, qrFileInput
+// Disesuaikan 100% dengan ID elemen pada index.html[cite: 7]:
+// - Dropdown sekolah hanya menampilkan Nama Sekolah (tanpa membocorkan NPSN)
+// - PIN Panitia dikosongkan otomatis, default PIN 123321 + ikon mata
 import { sb, toast } from './supabase.js';
 
 let cachedSekolahList = [];
@@ -32,7 +30,7 @@ export async function initLogin(onSuccessCallback) {
   const btnCloseScanner = document.getElementById("btnCloseScanner");
   const qrFileInput = document.getElementById("qrFileInput");
 
-  // 1. Kosongkan PIN Panitia (hapus value="2026" bawaan HTML) & pasang tombol mata
+  // 1. Kosongkan PIN Panitia (hapus value="2026" bawaan HTML) & pasang tombol mata[cite: 7]
   if (pinInput) {
     pinInput.value = "";
     pinInput.removeAttribute("value");
@@ -60,7 +58,7 @@ export async function initLogin(onSuccessCallback) {
     }
   }
 
-  // 2. Tombol mata pada input NPSN Peserta
+  // 2. Tombol mata pada input NPSN Peserta[cite: 7]
   if (togglePswdBtn && npsnInput) {
     togglePswdBtn.onclick = () => {
       const isPwd = npsnInput.type === "password";
@@ -69,7 +67,7 @@ export async function initLogin(onSuccessCallback) {
     };
   }
 
-  // 3. Pindah Tab Peserta <-> Panitia
+  // 3. Pindah Tab Peserta <-> Panitia[cite: 7]
   if (btnRolePeserta && btnRolePanitia) {
     btnRolePeserta.onclick = () => {
       btnRolePeserta.className = "py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition";
@@ -87,7 +85,7 @@ export async function initLogin(onSuccessCallback) {
     };
   }
 
-  // 4. Ambil data Sekolah & Panitia dari Supabase
+  // 4. Ambil data Sekolah & Panitia dari Supabase[cite: 1, 5, 8]
   try {
     const [sekRes, panRes] = await Promise.all([
       sb.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true }),
@@ -100,7 +98,7 @@ export async function initLogin(onSuccessCallback) {
     console.error("Gagal memuat data login:", err);
   }
 
-  // 5. Isi Dropdown Panitia
+  // 5. Isi Dropdown Panitia[cite: 1, 5, 8]
   if (panitiaSelect && cachedPanitiaList.length > 0) {
     panitiaSelect.innerHTML = `<option value="">Pilih Nama Panitia (${cachedPanitiaList.length} Orang)</option>`;
     cachedPanitiaList.forEach(p => {
@@ -112,7 +110,7 @@ export async function initLogin(onSuccessCallback) {
     });
   }
 
-  // 6. Filter Sub Rayon -> Aktifkan Dropdown Sekolah
+  // 6. Filter Sub Rayon -> Aktifkan Dropdown Sekolah (Tanpa Menampilkan NPSN)
   const renderSchoolDropdown = (selectedRayon) => {
     if (!schoolSelect) return;
     if (!selectedRayon) {
@@ -130,7 +128,7 @@ export async function initLogin(onSuccessCallback) {
     filtered.forEach(s => {
       const opt = document.createElement("option");
       opt.value = s.id_sekolah;
-      opt.textContent = `${s.nama_sekolah} (${s.npsn})`;
+      opt.textContent = s.nama_sekolah;
       schoolSelect.appendChild(opt);
     });
   };
@@ -153,7 +151,7 @@ export async function initLogin(onSuccessCallback) {
 
       if (!sr) return toast("Pilih Sub Rayon terlebih dahulu!");
       if (!idSekolah) return toast("Pilih nama sekolah Anda!");
-      if (!pass) return toast("Masukkan NPSN sekolah Anda!");
+      if (!pass) return toast("Masukkan NPSN / Password sekolah Anda!");
 
       let school = cachedSekolahList.find(s => String(s.id_sekolah) === String(idSekolah));
       if (!school) {
@@ -203,7 +201,7 @@ export async function initLogin(onSuccessCallback) {
     };
   }
 
-  // 9. Fitur Masuk dengan Scan QR
+  // 9. Fitur Masuk dengan Scan QR[cite: 7]
   const stopScanner = async () => {
     if (html5QrScanner) {
       try {
