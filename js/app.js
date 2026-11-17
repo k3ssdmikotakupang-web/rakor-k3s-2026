@@ -1276,11 +1276,10 @@ async function saveTaskModal() {
 }
 
 // =========================================================================
-// =========================================================================
 // PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (RUNNING TEXT + 8 MENU KOTAK)
 // 1. Running Text tampil di bagian atas tepat di atas grid menu Khusus Panitia
-// 2. Rekap Profil Kepsek & Infografis Sekolah dikeluarkan menjadi menu kotak sendiri
-// 3. Menu Catatan & Evaluasi murni hanya berisi form input & daftar catatan/temuan
+// 2. Rekap Profil Kepsek & Infografis Sekolah menjadi menu kotak sendiri
+// 3. Menu Catatan & Evaluasi memiliki Form Input & Riwayat Mandiri yang Pasti Muncul
 // =========================================================================
 
 let hiddenPanitiaWidgetsHolder = null;
@@ -1343,6 +1342,275 @@ function cleanUpHeaderClutter() {
       el.remove();
     }
   });
+}
+
+// =========================================================================
+// MODAL MURNI CATATAN & EVALUASI KEGIATAN (FORM INPUT TEMUAN & DAFTAR RIWAYAT)
+// =========================================================================
+async function openDedicatedCatatanEvaluasiModal() {
+  rescueWidgetsBeforeModalOverwrite();
+
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-clipboard-list text-rose-600 mr-1.5"></i> Catatan & Evaluasi Kegiatan`;
+
+  // Cek apakah widget asli dari catatan.js memiliki textarea form yang utuh
+  if (cachedCatatanElement) {
+    // Pulihkan semua elemen form di dalam cachedCatatanElement yang mungkin sempat tersembunyi
+    cachedCatatanElement.classList.remove("hidden");
+    cachedCatatanElement.style.display = "";
+    cachedCatatanElement.querySelectorAll("form, textarea, input, select, button, div").forEach(el => {
+      const t = (el.textContent || "").toLowerCase();
+      const isNonCatatan =
+        (t.includes("rekap profil kepsek") || (t.includes("infografis") && t.includes("sekolah"))) &&
+        !el.querySelector("textarea");
+      if (!isNonCatatan) {
+        if (el.style.display === "none") el.style.display = "";
+        el.classList.remove("hidden");
+      }
+    });
+
+    if (cachedCatatanElement.querySelector("textarea, input[type='text']")) {
+      bodyEl.innerHTML = "";
+      bodyEl.appendChild(cachedCatatanElement);
+      return;
+    }
+  }
+
+  // Render Form Input Catatan & Evaluasi Murni (Langsung Tersimpan ke Database Supabase)
+  const myName = activeUser?.profile?.nama_panitia || "Panitia";
+  const myDivisi = activeUser?.profile?.divisi || "Panitia";
+  const canDeleteAny = ["Ketua Panitia", "Sekretaris", "Penanggung Jawab"].includes(myDivisi);
+
+  bodyEl.innerHTML = `
+    <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-rose-950 to-slate-900 text-white space-y-2 shadow-lg border border-rose-400/30">
+      <div class="flex items-center justify-between">
+        <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+          Buku Catatan & Temuan Lapangan
+        </span>
+        <span class="text-[10px] font-bold text-rose-200">${myDivisi}</span>
+      </div>
+      <h4 class="text-xs font-extrabold text-white">Input Catatan, Kendala & Evaluasi Kegiatan</h4>
+      <p class="text-[10px] text-rose-200 leading-relaxed">
+        Catat setiap temuan penting, kendala teknis, maupun usulan evaluasi selama persiapan dan pelaksanaan Rakor K3S 2026.
+      </p>
+    </div>
+
+    <div class="p-4 rounded-2xl bg-rose-50/60 border-2 border-rose-200 space-y-3 shadow-2xs">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Kategori Temuan / Catatan:</label>
+          <select id="inpCatKategori" class="w-full rounded-xl border border-rose-300 bg-white px-2.5 py-2 text-xs font-extrabold text-slate-800">
+            <option value="Evaluasi Umum">📋 Evaluasi Umum</option>
+            <option value="Kendala Teknis / Mendesak">🚨 Kendala Mendesak</option>
+            <option value="Logistik & Konsumsi">🍱 Logistik & Konsumsi</option>
+            <option value="Kamar & Akomodasi">🛏️ Kamar & Akomodasi</option>
+            <option value="Acara & Persidangan">🎤 Acara & Sidang</option>
+            <option value="Usulan Tindak Lanjut">💡 Usulan Perbaikan</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Waktu / Hari Kegiatan:</label>
+          <select id="inpCatMomentum" class="w-full rounded-xl border border-rose-300 bg-white px-2.5 py-2 text-xs font-extrabold text-slate-800">
+            <option value="Pra-Rakor">Pra-Rakor (Persiapan)</option>
+            <option value="Hari Ke-1 (26 Nov)">Hari Ke-1 (26 Nov)</option>
+            <option value="Hari Ke-2 (27 Nov)">Hari Ke-2 (27 Nov)</option>
+            <option value="Hari Ke-3 (28 Nov)">Hari Ke-3 (28 Nov)</option>
+            <option value="Pasca-Rakor">Pasca-Rakor (LPJ)</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Isi Catatan / Temuan Baru:</label>
+        <textarea id="inpCatIsiText" rows="3" placeholder="Tuliskan detail temuan, catatan evaluasi, atau hal yang perlu segera ditindaklanjuti..." class="w-full rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:border-rose-600"></textarea>
+      </div>
+
+      <button type="button" id="btnSubmitNewCatatanNow" class="w-full py-2.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white font-extrabold text-xs shadow flex items-center justify-center gap-1.5 active:scale-[0.99] transition">
+        <i class="fa-solid fa-paper-plane"></i>
+        <span>Simpan Catatan & Evaluasi</span>
+      </button>
+    </div>
+
+    <div class="space-y-2 pt-1">
+      <div class="flex items-center justify-between px-1">
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+          Riwayat Catatan & Temuan Panitia
+        </span>
+        <span id="badgeCountCatatanList" class="text-[9px] font-extrabold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">Memuat...</span>
+      </div>
+      <div id="listDedicatedCatatanBox" class="space-y-2 max-h-72 overflow-y-auto pr-0.5"></div>
+    </div>
+  `;
+
+  const loadAndRenderNotes = async () => {
+    const listBox = document.getElementById("listDedicatedCatatanBox");
+    const countBadge = document.getElementById("badgeCountCatatanList");
+    if (!listBox) return;
+
+    let notes = [];
+    try {
+      const { data: tableData, error: tableErr } = await sb
+        .from("catatan_panitia")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (!tableErr && Array.isArray(tableData)) {
+        notes = tableData.map(r => ({
+          source: "table",
+          id: r.id || r.id_catatan,
+          nama: r.nama_panitia || r.penulis || "Panitia",
+          divisi: r.divisi || "-",
+          kategori: r.kategori || "Evaluasi Umum",
+          momentum: r.tahapan || r.hari || "",
+          isi: r.isi_catatan || r.catatan || r.deskripsi || "",
+          waktu: r.waktu || r.created_at || ""
+        }));
+      } else {
+        const { data: layData } = await sb
+          .from("info_layanan")
+          .select("*")
+          .eq("kode_menu", "catatan_evaluasi_panitia")
+          .maybeSingle();
+
+        if (layData && layData.deskripsi) {
+          const parsed = JSON.parse(layData.deskripsi);
+          if (Array.isArray(parsed)) notes = parsed;
+        }
+      }
+    } catch (e) {}
+
+    if (countBadge) countBadge.textContent = `${notes.length} Catatan`;
+
+    if (notes.length === 0) {
+      listBox.innerHTML = `<div class="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">Belum ada catatan atau temuan yang diinput.</div>`;
+      return;
+    }
+
+    listBox.innerHTML = notes.map((n, idx) => {
+      const isUrgent = String(n.kategori || "").toLowerCase().includes("mendesak") || String(n.kategori || "").toLowerCase().includes("kendala");
+      const canDel = canDeleteAny || n.nama === myName;
+      return `
+        <div class="p-3 rounded-2xl bg-white border ${isUrgent ? 'border-rose-300 bg-rose-50/20' : 'border-slate-200'} space-y-1.5 shadow-2xs">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-[9px] font-extrabold px-2 py-0.5 rounded ${isUrgent ? 'bg-rose-600 text-white' : 'bg-indigo-100 text-indigo-900'}">
+                ${n.kategori || 'Evaluasi'}
+              </span>
+              ${n.momentum ? `<span class="text-[9px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">${n.momentum}</span>` : ''}
+            </div>
+            ${canDel ? `
+              <button type="button" data-delidx="${idx}" data-delid="${n.id || ''}" data-delsrc="${n.source || 'json'}" class="btn-del-catatan-item text-slate-400 hover:text-rose-600 text-xs px-1" title="Hapus Catatan">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            ` : ''}
+          </div>
+          <p class="text-xs font-semibold text-slate-800 leading-relaxed whitespace-pre-line">${n.isi || '-'}</p>
+          <div class="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-100">
+            <span class="font-bold text-slate-600"><i class="fa-solid fa-user-pen mr-1 text-rose-600"></i>${n.nama} (${n.divisi})</span>
+            <span>${n.waktu || ''}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    listBox.querySelectorAll(".btn-del-catatan-item").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Hapus catatan evaluasi ini?")) return;
+        const src = btn.dataset.delsrc;
+        const delId = btn.dataset.delid;
+        const delIdx = parseInt(btn.dataset.delidx, 10);
+
+        if (src === "table" && delId) {
+          await sb.from("catatan_panitia").delete().eq("id", delId);
+        } else {
+          notes.splice(delIdx, 1);
+          await sb.from("info_layanan").upsert([{
+            kode_menu: "catatan_evaluasi_panitia",
+            judul: "Catatan & Evaluasi Kegiatan Rakor 2026",
+            deskripsi: JSON.stringify(notes),
+            url_link: String(notes.length),
+            status_tersedia: "PANITIA"
+          }]);
+        }
+        toast("Catatan dihapus.");
+        loadAndRenderNotes();
+      });
+    });
+  };
+
+  document.getElementById("btnSubmitNewCatatanNow")?.addEventListener("click", async () => {
+    const kategori = document.getElementById("inpCatKategori")?.value || "Evaluasi Umum";
+    const momentum = document.getElementById("inpCatMomentum")?.value || "Pra-Rakor";
+    const isi = document.getElementById("inpCatIsiText")?.value.trim() || "";
+
+    if (!isi) return toast("Tuliskan isi catatan atau temuan terlebih dahulu!");
+
+    const btn = document.getElementById("btnSubmitNewCatatanNow");
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Menyimpan...`;
+
+    const waktuStr = new Date().toLocaleString("id-ID");
+
+    let savedToTable = false;
+    try {
+      const { error } = await sb.from("catatan_panitia").insert([{
+        nama_panitia: myName,
+        divisi: myDivisi,
+        kategori,
+        tahapan: momentum,
+        isi_catatan: isi,
+        waktu: waktuStr
+      }]);
+      if (!error) savedToTable = true;
+    } catch (e) {}
+
+    if (!savedToTable) {
+      let existingArr = [];
+      try {
+        const { data: layData } = await sb
+          .from("info_layanan")
+          .select("*")
+          .eq("kode_menu", "catatan_evaluasi_panitia")
+          .maybeSingle();
+        if (layData && layData.deskripsi) {
+          const parsed = JSON.parse(layData.deskripsi);
+          if (Array.isArray(parsed)) existingArr = parsed;
+        }
+      } catch (e) {}
+
+      existingArr.unshift({
+        id: "CAT-" + Date.now(),
+        source: "json",
+        nama: myName,
+        divisi: myDivisi,
+        kategori,
+        momentum,
+        isi,
+        waktu: waktuStr
+      });
+
+      await sb.from("info_layanan").upsert([{
+        kode_menu: "catatan_evaluasi_panitia",
+        judul: "Catatan & Evaluasi Kegiatan Rakor 2026",
+        deskripsi: JSON.stringify(existingArr),
+        url_link: String(existingArr.length),
+        status_tersedia: "PANITIA"
+      }]);
+    }
+
+    document.getElementById("inpCatIsiText").value = "";
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Simpan Catatan & Evaluasi</span>`;
+    toast("Catatan & temuan berhasil disimpan!");
+    loadAndRenderNotes();
+  });
+
+  await loadAndRenderNotes();
 }
 
 function openProfilPanitiaDirectoryModal() {
@@ -1473,13 +1741,11 @@ function openProfilPanitiaDirectoryModal() {
   renderModalContent();
 }
 
-// Fungsi pemisah elemen yang tergabung di dalam wadah Catatan / Fitur Ekstra
 function extractMisplacedItemsFromCatatan() {
   const holder = ensureHiddenHolder();
   const searchRoots = [document.getElementById("tabContentBeranda"), cachedCatatanElement, holder].filter(Boolean);
 
   searchRoots.forEach(root => {
-    // 1. Cari elemen Running Text (marquee atau banner pengumuman berjalan)
     root.querySelectorAll("marquee, [id*='running'], [id*='marquee'], [id*='ticker'], [class*='marquee']").forEach(mq => {
       const bannerBox = mq.closest(".rounded-2xl, .rounded-3xl, .p-2, .p-2\\.5, .p-3") || mq.parentElement;
       if (bannerBox && !bannerBox.closest("#panitiaRunningTextSlot")) {
@@ -1487,53 +1753,17 @@ function extractMisplacedItemsFromCatatan() {
       }
     });
 
-    // 2. Cari tombol/kartu "Rekap Profil Kepsek" & "Infografis & Profil Sekolah"
-    root.querySelectorAll("button, a, div").forEach(el => {
+    root.querySelectorAll("button, a").forEach(el => {
       if (el.closest("#panitiaUnifiedGrid6")) return;
       const t = (el.textContent || "").toLowerCase().trim();
 
-      if (el.tagName === "BUTTON" || el.tagName === "A" || el.getAttribute("role") === "button") {
-        if (t.includes("rekap profil kepsek")) {
-          origRekapKepsekBtnRef = el;
-          const wrapCard = el.closest(".rounded-2xl, .rounded-3xl");
-          if (wrapCard && wrapCard !== cachedCatatanElement && !wrapCard.querySelector("textarea")) {
-            wrapCard.classList.add("hidden");
-            wrapCard.style.display = "none";
-          } else {
-            el.classList.add("hidden");
-            el.style.display = "none";
-          }
-        } else if (t.includes("infografis") && (t.includes("sekolah") || t.includes("profil"))) {
-          origInfografisBtnRef = el;
-          const wrapCard = el.closest(".rounded-2xl, .rounded-3xl");
-          if (wrapCard && wrapCard !== cachedCatatanElement && !wrapCard.querySelector("textarea")) {
-            wrapCard.classList.add("hidden");
-            wrapCard.style.display = "none";
-          } else {
-            el.classList.add("hidden");
-            el.style.display = "none";
-          }
-        }
+      if (t.includes("rekap profil kepsek")) {
+        origRekapKepsekBtnRef = el;
+      } else if (t.includes("infografis") && (t.includes("sekolah") || t.includes("profil"))) {
+        origInfografisBtnRef = el;
       }
     });
   });
-
-  // Jika di dalam cachedCatatanElement masih ada sub-blok non-catatan (Rekap Kepsek / Infografis / Running Text), sembunyikan dari form Catatan
-  if (cachedCatatanElement) {
-    cachedCatatanElement.querySelectorAll("div, section, button").forEach(child => {
-      // Jangan sembunyikan bagian yang berisi form input catatan (textarea/input catatan)
-      if (child.querySelector("textarea") || child.tagName === "TEXTAREA") return;
-      const ct = (child.textContent || "").toLowerCase();
-      if (
-        (ct.includes("rekap profil kepsek") || (ct.includes("infografis") && ct.includes("sekolah"))) &&
-        !ct.includes("tulis catatan") &&
-        !ct.includes("simpan catatan")
-      ) {
-        child.classList.add("hidden");
-        child.style.display = "none";
-      }
-    });
-  }
 }
 
 function reorganizePanitiaWorkspaceCards() {
@@ -1542,7 +1772,6 @@ function reorganizePanitiaWorkspaceCards() {
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (!tabBeranda) return;
 
-  // 1. Sembunyikan SK Panitia, Job Deskripsi, Meeting Panitia, Rekap Kepsek, & Infografis dari Kartu Layanan Umum
   const generalServiceCard = tabBeranda.querySelector(".service-menu-btn")?.closest(".bg-white");
   if (generalServiceCard) {
     generalServiceCard.querySelectorAll("button, a").forEach(btn => {
@@ -1572,13 +1801,11 @@ function reorganizePanitiaWorkspaceCards() {
     });
   }
 
-  // Jika login sebagai Peserta, sembunyikan Card Khusus Panitia
   if (!activeUser || activeUser.role !== "panitia") {
     document.getElementById("panitiaUnifiedWorkspaceCard")?.classList.add("hidden");
     return;
   }
 
-  // 2. Tangkap elemen Catatan & Evaluasi, Layanan Scanner, dan Kartu Statistik/Infografis dari Beranda
   const holder = ensureHiddenHolder();
 
   Array.from(tabBeranda.children).forEach(el => {
@@ -1590,16 +1817,16 @@ function reorganizePanitiaWorkspaceCards() {
       el.style.display = "none";
     }
 
-    // Tangkap kartu Catatan & Evaluasi
+    // Hanya tangkap sebagai cachedCatatanElement jika benar-benar berisi form catatan (bukan kartu gabungan fitur_ekstra)
     if (
       (txt.includes("catatan & evaluasi") || txt.includes("catatan panitia") || el.id?.toLowerCase().includes("catatan")) &&
-      !txt.includes("layanan scanner")
+      !txt.includes("layanan scanner") &&
+      !txt.includes("rekap profil kepsek")
     ) {
       cachedCatatanElement = el;
       holder.appendChild(el);
     }
 
-    // Tangkap kartu Meja Layanan & Otorisasi Pos (Layanan Scanner)
     if (
       (txt.includes("meja layanan") && txt.includes("otorisasi")) ||
       el.id === "berandaPosLayananBox" ||
@@ -1609,7 +1836,6 @@ function reorganizePanitiaWorkspaceCards() {
       holder.appendChild(el);
     }
 
-    // Jika ada kartu berdiri sendiri untuk Rekap Profil Kepsek / Infografis Sekolah di Beranda, tangkap tombolnya & sembunyikan kartunya
     if (
       (txt.includes("rekap profil kepsek") || (txt.includes("infografis") && txt.includes("sekolah"))) &&
       !txt.includes("progres pendaftaran 6 sub rayon") &&
@@ -1620,16 +1846,13 @@ function reorganizePanitiaWorkspaceCards() {
         if (bt.includes("rekap profil kepsek")) origRekapKepsekBtnRef = b;
         if (bt.includes("infografis") || bt.includes("profil 1")) origInfografisBtnRef = b;
       });
-      if (el !== cachedCatatanElement) {
-        el.classList.add("hidden");
-        el.style.display = "none";
-      }
+      el.classList.add("hidden");
+      el.style.display = "none";
     }
   });
 
   extractMisplacedItemsFromCatatan();
 
-  // 3. Buat Card "KHUSUS PANITIA & AKSES KHUSUS" tepat di bawah Card "Menu Layanan Peserta & Panitia"
   let workspaceCard = document.getElementById("panitiaUnifiedWorkspaceCard");
   if (!workspaceCard) {
     workspaceCard = document.createElement("div");
@@ -1668,7 +1891,6 @@ function reorganizePanitiaWorkspaceCards() {
 
       <!-- GRID MENU KOTAK KHUSUS PANITIA (8 MENU) -->
       <div id="panitiaUnifiedGrid6" class="grid grid-cols-3 gap-2.5 text-center">
-        <!-- 1. SK Panitia -->
         <button type="button" data-panmenu="sk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-file-signature"></i>
@@ -1677,7 +1899,6 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Surat Keputusan</span>
         </button>
 
-        <!-- 2. Job Deskripsi -->
         <button type="button" data-panmenu="jobdesk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-list-check"></i>
@@ -1686,7 +1907,6 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Rincian Tugas</span>
         </button>
 
-        <!-- 3. Meeting Panitia -->
         <button type="button" data-panmenu="meeting" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-amber-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-users-gear"></i>
@@ -1695,7 +1915,6 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Jadwal & Rapat</span>
         </button>
 
-        <!-- 4. Catatan & Evaluasi (Murni Input & Daftar Catatan) -->
         <button type="button" data-panmenu="catatan" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-clipboard-list"></i>
@@ -1704,7 +1923,6 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Input Temuan</span>
         </button>
 
-        <!-- 5. Layanan Scanner -->
         <button type="button" data-panmenu="scanner_pos" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-violet-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-qrcode"></i>
@@ -1713,7 +1931,6 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-bold text-violet-700">Pos & Absen (${ikutCount})</span>
         </button>
 
-        <!-- 6. Profil Panitia -->
         <button type="button" data-panmenu="profil_panitia" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-id-card-clip"></i>
@@ -1722,7 +1939,6 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">${panCount} Anggota</span>
         </button>
 
-        <!-- 7. Rekap Profil Kepsek per Sub Rayon -->
         <button type="button" data-panmenu="rekap_kepsek" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-teal-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-user-tie"></i>
@@ -1731,7 +1947,6 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Per Sub Rayon</span>
         </button>
 
-        <!-- 8. Infografis & Profil Sekolah -->
         <button type="button" data-panmenu="infografis_sekolah" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-sky-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-chart-pie"></i>
@@ -1749,6 +1964,11 @@ function reorganizePanitiaWorkspaceCards() {
 
         if (code === "profil_panitia") {
           openProfilPanitiaDirectoryModal();
+          return;
+        }
+
+        if (code === "catatan") {
+          openDedicatedCatatanEvaluasiModal();
           return;
         }
 
@@ -1806,26 +2026,6 @@ function reorganizePanitiaWorkspaceCards() {
           return;
         }
 
-        if (code === "catatan") {
-          extractMisplacedItemsFromCatatan();
-          const modal = document.getElementById("serviceModal");
-          const titleEl = document.getElementById("serviceModalTitle");
-          const bodyEl = document.getElementById("serviceModalBody");
-          if (modal && titleEl && bodyEl) {
-            modal.classList.remove("hidden");
-            titleEl.innerHTML = `<i class="fa-solid fa-clipboard-list text-rose-600 mr-1.5"></i> Catatan & Evaluasi Kegiatan`;
-            bodyEl.innerHTML = "";
-            if (cachedCatatanElement) {
-              cachedCatatanElement.classList.remove("hidden");
-              cachedCatatanElement.style.display = "";
-              bodyEl.appendChild(cachedCatatanElement);
-            } else {
-              renderCatatanPanitiaWidget(activeUser);
-            }
-          }
-          return;
-        }
-
         if (code === "scanner_pos") {
           const modal = document.getElementById("serviceModal");
           const titleEl = document.getElementById("serviceModalTitle");
@@ -1848,7 +2048,6 @@ function reorganizePanitiaWorkspaceCards() {
     });
   }
 
-  // 4. Tempatkan Running Text tepat di atas Grid Pertama menu Khusus Panitia
   const rtSlot = document.getElementById("panitiaRunningTextSlot");
   if (rtSlot && cachedRunningTextElement && cachedRunningTextElement.parentElement !== rtSlot) {
     cachedRunningTextElement.classList.remove("hidden");
