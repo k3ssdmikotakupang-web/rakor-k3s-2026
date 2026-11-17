@@ -12,6 +12,33 @@ export function initLogin(onSuccess) {
   const schoolSelect = document.getElementById("loginSchoolSelect");
   const pinInput = document.getElementById("loginPinInput");
 
+  // 1. Kosongkan PIN Panitia secara mutlak (hapus value="2026" bawaan HTML) & pasang ikon mata
+  if (pinInput) {
+    pinInput.value = "";
+    pinInput.removeAttribute("value");
+    pinInput.setAttribute("autocomplete", "new-password");
+    pinInput.placeholder = "Ketik PIN Panitia (123321)";
+    pinInput.classList.remove("pr-4");
+    pinInput.classList.add("pr-10");
+
+    const parentWrap = pinInput.parentElement;
+    if (parentWrap && !document.getElementById("togglePanitiaPinBtn")) {
+      parentWrap.classList.add("relative");
+      const eyeBtn = document.createElement("button");
+      eyeBtn.type = "button";
+      eyeBtn.id = "togglePanitiaPinBtn";
+      eyeBtn.className = "absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-300 text-xs p-1 transition";
+      eyeBtn.title = "Lihat / Sembunyikan PIN";
+      eyeBtn.innerHTML = `<i class="fa-solid fa-eye"></i>`;
+      eyeBtn.addEventListener("click", () => {
+        const isPass = pinInput.type === "password";
+        pinInput.type = isPass ? "text" : "password";
+        eyeBtn.innerHTML = `<i class="fa-solid ${isPass ? 'fa-eye-slash text-amber-300' : 'fa-eye'}"></i>`;
+      });
+      parentWrap.appendChild(eyeBtn);
+    }
+  }
+
   btnRolePeserta?.addEventListener("click", () => setRole('peserta'));
   btnRolePanitia?.addEventListener("click", () => setRole('panitia'));
 
@@ -19,6 +46,13 @@ export function initLogin(onSuccess) {
     const isPeserta = role === 'peserta';
     loginFormPeserta?.classList.toggle("hidden", !isPeserta);
     loginFormPanitia?.classList.toggle("hidden", isPeserta);
+
+    if (!isPeserta && pinInput) {
+      pinInput.value = "";
+      pinInput.type = "password";
+      const eyeIcon = document.querySelector("#togglePanitiaPinBtn i");
+      if (eyeIcon) eyeIcon.className = "fa-solid fa-eye";
+    }
 
     if (btnRolePeserta) {
       btnRolePeserta.className = isPeserta
@@ -62,7 +96,7 @@ export function initLogin(onSuccess) {
     }
   });
 
-  // Login Peserta: Cek password_custom jika sudah pernah diubah, jika belum gunakan NPSN
+  // Login Peserta
   document.getElementById("btnSubmitPeserta")?.addEventListener("click", async () => {
     const idSek = schoolSelect?.value;
     const passInput = document.getElementById("loginNpsnPassword")?.value.trim();
@@ -93,14 +127,13 @@ export function initLogin(onSuccess) {
     }
   });
 
-  // Login Panitia: Cek pin_custom jika sudah pernah diubah, jika belum gunakan PIN default 2026
+  // Login Panitia: Wajib ketik manual, mendukung pin_custom atau default 123321
   document.getElementById("btnSubmitPanitia")?.addEventListener("click", async () => {
     const idPan = document.getElementById("loginPanitiaSelect")?.value;
     const pin = pinInput?.value.trim();
 
-    if (!idPan || !pin) {
-      return toast("Pilih nama panitia & masukkan PIN!");
-    }
+    if (!idPan) return toast("Pilih nama panitia terlebih dahulu!");
+    if (!pin) return toast("Ketik PIN Panitia secara manual!");
 
     const { data: panitia, error } = await sb
       .from("panitia_rakor")
@@ -112,22 +145,26 @@ export function initLogin(onSuccess) {
       return toast("Data panitia tidak ditemukan.");
     }
 
-    const activePin = (panitia.pin_custom && String(panitia.pin_custom).trim() !== "")
+    const customPin = (panitia.pin_custom && String(panitia.pin_custom).trim() !== "" && String(panitia.pin_custom).trim() !== "2026")
       ? String(panitia.pin_custom).trim()
-      : "2026";
+      : "123321";
 
-    if (pin === activePin) {
+    if (pin === customPin || pin === "123321") {
+      pinInput.value = "";
       toast(`Selamat bertugas, ${panitia.nama_panitia}!`);
       onSuccess({ role: 'panitia', profile: panitia });
     } else {
-      toast("PIN Akses salah!");
+      toast("PIN Akses Panitia salah!");
     }
   });
 
   document.getElementById("togglePswdBtn")?.addEventListener("click", () => {
     const inp = document.getElementById("loginNpsnPassword");
+    const icon = document.querySelector("#togglePswdBtn i");
     if (inp) {
-      inp.type = inp.type === "password" ? "text" : "password";
+      const isPass = inp.type === "password";
+      inp.type = isPass ? "text" : "password";
+      if (icon) icon.className = `fa-solid ${isPass ? 'fa-eye-slash text-amber-300' : 'fa-eye'}`;
     }
   });
 
