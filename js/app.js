@@ -16,7 +16,6 @@ import { renderSpjBospWidgets } from './spj_bosp.js';
 import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
 import { renderProdukRakorAndUniformCards } from './produk_rakor.js';
 
-// Definisikan seluruh fungsi helper keuangan secara mandiri agar bebas error modul
 const TARIF_KONTRIBUSI_DEFAULT = 2000000;
 
 function formatRupiah(num) {
@@ -35,9 +34,7 @@ function canEditPaymentAndParticipation(user, targetSubrayon) {
   return false;
 }
 
-function renderInfoKeuanganWidget() {
-  // Widget informasi keuangan pendukung
-}
+function renderInfoKeuanganWidget() {}
 
 function openInfoKeuanganModal(activeUser, sekolahList) {
   const modal = document.getElementById("serviceModal");
@@ -48,7 +45,7 @@ function openInfoKeuanganModal(activeUser, sekolahList) {
   modal.classList.remove("hidden");
   titleEl.innerHTML = `<i class="fa-solid fa-sack-dollar text-emerald-700 mr-1.5"></i> Informasi Keuangan & Kontribusi`;
 
-  const totalSekolah = (sekolahList || []).length || 160;
+  const totalSekolah = (sekolahList || []).length || 158; // Sebaran 158 SD/MI per Sub Rayon
   const lunasList = (sekolahList || []).filter(s => s.status_bayar === "Lunas");
   const totalKasMasuk = lunasList.length * TARIF_KONTRIBUSI_DEFAULT;
 
@@ -67,11 +64,6 @@ function openInfoKeuanganModal(activeUser, sekolahList) {
     </div>
   `;
 }
-
-
-
-
-
 
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
@@ -122,7 +114,7 @@ async function initApp() {
 }
 
 function updateStaticEventDatesToNov2026() {
-  const totalCount = (sekolahList && sekolahList.length > 0) ? sekolahList.length : 160;
+  const totalCount = (sekolahList && sekolahList.length > 0) ? sekolahList.length : 158; // Sebaran 158 SD/MI per Sub Rayon
   document.querySelectorAll("span, p, div, h3, h4, button, option").forEach(el => {
     if (el.children.length === 0 && el.textContent) {
       let t = el.textContent;
@@ -164,17 +156,6 @@ async function loadAllDatabase(showNotif = false) {
     if (rTgs.data) tugasList = rTgs.data;
     layananList = (rLay.data && rLay.data.length > 0) ? rLay.data : DEFAULT_LAYANAN;
     tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT;
-
-    const pSelect = document.getElementById("loginPanitiaSelect");
-    if (pSelect) {
-      const prev = pSelect.value;
-      pSelect.innerHTML = `<option value="">Pilih Nama Panitia (${panitiaList.length} Orang)</option>`;
-      panitiaList.forEach(p => {
-        const srTag = p.tugas_subrayon ? ` [Ketua Rayon ${p.tugas_subrayon}]` : "";
-        pSelect.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${srTag})</option>`;
-      });
-      if (prev) pSelect.value = prev;
-    }
 
     const badge = document.getElementById("dbStatusBadge");
     if (badge) badge.textContent = `Online • ${sekolahList.length} Sekolah`;
@@ -388,7 +369,7 @@ function renderAllViews() {
 }
 
 function renderBerandaView() {
-  const totalSek = sekolahList.length || 160;
+  const totalSek = sekolahList.length || 158; // Sebaran 158 SD/MI per Sub Rayon
   const ikutSek = sekolahList.filter(s => s.status_ikut === "Ikut").length;
 
   const elTot = document.getElementById("homeMetricTotalSekolah");
@@ -1170,7 +1151,6 @@ async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
     waktu_registrasi: new Date().toLocaleString("id-ID")
   };
 
-  // Jika sekolah ditandai "Tidak Ikut", otomatis kosongkan kamar & reset layanan agar tidak memakan kuota peserta aktif
   if (statusBaru === "Tidak Ikut") {
     updatePayload.nomor_kamar = "Belum Ditentukan";
     updatePayload.hadir_h1 = false;
