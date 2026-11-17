@@ -1,5 +1,4 @@
 // js/app.js
-// js/app.js
 import { sb, toast } from './supabase.js';
 import { initLogin } from './login.js';
 import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from './jadwal.js';
@@ -11,8 +10,6 @@ import { renderPosScannerWidgets } from './scanner_pos.js';
 import { renderCatatanPanitiaWidget } from './catatan.js';
 import {
   formatRupiah,
-  canAccessInfoKeuangan,
-  canEditPaymentAndParticipation,
   renderInfoKeuanganWidget,
   openInfoKeuanganModal
 } from './keuangan.js';
@@ -24,8 +21,21 @@ import { renderSpjBospWidgets } from './spj_bosp.js';
 import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
 import { renderProdukRakorAndUniformCards } from './produk_rakor.js';
 
-// Tetapkan nilai default tarif kontribusi Rp 2.000.000 secara mandiri di sini
+// Tetapkan konstanta dan fungsi helper otorisasi keuangan secara mandiri di sini
 const TARIF_KONTRIBUSI_DEFAULT = 2000000;
+
+function canAccessInfoKeuangan(user) {
+  return Boolean(user && user.role === "panitia");
+}
+
+function canEditPaymentAndParticipation(user, targetSubrayon) {
+  if (!user || user.role !== "panitia" || !user.profile) return false;
+  const p = user.profile;
+  if (["Bendahara", "Ketua Panitia", "Sekretaris"].includes(p.divisi)) return true;
+  if (p.tugas_subrayon && String(p.tugas_subrayon).trim() === String(targetSubrayon).trim()) return true;
+  return false;
+}
+
 
 if (!document.querySelector("link[rel*='icon']")) {
   const link = document.createElement("link");
