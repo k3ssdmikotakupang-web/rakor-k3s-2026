@@ -1276,20 +1276,22 @@ async function saveTaskModal() {
 }
 
 // =========================================================================
-// PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (6 MENU KOTAK SERAGAM)
-// 1. Bersihkan Header dari ikon '?' (Panduan) & badge Nomor Kamar
-// 2. Pindahkan SK Panitia, Job Deskripsi, Meeting Panitia dari kartu umum
-// 3. Kumpulkan 6 Menu Kotak di Card "KHUSUS PANITIA & AKSES KHUSUS":
-//    - SK Panitia, Job Deskripsi, Meeting Panitia
-//    - Catatan & Evaluasi, Layanan Scanner, Profil Panitia
+// =========================================================================
+// PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (RUNNING TEXT + 8 MENU KOTAK)
+// 1. Running Text tampil di bagian atas tepat di atas grid menu Khusus Panitia
+// 2. Rekap Profil Kepsek & Infografis Sekolah dikeluarkan menjadi menu kotak sendiri
+// 3. Menu Catatan & Evaluasi murni hanya berisi form input & daftar catatan/temuan
 // =========================================================================
 
 let hiddenPanitiaWidgetsHolder = null;
 let cachedCatatanElement = null;
 let cachedScannerElement = null;
+let cachedRunningTextElement = null;
 let origSkBtnRef = null;
 let origJobBtnRef = null;
 let origMeetBtnRef = null;
+let origRekapKepsekBtnRef = null;
+let origInfografisBtnRef = null;
 
 function ensureHiddenHolder() {
   if (!hiddenPanitiaWidgetsHolder) {
@@ -1471,13 +1473,76 @@ function openProfilPanitiaDirectoryModal() {
   renderModalContent();
 }
 
+// Fungsi pemisah elemen yang tergabung di dalam wadah Catatan / Fitur Ekstra
+function extractMisplacedItemsFromCatatan() {
+  const holder = ensureHiddenHolder();
+  const searchRoots = [document.getElementById("tabContentBeranda"), cachedCatatanElement, holder].filter(Boolean);
+
+  searchRoots.forEach(root => {
+    // 1. Cari elemen Running Text (marquee atau banner pengumuman berjalan)
+    root.querySelectorAll("marquee, [id*='running'], [id*='marquee'], [id*='ticker'], [class*='marquee']").forEach(mq => {
+      const bannerBox = mq.closest(".rounded-2xl, .rounded-3xl, .p-2, .p-2\\.5, .p-3") || mq.parentElement;
+      if (bannerBox && !bannerBox.closest("#panitiaRunningTextSlot")) {
+        cachedRunningTextElement = bannerBox;
+      }
+    });
+
+    // 2. Cari tombol/kartu "Rekap Profil Kepsek" & "Infografis & Profil Sekolah"
+    root.querySelectorAll("button, a, div").forEach(el => {
+      if (el.closest("#panitiaUnifiedGrid6")) return;
+      const t = (el.textContent || "").toLowerCase().trim();
+
+      if (el.tagName === "BUTTON" || el.tagName === "A" || el.getAttribute("role") === "button") {
+        if (t.includes("rekap profil kepsek")) {
+          origRekapKepsekBtnRef = el;
+          const wrapCard = el.closest(".rounded-2xl, .rounded-3xl");
+          if (wrapCard && wrapCard !== cachedCatatanElement && !wrapCard.querySelector("textarea")) {
+            wrapCard.classList.add("hidden");
+            wrapCard.style.display = "none";
+          } else {
+            el.classList.add("hidden");
+            el.style.display = "none";
+          }
+        } else if (t.includes("infografis") && (t.includes("sekolah") || t.includes("profil"))) {
+          origInfografisBtnRef = el;
+          const wrapCard = el.closest(".rounded-2xl, .rounded-3xl");
+          if (wrapCard && wrapCard !== cachedCatatanElement && !wrapCard.querySelector("textarea")) {
+            wrapCard.classList.add("hidden");
+            wrapCard.style.display = "none";
+          } else {
+            el.classList.add("hidden");
+            el.style.display = "none";
+          }
+        }
+      }
+    });
+  });
+
+  // Jika di dalam cachedCatatanElement masih ada sub-blok non-catatan (Rekap Kepsek / Infografis / Running Text), sembunyikan dari form Catatan
+  if (cachedCatatanElement) {
+    cachedCatatanElement.querySelectorAll("div, section, button").forEach(child => {
+      // Jangan sembunyikan bagian yang berisi form input catatan (textarea/input catatan)
+      if (child.querySelector("textarea") || child.tagName === "TEXTAREA") return;
+      const ct = (child.textContent || "").toLowerCase();
+      if (
+        (ct.includes("rekap profil kepsek") || (ct.includes("infografis") && ct.includes("sekolah"))) &&
+        !ct.includes("tulis catatan") &&
+        !ct.includes("simpan catatan")
+      ) {
+        child.classList.add("hidden");
+        child.style.display = "none";
+      }
+    });
+  }
+}
+
 function reorganizePanitiaWorkspaceCards() {
   cleanUpHeaderClutter();
 
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (!tabBeranda) return;
 
-  // 1. Sembunyikan SK Panitia, Job Deskripsi, dan Meeting Panitia dari Kartu Layanan Umum, lalu simpan referensinya
+  // 1. Sembunyikan SK Panitia, Job Deskripsi, Meeting Panitia, Rekap Kepsek, & Infografis dari Kartu Layanan Umum
   const generalServiceCard = tabBeranda.querySelector(".service-menu-btn")?.closest(".bg-white");
   if (generalServiceCard) {
     generalServiceCard.querySelectorAll("button, a").forEach(btn => {
@@ -1495,17 +1560,25 @@ function reorganizePanitiaWorkspaceCards() {
         origMeetBtnRef = btn;
         btn.classList.add("hidden");
         btn.style.display = "none";
+      } else if (t.includes("rekap profil kepsek")) {
+        origRekapKepsekBtnRef = btn;
+        btn.classList.add("hidden");
+        btn.style.display = "none";
+      } else if (t.includes("infografis") && t.includes("sekolah")) {
+        origInfografisBtnRef = btn;
+        btn.classList.add("hidden");
+        btn.style.display = "none";
       }
     });
   }
 
-  // Jika login sebagai Peserta, pastikan Card Khusus Panitia disembunyikan
+  // Jika login sebagai Peserta, sembunyikan Card Khusus Panitia
   if (!activeUser || activeUser.role !== "panitia") {
     document.getElementById("panitiaUnifiedWorkspaceCard")?.classList.add("hidden");
     return;
   }
 
-  // 2. Tangkap elemen asli Catatan & Evaluasi serta Meja Layanan (Layanan Scanner) dan simpan di holder tersembunyi
+  // 2. Tangkap elemen Catatan & Evaluasi, Layanan Scanner, dan Kartu Statistik/Infografis dari Beranda
   const holder = ensureHiddenHolder();
 
   Array.from(tabBeranda.children).forEach(el => {
@@ -1517,6 +1590,7 @@ function reorganizePanitiaWorkspaceCards() {
       el.style.display = "none";
     }
 
+    // Tangkap kartu Catatan & Evaluasi
     if (
       (txt.includes("catatan & evaluasi") || txt.includes("catatan panitia") || el.id?.toLowerCase().includes("catatan")) &&
       !txt.includes("layanan scanner")
@@ -1525,6 +1599,7 @@ function reorganizePanitiaWorkspaceCards() {
       holder.appendChild(el);
     }
 
+    // Tangkap kartu Meja Layanan & Otorisasi Pos (Layanan Scanner)
     if (
       (txt.includes("meja layanan") && txt.includes("otorisasi")) ||
       el.id === "berandaPosLayananBox" ||
@@ -1533,18 +1608,26 @@ function reorganizePanitiaWorkspaceCards() {
       cachedScannerElement = el;
       holder.appendChild(el);
     }
-  });
 
-  tabBeranda.querySelectorAll("#berandaPosLayananBox, #posScannerHomeWidget, #catatanPanitiaBox, #berandaCatatanBox").forEach(subEl => {
-    const t = (subEl.textContent || "").toLowerCase();
-    if (t.includes("meja layanan") || subEl.id.toLowerCase().includes("pos")) {
-      cachedScannerElement = subEl;
-      holder.appendChild(subEl);
-    } else if (t.includes("catatan") || subEl.id.toLowerCase().includes("catatan")) {
-      cachedCatatanElement = subEl;
-      holder.appendChild(subEl);
+    // Jika ada kartu berdiri sendiri untuk Rekap Profil Kepsek / Infografis Sekolah di Beranda, tangkap tombolnya & sembunyikan kartunya
+    if (
+      (txt.includes("rekap profil kepsek") || (txt.includes("infografis") && txt.includes("sekolah"))) &&
+      !txt.includes("progres pendaftaran 6 sub rayon") &&
+      !txt.includes("menu layanan peserta")
+    ) {
+      el.querySelectorAll("button, a").forEach(b => {
+        const bt = (b.textContent || "").toLowerCase();
+        if (bt.includes("rekap profil kepsek")) origRekapKepsekBtnRef = b;
+        if (bt.includes("infografis") || bt.includes("profil 1")) origInfografisBtnRef = b;
+      });
+      if (el !== cachedCatatanElement) {
+        el.classList.add("hidden");
+        el.style.display = "none";
+      }
     }
   });
+
+  extractMisplacedItemsFromCatatan();
 
   // 3. Buat Card "KHUSUS PANITIA & AKSES KHUSUS" tepat di bawah Card "Menu Layanan Peserta & Panitia"
   let workspaceCard = document.getElementById("panitiaUnifiedWorkspaceCard");
@@ -1560,147 +1643,219 @@ function reorganizePanitiaWorkspaceCards() {
 
   workspaceCard.classList.remove("hidden");
 
+  const totalSek = (sekolahList || []).length || 160;
   const ikutCount = (sekolahList || []).filter(s => s.status_ikut === "Ikut").length;
   const panCount = (panitiaList || []).length || 38;
-  const currentSig = `${activeUser.profile?.id_panitia || ''}_${ikutCount}_${panCount}`;
+  const currentSig = `${activeUser.profile?.id_panitia || ''}_${ikutCount}_${panCount}_${totalSek}`;
 
-  if (workspaceCard.dataset.sig === currentSig && workspaceCard.querySelector("#panitiaUnifiedGrid6")) {
-    return;
-  }
-  workspaceCard.dataset.sig = currentSig;
+  if (workspaceCard.dataset.sig !== currentSig || !workspaceCard.querySelector("#panitiaUnifiedGrid6")) {
+    workspaceCard.dataset.sig = currentSig;
 
-  workspaceCard.className = "bg-white rounded-3xl p-4 border-2 border-indigo-200/80 shadow-2xs space-y-3";
-  workspaceCard.innerHTML = `
-    <div class="flex items-center justify-between">
-      <h4 class="text-xs font-extrabold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
-        <i class="fa-solid fa-user-shield text-indigo-700"></i>
-        <span>Khusus Panitia & Akses Khusus</span>
-      </h4>
-      <span class="text-[9px] font-extrabold uppercase bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded-full">
-        Internal Panitia
-      </span>
-    </div>
+    workspaceCard.className = "bg-white rounded-3xl p-4 border-2 border-indigo-200/80 shadow-2xs space-y-3";
+    workspaceCard.innerHTML = `
+      <div class="flex items-center justify-between">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+          <i class="fa-solid fa-user-shield text-indigo-700"></i>
+          <span>Khusus Panitia & Akses Khusus</span>
+        </h4>
+        <span class="text-[9px] font-extrabold uppercase bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded-full">
+          Internal Panitia
+        </span>
+      </div>
 
-    <div id="panitiaUnifiedGrid6" class="grid grid-cols-3 gap-2.5 text-center">
-      <button type="button" data-panmenu="sk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
-        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-base shadow-2xs">
-          <i class="fa-solid fa-file-signature"></i>
-        </div>
-        <span class="text-[11px] font-extrabold text-slate-800 leading-tight">SK Panitia</span>
-        <span class="text-[9px] font-semibold text-slate-500">Surat Keputusan</span>
-      </button>
+      <!-- SLOT RUNNING TEXT DI ATAS GRID MENU KHUSUS PANITIA -->
+      <div id="panitiaRunningTextSlot" class="space-y-1.5"></div>
 
-      <button type="button" data-panmenu="jobdesk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
-        <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shadow-2xs">
-          <i class="fa-solid fa-list-check"></i>
-        </div>
-        <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Job Deskripsi</span>
-        <span class="text-[9px] font-semibold text-slate-500">Rincian Tugas</span>
-      </button>
+      <!-- GRID MENU KOTAK KHUSUS PANITIA (8 MENU) -->
+      <div id="panitiaUnifiedGrid6" class="grid grid-cols-3 gap-2.5 text-center">
+        <!-- 1. SK Panitia -->
+        <button type="button" data-panmenu="sk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-file-signature"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">SK Panitia</span>
+          <span class="text-[9px] font-semibold text-slate-500">Surat Keputusan</span>
+        </button>
 
-      <button type="button" data-panmenu="meeting" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-amber-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
-        <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shadow-2xs">
-          <i class="fa-solid fa-users-gear"></i>
-        </div>
-        <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Meeting Panitia</span>
-        <span class="text-[9px] font-semibold text-slate-500">Jadwal & Rapat</span>
-      </button>
+        <!-- 2. Job Deskripsi -->
+        <button type="button" data-panmenu="jobdesk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Job Deskripsi</span>
+          <span class="text-[9px] font-semibold text-slate-500">Rincian Tugas</span>
+        </button>
 
-      <button type="button" data-panmenu="catatan" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
-        <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-base shadow-2xs">
-          <i class="fa-solid fa-clipboard-list"></i>
-        </div>
-        <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Catatan & Evaluasi</span>
-        <span class="text-[9px] font-semibold text-slate-500">Evaluasi Rakor</span>
-      </button>
+        <!-- 3. Meeting Panitia -->
+        <button type="button" data-panmenu="meeting" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-amber-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-users-gear"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Meeting Panitia</span>
+          <span class="text-[9px] font-semibold text-slate-500">Jadwal & Rapat</span>
+        </button>
 
-      <button type="button" data-panmenu="scanner_pos" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-violet-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
-        <div class="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center text-base shadow-2xs">
-          <i class="fa-solid fa-qrcode"></i>
-        </div>
-        <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Layanan Scanner</span>
-        <span class="text-[9px] font-bold text-violet-700">Pos & Absen (${ikutCount})</span>
-      </button>
+        <!-- 4. Catatan & Evaluasi (Murni Input & Daftar Catatan) -->
+        <button type="button" data-panmenu="catatan" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-clipboard-list"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Catatan & Evaluasi</span>
+          <span class="text-[9px] font-semibold text-slate-500">Input Temuan</span>
+        </button>
 
-      <button type="button" data-panmenu="profil_panitia" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
-        <div class="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-base shadow-2xs">
-          <i class="fa-solid fa-id-card-clip"></i>
-        </div>
-        <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Profil Panitia</span>
-        <span class="text-[9px] font-semibold text-slate-500">${panCount} Anggota</span>
-      </button>
-    </div>
-  `;
+        <!-- 5. Layanan Scanner -->
+        <button type="button" data-panmenu="scanner_pos" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-violet-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-qrcode"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Layanan Scanner</span>
+          <span class="text-[9px] font-bold text-violet-700">Pos & Absen (${ikutCount})</span>
+        </button>
 
-  workspaceCard.querySelectorAll(".pan-box-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const code = btn.dataset.panmenu;
-      rescueWidgetsBeforeModalOverwrite();
+        <!-- 6. Profil Panitia -->
+        <button type="button" data-panmenu="profil_panitia" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-id-card-clip"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Profil Panitia</span>
+          <span class="text-[9px] font-semibold text-slate-500">${panCount} Anggota</span>
+        </button>
 
-      if (code === "profil_panitia") {
-        openProfilPanitiaDirectoryModal();
-        return;
-      }
+        <!-- 7. Rekap Profil Kepsek per Sub Rayon -->
+        <button type="button" data-panmenu="rekap_kepsek" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-teal-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-user-tie"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Rekap Kepsek</span>
+          <span class="text-[9px] font-semibold text-slate-500">Per Sub Rayon</span>
+        </button>
 
-      if (code === "sk" || code === "jobdesk" || code === "meeting") {
-        const keyword = code === "sk" ? "sk panitia" : code === "jobdesk" ? "job" : "meeting";
-        let targetOrig = code === "sk" ? origSkBtnRef : code === "jobdesk" ? origJobBtnRef : origMeetBtnRef;
+        <!-- 8. Infografis & Profil Sekolah -->
+        <button type="button" data-panmenu="infografis_sekolah" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-sky-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Infografis</span>
+          <span class="text-[9px] font-semibold text-slate-500">Profil ${totalSek} Sekolah</span>
+        </button>
+      </div>
+    `;
 
-        if (!targetOrig) {
-          document.querySelectorAll("button, a").forEach(el => {
-            if (el === btn || el.closest("#panitiaUnifiedGrid6")) return;
-            const t = (el.textContent || "").toLowerCase();
-            if (t.includes(keyword)) targetOrig = el;
-          });
+    workspaceCard.querySelectorAll(".pan-box-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const code = btn.dataset.panmenu;
+        rescueWidgetsBeforeModalOverwrite();
+
+        if (code === "profil_panitia") {
+          openProfilPanitiaDirectoryModal();
+          return;
         }
 
-        if (targetOrig) {
-          targetOrig.click();
-        } else {
-          openLayananDocumentModal(code === "sk" ? "sk_panitia" : code, activeUser, layananList, () => loadAllDatabase(false));
-        }
-        return;
-      }
+        if (code === "sk" || code === "jobdesk" || code === "meeting") {
+          const keyword = code === "sk" ? "sk panitia" : code === "jobdesk" ? "job" : "meeting";
+          let targetOrig = code === "sk" ? origSkBtnRef : code === "jobdesk" ? origJobBtnRef : origMeetBtnRef;
 
-      if (code === "catatan") {
-        const modal = document.getElementById("serviceModal");
-        const titleEl = document.getElementById("serviceModalTitle");
-        const bodyEl = document.getElementById("serviceModalBody");
-        if (modal && titleEl && bodyEl) {
-          modal.classList.remove("hidden");
-          titleEl.innerHTML = `<i class="fa-solid fa-clipboard-list text-rose-600 mr-1.5"></i> Catatan & Evaluasi Kegiatan`;
-          bodyEl.innerHTML = "";
-          if (cachedCatatanElement) {
-            cachedCatatanElement.classList.remove("hidden");
-            cachedCatatanElement.style.display = "";
-            bodyEl.appendChild(cachedCatatanElement);
-          } else {
-            renderCatatanPanitiaWidget(activeUser);
+          if (!targetOrig) {
+            document.querySelectorAll("button, a").forEach(el => {
+              if (el === btn || el.closest("#panitiaUnifiedGrid6")) return;
+              const t = (el.textContent || "").toLowerCase();
+              if (t.includes(keyword)) targetOrig = el;
+            });
           }
-        }
-        return;
-      }
 
-      if (code === "scanner_pos") {
-        const modal = document.getElementById("serviceModal");
-        const titleEl = document.getElementById("serviceModalTitle");
-        const bodyEl = document.getElementById("serviceModalBody");
-        if (modal && titleEl && bodyEl) {
-          modal.classList.remove("hidden");
-          titleEl.innerHTML = `<i class="fa-solid fa-qrcode text-violet-700 mr-1.5"></i> Layanan Scanner & Otorisasi Pos`;
-          bodyEl.innerHTML = "";
-          if (cachedScannerElement) {
-            cachedScannerElement.classList.remove("hidden");
-            cachedScannerElement.style.display = "";
-            bodyEl.appendChild(cachedScannerElement);
+          if (targetOrig) {
+            targetOrig.click();
           } else {
-            renderPosScannerWidgets(activeUser, sekolahList, () => loadAllDatabase(false));
+            openLayananDocumentModal(code === "sk" ? "sk_panitia" : code, activeUser, layananList, () => loadAllDatabase(false));
           }
+          return;
         }
-        return;
-      }
+
+        if (code === "rekap_kepsek") {
+          if (!origRekapKepsekBtnRef) {
+            document.querySelectorAll("button, a").forEach(el => {
+              if (el === btn || el.closest("#panitiaUnifiedGrid6")) return;
+              const t = (el.textContent || "").toLowerCase();
+              if (t.includes("rekap profil kepsek")) origRekapKepsekBtnRef = el;
+            });
+          }
+          if (origRekapKepsekBtnRef) {
+            origRekapKepsekBtnRef.click();
+          } else {
+            toast("Membuka Rekap Profil Kepala Sekolah...");
+          }
+          return;
+        }
+
+        if (code === "infografis_sekolah") {
+          if (!origInfografisBtnRef) {
+            document.querySelectorAll("button, a").forEach(el => {
+              if (el === btn || el.closest("#panitiaUnifiedGrid6")) return;
+              const t = (el.textContent || "").toLowerCase();
+              if (t.includes("infografis") && (t.includes("sekolah") || t.includes("profil"))) {
+                origInfografisBtnRef = el;
+              }
+            });
+          }
+          if (origInfografisBtnRef) {
+            origInfografisBtnRef.click();
+          } else {
+            toast("Membuka Infografis & Profil Sekolah...");
+          }
+          return;
+        }
+
+        if (code === "catatan") {
+          extractMisplacedItemsFromCatatan();
+          const modal = document.getElementById("serviceModal");
+          const titleEl = document.getElementById("serviceModalTitle");
+          const bodyEl = document.getElementById("serviceModalBody");
+          if (modal && titleEl && bodyEl) {
+            modal.classList.remove("hidden");
+            titleEl.innerHTML = `<i class="fa-solid fa-clipboard-list text-rose-600 mr-1.5"></i> Catatan & Evaluasi Kegiatan`;
+            bodyEl.innerHTML = "";
+            if (cachedCatatanElement) {
+              cachedCatatanElement.classList.remove("hidden");
+              cachedCatatanElement.style.display = "";
+              bodyEl.appendChild(cachedCatatanElement);
+            } else {
+              renderCatatanPanitiaWidget(activeUser);
+            }
+          }
+          return;
+        }
+
+        if (code === "scanner_pos") {
+          const modal = document.getElementById("serviceModal");
+          const titleEl = document.getElementById("serviceModalTitle");
+          const bodyEl = document.getElementById("serviceModalBody");
+          if (modal && titleEl && bodyEl) {
+            modal.classList.remove("hidden");
+            titleEl.innerHTML = `<i class="fa-solid fa-qrcode text-violet-700 mr-1.5"></i> Layanan Scanner & Otorisasi Pos`;
+            bodyEl.innerHTML = "";
+            if (cachedScannerElement) {
+              cachedScannerElement.classList.remove("hidden");
+              cachedScannerElement.style.display = "";
+              bodyEl.appendChild(cachedScannerElement);
+            } else {
+              renderPosScannerWidgets(activeUser, sekolahList, () => loadAllDatabase(false));
+            }
+          }
+          return;
+        }
+      });
     });
-  });
+  }
+
+  // 4. Tempatkan Running Text tepat di atas Grid Pertama menu Khusus Panitia
+  const rtSlot = document.getElementById("panitiaRunningTextSlot");
+  if (rtSlot && cachedRunningTextElement && cachedRunningTextElement.parentElement !== rtSlot) {
+    cachedRunningTextElement.classList.remove("hidden");
+    cachedRunningTextElement.style.display = "";
+    rtSlot.innerHTML = "";
+    rtSlot.appendChild(cachedRunningTextElement);
+  }
 }
 
 setInterval(reorganizePanitiaWorkspaceCards, 450);
