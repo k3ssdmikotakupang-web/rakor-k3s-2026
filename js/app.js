@@ -1,11 +1,11 @@
 // js/app.js
 import { sb, toast } from './supabase.js';
 import { initLogin } from './login.js';
-import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from './jadwal.js'; 
+import { initJadwal, renderLiveJadwal, checkSecretaryPrivilege, filterDay } from './jadwal.js';
 import { openRoomManagerModal } from './kamar.js';
 import { openLayananDocumentModal, DEFAULT_LAYANAN } from './layanan.js';
 import { openDokumentasiModal } from './dokumentasi.js';
-import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifikat.js'; 
+import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifikat.js';
 import { renderPosScannerWidgets } from './scanner_pos.js';
 import { renderCatatanPanitiaWidget } from './catatan.js';
 import {
@@ -77,8 +77,8 @@ function updateStaticEventDatesToNov2026() {
       let t = el.textContent;
       let changed = false;
       if (
-        t.includes("24–26") || t.includes("24-26") || 
-        t.includes("19–21") || t.includes("19-21") || 
+        t.includes("24–26") || t.includes("24-26") ||
+        t.includes("19–21") || t.includes("19-21") ||
         t.includes("19 Nov") || t.includes("20 Nov") || t.includes("21 Nov")
       ) {
         t = t
@@ -113,7 +113,7 @@ async function loadAllDatabase(showNotif = false) {
     if (rTgs.data) tugasList = rTgs.data;
     layananList = (rLay.data && rLay.data.length > 0) ? rLay.data : DEFAULT_LAYANAN;
     tarifKontribusiDefault = TARIF_KONTRIBUSI_DEFAULT;
-    
+
     const pSelect = document.getElementById("loginPanitiaSelect");
     if (pSelect) {
       const prev = pSelect.value;
@@ -172,7 +172,7 @@ function bindNavigationAndActions() {
   document.getElementById("btnSubmitIzin")?.addEventListener("click", submitPerijinanPeserta);
   document.getElementById("btnForceRefresh")?.addEventListener("click", () => loadAllDatabase(true));
   document.getElementById("btnRefreshApp")?.addEventListener("click", () => loadAllDatabase(true));
-  
+
   document.getElementById("btnLogout")?.addEventListener("click", () => {
     activeUser = null;
     document.getElementById("mainAppScreen")?.classList.add("hidden");
@@ -183,7 +183,7 @@ function bindNavigationAndActions() {
   document.getElementById("srSearchInput")?.addEventListener("input", () => renderSubrayonView());
   document.getElementById("btnMarkAllSr")?.addEventListener("click", markAllSubrayonIkut);
   document.getElementById("btnSaveKepsek")?.addEventListener("click", saveNamaKepsek);
-  
+
   document.getElementById("taskFilterPhase")?.addEventListener("change", () => renderTaskListView());
   document.getElementById("taskFilterDivisi")?.addEventListener("change", () => renderTaskListView());
   document.getElementById("btnAddTaskTop")?.addEventListener("click", () => openTaskModal(null));
@@ -204,7 +204,7 @@ function setupRealtimeListeners() {
 async function onLoginSuccess() {
   document.getElementById("loginScreen")?.classList.add("hidden");
   document.getElementById("mainAppScreen")?.classList.remove("hidden");
-  
+
   if (sekolahList.length === 0 || tugasList.length === 0) {
     await loadAllDatabase(false);
   }
@@ -249,7 +249,7 @@ async function onLoginSuccess() {
     const srFilter = document.getElementById("srSelectFilter");
     if (srFilter) srFilter.value = s.subrayon;
   }
-  
+
   await checkSecretaryPrivilege(activeUser);
   filterDay(1);
   showTab("beranda");
@@ -361,7 +361,7 @@ function renderBerandaView() {
     const ikut = all.filter(s => s.status_ikut === "Ikut").length;
     const pct = all.length > 0 ? Math.round((ikut / all.length) * 100) : 0;
     const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
-    
+
     const div = document.createElement("div");
     div.className = "p-2.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-emerald-50/50 transition";
     div.innerHTML = `
@@ -415,13 +415,13 @@ function renderAbsensiPesertaView() {
   const s = sekolahList.find(x => x.id_sekolah === activeUser.profile.id_sekolah) || activeUser.profile;
   const subEl = document.getElementById("absensiSchoolSubtitle");
   if (subEl) subEl.textContent = `${s.nama_sekolah} (NPSN: ${s.npsn}) • Sub Rayon ${s.subrayon}`;
-  
+
   const h1 = Boolean(s.hadir_h1);
   const h2 = Boolean(s.hadir_h2);
   const h3 = Boolean(s.hadir_h3);
   const hadirCount = [h1, h2, h3].filter(Boolean).length;
   const pctHadir = Math.round((hadirCount / 3) * 100);
-  
+
   const days = [
     { key: "hadir_h1", isHadir: h1, dayNum: 1, label: "Hari Ke-1 • Kamis, 26 Nov 2026", desc: "Registrasi, Pembukaan & Sidang Pleno" },
     { key: "hadir_h2", isHadir: h2, dayNum: 2, label: "Hari Ke-2 • Jumat, 27 Nov 2026", desc: "Sidang Komisi & Penyusunan Program" },
@@ -626,13 +626,13 @@ function renderQrView() {
     const subEl = document.getElementById("qrCardSubtitle");
     zoomTitle = s.nama_sekolah || "Sekolah Peserta";
     zoomSub = (s.nama_kepsek ? s.nama_kepsek + " • " : "") + "NPSN: " + (s.npsn || "-") + " • Sub Rayon " + (s.subrayon || "-");
-    
+
     if (titleEl) titleEl.textContent = zoomTitle;
     if (subEl) subEl.textContent = zoomSub;
     if (!s.nama_kepsek || String(s.nama_kepsek).trim() === "") missingFields.push("Nama & Gelar Kepala Sekolah");
     if (!s.nip_kepsek || String(s.nip_kepsek).trim() === "") missingFields.push("NIP");
     if (!s.no_hp || String(s.no_hp).trim() === "") missingFields.push("No. WhatsApp");
-    
+
     if (roomPill) {
       roomPill.classList.remove("hidden");
       roomPill.innerHTML = '<i class="fa-solid fa-bed mr-1"></i>Kamar: ' + (s.nomor_kamar || "Belum Ditentukan");
@@ -657,11 +657,11 @@ function renderQrView() {
     const subEl = document.getElementById("qrCardSubtitle");
     zoomTitle = p.nama_panitia || "Panitia Rakor";
     zoomSub = (p.divisi || "Panitia") + " (" + (p.jabatan || "Anggota") + ")";
-    
+
     if (titleEl) titleEl.textContent = zoomTitle;
     if (subEl) subEl.textContent = zoomSub;
     roomPill?.classList.add("hidden");
-    
+
     if (!p.no_hp || String(p.no_hp).trim() === "") missingFields.push("No. WhatsApp Aktif");
     const pill = document.getElementById("qrStatusPill");
     if (pill) {
@@ -719,11 +719,11 @@ function renderQrView() {
   qrBox.innerHTML = "";
   qrBox.className = "w-[210px] mx-auto bg-white p-3 rounded-3xl border-2 border-slate-200 flex flex-col items-center gap-2 shadow-xl cursor-pointer hover:border-amber-400 transition";
   qrBox.title = "Ketuk untuk memperbesar QR Code";
-  
+
   const innerQrHolder = document.createElement("div");
   innerQrHolder.className = "w-[170px] h-[170px] flex items-center justify-center mx-auto";
   qrBox.appendChild(innerQrHolder);
-  
+
   const hintBadge = document.createElement("div");
   hintBadge.className = "w-full py-1 px-2 rounded-xl bg-blue-50 text-blue-900 border border-blue-200/80 text-[9px] font-extrabold flex items-center justify-center gap-1";
   hintBadge.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus text-blue-700"></i> <span>Ketuk QR untuk Perbesar</span>';
@@ -731,7 +731,7 @@ function renderQrView() {
 
   const encoded = encodeURIComponent(qrPayloadText);
   const fallbackImgUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=6&data=" + encoded;
-  
+
   let localSuccess = false;
   if (typeof window.QRCode === "function") {
     try {
@@ -768,7 +768,7 @@ function openFullscreenQrZoomModal(qrPayloadText, titleText, subText) {
   }
   const encoded = encodeURIComponent(qrPayloadText);
   const bigQrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=10&data=" + encoded;
-  
+
   zoomOverlay.className = "fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4";
   zoomOverlay.innerHTML =
     '<div class="w-full max-w-sm bg-white rounded-3xl p-6 text-center space-y-4 shadow-2xl border-4 border-amber-400">' +
@@ -822,127 +822,50 @@ async function saveNamaKepsek() {
   await loadAllDatabase(false);
 }
 
+function getJenjang(namaSekolah) {
+  const n = String(namaSekolah || "").toUpperCase();
+  if (n.includes("MI ") || n.startsWith("MI") || n.includes("MADRASAH IBTIDAIYAH")) return "MI";
+  if (n.includes("MTS") || n.includes("MADRASAH TSANAWIYAH")) return "MTs";
+  if (n.includes("MA ") || n.startsWith("MA") || n.includes("MADRASAH ALIYAH")) return "MA";
+  return "SD";
+}
+
 function renderSubrayonView() {
   const sr = document.getElementById("srSelectFilter")?.value || "Maulafa";
   const kw = document.getElementById("srSearchInput")?.value.toLowerCase() || "";
   const allSr = sekolahList.filter(s => s.subrayon === sr);
-  
-  const canEditThisRayon = Boolean(
-    activeUser && (
-      activeUser.role === "bendahara" || 
-      (activeUser.role === "panitia" && (
-        ["Ketua Panitia", "Sekretaris", "Bendahara"].includes(activeUser.profile?.divisi) || 
-        activeUser.profile?.tugas_subrayon === sr
-      ))
-    )
-  );
+  const isPesertaView = Boolean(activeUser && activeUser.role === "peserta");
 
-  const canSeeFinanceBtn = Boolean(
-    activeUser && (
-      activeUser.role === "bendahara" ||
-      (activeUser.role === "panitia" && ["Ketua Panitia", "Sekretaris", "Bendahara"].includes(activeUser.profile?.divisi))
-    )
-  );
+  const canEditThisRayon = canEditPaymentAndParticipation(activeUser, sr);
+  const canSeeFinanceBtn = canAccessInfoKeuangan(activeUser);
 
   const titleEl = document.getElementById("srHeaderTitle");
   const subTitleEl = document.getElementById("srHeaderSubtitle");
   const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
   const ikutCount = allSr.filter(s => s.status_ikut === "Ikut").length;
-  
+
   if (titleEl) titleEl.textContent = `Sub Rayon ${sr}`;
   if (subTitleEl) {
     subTitleEl.textContent = `Ketua Rayon: ${ketua ? ketua.nama_panitia : 'Belum Ditentukan'} • ${ikutCount} dari ${allSr.length} Sekolah Ikut`;
   }
 
+  const btnMarkAll = document.getElementById("btnMarkAllSr");
+  if (btnMarkAll) {
+    btnMarkAll.classList.toggle("hidden", !canEditThisRayon || isPesertaView);
+  }
+
   const cardsContainer = document.getElementById("srSchoolCardsContainer");
   if (!cardsContainer) return;
 
-  const filtered = allSr.filter(
-    s => s.nama_sekolah.toLowerCase().includes(kw) || String(s.npsn).includes(kw)
-  );
-  
-  cardsContainer.innerHTML = "";
-  if (filtered.length === 0) {
-    cardsContainer.innerHTML = `<div class="bg-white rounded-3xl p-6 text-center border text-xs text-slate-500">Tidak ada sekolah yang sesuai pencarian.</div>`;
-    return;
-  }
-
-  filtered.forEach((s, i) => {
-    const isIkut = s.status_ikut === "Ikut";
-    const isTidak = s.status_ikut === "Tidak Ikut";
-    const statusBayar = s.status_bayar || "Belum Bayar";
-    const jenjang = s.nama_sekolah.toLowerCase().includes("mi") ? "MI" : s.nama_sekolah.toLowerCase().includes("mts") ? "MTs" : "MA";
-    const waClean = String(s.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
-    
-    const bayarBadgeStyle = statusBayar === "Lunas"
-      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-      : statusBayar === "Dalam Proses"
-      ? "bg-amber-100 text-amber-800 border-amber-300"
-      : "bg-rose-50 text-rose-700 border-rose-200";
-
-    const card = document.createElement("div");
-    card.className = `bg-white rounded-2xl p-3.5 border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} shadow-sm space-y-2.5`;
-    card.innerHTML = `
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
-            <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
-            <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">${jenjang}</span>
-            ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded"><i class="fa-solid fa-bed mr-1"></i>${s.nomor_kamar}</span>` : ''}
-          </div>
-          <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
-          <p class="text-[10px] text-slate-500 truncate">Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • Kel. ${s.kelurahan || '-'}</p>
-        </div>
-        ${canEditThisRayon ? `
-          <div class="flex items-center gap-1 shrink-0">
-            <button type="button" class="btn-ikut px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition ${isIkut ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-emerald-100'}">Ikut</button>
-            <button type="button" class="btn-tidak px-2 py-1.5 rounded-xl text-[11px] font-bold transition ${isTidak ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-rose-100'}">Batal</button>
-          </div>
-        ` : `
-          <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-xl shrink-0 ${isIkut ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
-            ${s.status_ikut}
-          </span>
-        `}
-      </div>
-      <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <i class="fa-solid fa-money-bill-wave text-xs ${statusBayar === 'Lunas' ? 'text-emerald-600' : 'text-slate-400'}"></i>
-          <span class="text-[10px] font-bold text-slate-600">Kontribusi:</span>
-          <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${bayarBadgeStyle}">
-            ${statusBayar === 'Lunas' ? 'LUNAS' : statusBayar === 'Dalam Proses' ? 'PROSES' : 'BELUM BAYAR'}
-          </span>
-        </div>
-        ${canEditThisRayon ? `
-          <select class="select-status-bayar rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-800">
-            <option value="Belum Bayar" ${statusBayar === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
-            <option value="Dalam Proses" ${statusBayar === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
-            <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>Lunas</option>
-          </select>
-        ` : `
-          <span class="text-[10px] font-bold text-slate-400">${s.waktu_bayar ? s.waktu_bayar.split(',')[0] : ''}</span>
-        `}
-      </div>
-    `;
-
-    if (canEditThisRayon) {
-      card.querySelector(".btn-ikut")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Ikut"));
-      card.querySelector(".btn-tidak")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Tidak Ikut"));
-      card.querySelector(".select-status-bayar")?.addEventListener("change", (e) => {
-        setSchoolPaymentStatus(s.id_sekolah, sr, e.target.value);
-      });
-    }
-    cardsContainer.appendChild(card);
-  });
-
   let shortcutBar = document.getElementById("srFinanceShortcutBar");
-  if (!shortcutBar && cardsContainer && cardsContainer.parentElement) {
+  if (!shortcutBar && cardsContainer.parentElement) {
     shortcutBar = document.createElement("div");
     shortcutBar.id = "srFinanceShortcutBar";
     cardsContainer.parentElement.insertBefore(shortcutBar, cardsContainer);
   }
+
   if (shortcutBar) {
-    if (canSeeFinanceBtn) {
+    if (canSeeFinanceBtn && !isPesertaView) {
       const srLunas = allSr.filter(s => s.status_bayar === "Lunas").length;
       shortcutBar.className = "p-3 rounded-2xl bg-slate-900 text-white flex items-center justify-between gap-2 shadow-md mb-3";
       shortcutBar.innerHTML = `
@@ -962,6 +885,104 @@ function renderSubrayonView() {
       shortcutBar.innerHTML = "";
     }
   }
+
+  const filtered = allSr.filter(
+    s => s.nama_sekolah.toLowerCase().includes(kw) || String(s.npsn).includes(kw)
+  );
+
+  cardsContainer.innerHTML = "";
+  if (filtered.length === 0) {
+    cardsContainer.innerHTML = `<div class="bg-white rounded-3xl p-6 text-center border text-xs text-slate-500">Tidak ada sekolah yang sesuai pencarian.</div>`;
+    return;
+  }
+
+  filtered.forEach((s, i) => {
+    const isIkut = s.status_ikut === "Ikut";
+    const isTidak = s.status_ikut === "Tidak Ikut";
+    const statusBayar = s.status_bayar || "Belum Bayar";
+    const jenjang = getJenjang(s.nama_sekolah);
+    const isNegeri = String(s.status_sekolah || "").toLowerCase() === "negeri";
+    const waClean = String(s.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
+
+    const bayarBadgeStyle = statusBayar === "Lunas"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+      : statusBayar === "Dalam Proses"
+      ? "bg-amber-100 text-amber-800 border-amber-300"
+      : "bg-rose-50 text-rose-700 border-rose-200";
+
+    const card = document.createElement("div");
+    card.className = `bg-white rounded-2xl p-3.5 border ${isIkut ? 'border-emerald-300' : isTidak ? 'border-rose-200' : 'border-slate-200'} shadow-sm space-y-2.5`;
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[10px] font-extrabold text-slate-400">#${i + 1}</span>
+            <span class="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
+            <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${jenjang === 'MI' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${jenjang}</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isNegeri ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'}">${s.status_sekolah || 'Swasta'}</span>
+            ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded"><i class="fa-solid fa-bed mr-1"></i>${s.nomor_kamar}</span>` : ''}
+          </div>
+          <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
+          <p class="text-[10px] text-slate-500 truncate">Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • Kel. ${s.kelurahan || '-'}</p>
+        </div>
+        ${canEditThisRayon && !isPesertaView ? `
+          <div class="flex items-center gap-1 shrink-0">
+            <button type="button" class="btn-ikut px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold transition ${isIkut ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-emerald-100'}">Ikut</button>
+            <button type="button" class="btn-tidak px-2 py-1.5 rounded-xl text-[11px] font-bold transition ${isTidak ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-rose-100'}">Tidak</button>
+          </div>
+        ` : `
+          <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-xl shrink-0 ${isIkut ? 'bg-emerald-100 text-emerald-800' : isTidak ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'}">
+            ${s.status_ikut || 'Belum Konfirmasi'}
+          </span>
+        `}
+      </div>
+      ${isPesertaView ? `
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <i class="fa-solid fa-phone-volume text-xs ${s.no_hp ? 'text-emerald-600' : 'text-slate-400'}"></i>
+            <span class="text-[10px] font-bold text-slate-600">Kontak HP Kepsek:</span>
+            <span class="text-[11px] font-extrabold ${s.no_hp ? 'text-slate-900' : 'text-slate-400'}">
+              ${s.no_hp || 'Belum Diisi'}
+            </span>
+          </div>
+          ${s.no_hp ? `
+            <a href="https://wa.me/${waClean}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-extrabold flex items-center gap-1 hover:bg-emerald-100 transition">
+              <i class="fa-brands fa-whatsapp text-emerald-600"></i>
+              <span>Hubungi</span>
+            </a>
+          ` : ''}
+        </div>
+      ` : `
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <i class="fa-solid fa-money-bill-wave text-xs ${statusBayar === 'Lunas' ? 'text-emerald-600' : statusBayar === 'Dalam Proses' ? 'text-amber-500' : 'text-slate-400'}"></i>
+            <span class="text-[10px] font-bold text-slate-600">Kontribusi (Rp 2 Jt):</span>
+            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${bayarBadgeStyle}">
+              ${statusBayar === 'Lunas' ? 'LUNAS' : statusBayar === 'Dalam Proses' ? 'PROSES' : 'BELUM BAYAR'}
+            </span>
+          </div>
+          ${canEditThisRayon ? `
+            <select class="select-status-bayar rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-800">
+              <option value="Belum Bayar" ${statusBayar === 'Belum Bayar' ? 'selected' : ''}>Belum Bayar</option>
+              <option value="Dalam Proses" ${statusBayar === 'Dalam Proses' ? 'selected' : ''}>Dalam Proses</option>
+              <option value="Lunas" ${statusBayar === 'Lunas' ? 'selected' : ''}>Lunas</option>
+            </select>
+          ` : `
+            <span class="text-[10px] font-bold text-slate-400">${s.waktu_bayar ? s.waktu_bayar.split(',')[0] : ''}</span>
+          `}
+        </div>
+      `}
+    `;
+
+    if (canEditThisRayon && !isPesertaView) {
+      card.querySelector(".btn-ikut")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Ikut"));
+      card.querySelector(".btn-tidak")?.addEventListener("click", () => setSchoolStatus(s.id_sekolah, sr, "Tidak Ikut"));
+      card.querySelector(".select-status-bayar")?.addEventListener("change", (e) => {
+        setSchoolPaymentStatus(s.id_sekolah, sr, e.target.value);
+      });
+    }
+    cardsContainer.appendChild(card);
+  });
 }
 
 async function setSchoolStatus(idSekolah, targetSubrayon, statusBaru) {
@@ -1027,11 +1048,11 @@ function renderKinerjaView() {
   const total = tugasList.length;
   const done = tugasList.filter(t => t.status === "Selesai").length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  
+
   const bigPctEl = document.getElementById("kinerjaBigPercent");
   const subCntEl = document.getElementById("kinerjaSubtitleCount");
   const bigBarEl = document.getElementById("kinerjaBigBar");
-  
+
   if (bigPctEl) bigPctEl.textContent = pct + "%";
   if (subCntEl) subCntEl.textContent = `${done} dari ${total} Tugas Selesai`;
   if (bigBarEl) bigBarEl.style.width = pct + "%";
@@ -1044,7 +1065,7 @@ function renderKinerjaView() {
       const allP = tugasList.filter(t => t.tahapan === ph);
       const doneP = allP.filter(t => t.status === "Selesai").length;
       const pctP = allP.length > 0 ? Math.round((doneP / allP.length) * 100) : 0;
-      
+
       const item = document.createElement("div");
       item.className = "bg-white/10 hover:bg-white/20 rounded-2xl p-2 cursor-pointer transition";
       item.innerHTML = `
@@ -1069,7 +1090,7 @@ function renderKinerjaView() {
       const doneD = allD.filter(t => t.status === "Selesai").length;
       const pctD = allD.length > 0 ? Math.round((doneD / allD.length) * 100) : 0;
       const color = pctD === 100 ? "bg-emerald-500" : pctD > 0 ? "bg-blue-600" : "bg-slate-300";
-      
+
       const row = document.createElement("div");
       row.className = "p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 cursor-pointer transition";
       row.innerHTML = `
@@ -1113,7 +1134,7 @@ function renderTaskListView() {
   const div = document.getElementById("taskFilterDivisi")?.value || "ALL";
   const canEditMaster = canManageMasterTasks(activeUser);
   const btnAddTop = document.getElementById("btnAddTaskTop");
-  
+
   if (btnAddTop) {
     btnAddTop.classList.toggle("hidden", !canEditMaster);
   }
@@ -1125,7 +1146,7 @@ function renderTaskListView() {
   const box = document.getElementById("taskCardsContainer");
   if (!box) return;
   box.innerHTML = "";
-  
+
   if (list.length === 0) {
     box.innerHTML = `<div class="bg-white rounded-3xl p-6 text-center border text-xs text-slate-500">Belum ada rincian tugas untuk filter ini.</div>`;
     return;
@@ -1148,7 +1169,7 @@ function renderTaskListView() {
           ? (isDone ? 'bg-emerald-600 border-emerald-600 text-white active:scale-90 cursor-pointer' : 'border-slate-300 hover:border-emerald-500 bg-slate-50 text-slate-400 cursor-pointer')
           : (isDone ? 'bg-emerald-600/50 border-emerald-600/50 text-white opacity-60 cursor-not-allowed' : 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed')
       }">
-        <i class="fa-solid ${canToggleThis ? 'fa-check text-xs' : (isDone ? 'fa-check text-xs' : 'fa-lock text-[10px])'}"></i>
+        <i class="fa-solid ${canToggleThis ? 'fa-check text-xs' : (isDone ? 'fa-check text-xs' : 'fa-lock text-[10px]')}"></i>
       </button>
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-1.5 flex-wrap">
