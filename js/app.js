@@ -9,7 +9,6 @@ import { openSertifikatModal, checkCertificateVerificationUrl } from './sertifik
 import { renderPosScannerWidgets } from './scanner_pos.js';
 import { renderCatatanPanitiaWidget } from './catatan.js';
 import {
-  formatRupiah,
   renderInfoKeuanganWidget,
   openInfoKeuanganModal
 } from './keuangan.js';
@@ -21,8 +20,12 @@ import { renderSpjBospWidgets } from './spj_bosp.js';
 import { initPwaInstallSupport, renderFiturEkstraWidgets } from './fitur_ekstra.js';
 import { renderProdukRakorAndUniformCards } from './produk_rakor.js';
 
-// Tetapkan konstanta dan fungsi helper otorisasi keuangan secara mandiri di sini
+// Tetapkan konstanta, format rupiah, dan fungsi helper keuangan secara mandiri di sini
 const TARIF_KONTRIBUSI_DEFAULT = 2000000;
+
+function formatRupiah(num) {
+  return "Rp " + Number(num || 0).toLocaleString("id-ID");
+}
 
 function canAccessInfoKeuangan(user) {
   return Boolean(user && user.role === "panitia");
@@ -35,6 +38,8 @@ function canEditPaymentAndParticipation(user, targetSubrayon) {
   if (p.tugas_subrayon && String(p.tugas_subrayon).trim() === String(targetSubrayon).trim()) return true;
   return false;
 }
+
+
 
 
 if (!document.querySelector("link[rel*='icon']")) {
