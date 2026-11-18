@@ -2001,7 +2001,38 @@ async function renderHotelMealCheckerFullScreen() {
   renderMealCheckerInterface(screen, true);
 }
 
+function canAccessKonsumsiHotel(user) {
+  if (!user) return false;
+  if (user.role === "hotel_checker") return true;
+  if (user.role !== "panitia" || !user.profile) return false;
+  const div = String(user.profile.divisi || "").trim();
+  return [
+    "Penanggung Jawab",
+    "Ketua Panitia",
+    "Sekretaris",
+    "Bendahara",
+    "Seksi Konsumsi"
+  ].includes(div);
+}
+
+function canAccessKonsumsiHotel(user) {
+  if (!user) return false;
+  if (user.role === "hotel_checker") return true;
+  if (user.role !== "panitia" || !user.profile) return false;
+  const div = String(user.profile.divisi || "").trim();
+  return [
+    "Penanggung Jawab",
+    "Ketua Panitia",
+    "Sekretaris",
+    "Bendahara",
+    "Seksi Konsumsi"
+  ].includes(div);
+}
+
 async function openKonsumsiCheckerModalForPanitia() {
+  if (!canAccessKonsumsiHotel(activeUser)) {
+    return toast("Akses Ditolak: Data Konsumsi Hotel khusus untuk Penanggung Jawab, Ketua, Sekretaris, Bendahara, dan Seksi Konsumsi!");
+  }
   rescueWidgetsBeforeModalOverwrite();
   await loadMealLogsFromSupabase();
 
@@ -3058,7 +3089,8 @@ function reorganizePanitiaWorkspaceCards() {
   const ikutCount = (sekolahList || []).filter(s => s.status_ikut === "Ikut").length;
   const panCount = (panitiaList || []).length || 38;
   const hasAccPrivilege = canManageAccounts(activeUser);
-  const currentSig = `${activeUser.profile?.id_panitia || ''}_${ikutCount}_${panCount}_${totalSek}_${hasAccPrivilege}`;
+  const hasMealPrivilege = canAccessKonsumsiHotel(activeUser);
+  const currentSig = `${activeUser.profile?.id_panitia || ''}_${ikutCount}_${panCount}_${totalSek}_${hasAccPrivilege}_${hasMealPrivilege}`;
 
   if (workspaceCard.dataset.sig !== currentSig || !workspaceCard.querySelector("#panitiaUnifiedGrid6")) {
     workspaceCard.dataset.sig = currentSig;
@@ -3078,21 +3110,23 @@ function reorganizePanitiaWorkspaceCards() {
       <!-- SLOT RUNNING TEXT DI ATAS GRID MENU KHUSUS PANITIA -->
       <div id="panitiaRunningTextSlot" class="space-y-1.5"></div>
 
-      <!-- PINTAS PANTAUAN KONSUMSI & CHECKER HOTEL (UNTUK SEKSI KONSUMSI & PANITIA) -->
-      <button type="button" id="btnOpenHotelMealMonitorPanitia" class="w-full p-2.5 rounded-2xl bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 text-white flex items-center justify-between px-3.5 shadow active:scale-[0.99] transition">
-        <div class="flex items-center gap-2.5 text-left">
-          <div class="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-sm font-extrabold shrink-0">
-            <i class="fa-solid fa-utensils"></i>
+      <!-- PINTAS PANTAUAN KONSUMSI & CHECKER HOTEL (HANYA TAMPIL UNTUK PJ, KETUA, SEKRETARIS, BENDAHARA & SEKSI KONSUMSI) -->
+      ${hasMealPrivilege ? `
+        <button type="button" id="btnOpenHotelMealMonitorPanitia" class="w-full p-2.5 rounded-2xl bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 text-white flex items-center justify-between px-3.5 shadow active:scale-[0.99] transition">
+          <div class="flex items-center gap-2.5 text-left">
+            <div class="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-sm font-extrabold shrink-0">
+              <i class="fa-solid fa-utensils"></i>
+            </div>
+            <div>
+              <div class="text-[11px] font-extrabold text-white">Pantauan Konsumsi & Checker Hotel</div>
+              <div class="text-[9px] text-teal-200">Khusus Panitia Inti & Seksi Konsumsi</div>
+            </div>
           </div>
-          <div>
-            <div class="text-[11px] font-extrabold text-white">Pantauan Konsumsi & Checker Hotel</div>
-            <div class="text-[9px] text-teal-200">Scan Kuota Makan Peserta & Input Tamu/Keluarga</div>
-          </div>
-        </div>
-        <span class="text-[9px] font-extrabold bg-white/15 text-amber-300 px-2.5 py-1 rounded-xl shrink-0">
-          Buka &rarr;
-        </span>
-      </button>
+          <span class="text-[9px] font-extrabold bg-white/15 text-amber-300 px-2.5 py-1 rounded-xl shrink-0">
+            Buka &rarr;
+          </span>
+        </button>
+      ` : ''}
 
       <!-- GRID 3x3 (9 MENU KOTAK KHUSUS PANITIA) -->
       <div id="panitiaUnifiedGrid6" class="grid grid-cols-3 gap-2.5 text-center">
