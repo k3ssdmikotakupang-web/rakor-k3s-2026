@@ -1277,9 +1277,10 @@ async function saveTaskModal() {
 
 
 // =========================================================================
-// PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (AMAN UNTUK BERANDA PESERTA)
+// PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (RUNNING TEXT + 9 MENU KOTAK 3x3)
 // - Saat Login PESERTA: Semua info card, Running Text, & menu peserta tampil utuh 100%
-// - Saat Login PANITIA: Menampilkan Card Khusus Panitia (Running Text + 8 Menu Kotak)
+// - Saat Login PANITIA: Menampilkan Card Khusus Panitia (Running Text + 9 Menu Kotak)
+// - Menu ke-9: MANAJEMEN AKUN (Khusus Seksi Kesekretariatan, Sekretaris & Ketua Panitia)
 // =========================================================================
 
 let hiddenPanitiaWidgetsHolder = null;
@@ -1348,11 +1349,9 @@ function cleanUpHeaderClutter() {
   });
 }
 
-// Fungsi untuk memulihkan seluruh kartu & Running Text saat login sebagai PESERTA
 function restorePesertaBerandaCards() {
   document.getElementById("panitiaUnifiedWorkspaceCard")?.classList.add("hidden");
 
-  // Kembalikan Running Text ke posisi aslinya di Beranda Peserta
   if (cachedRunningTextElement && cachedRunningTextOriginalParent) {
     cachedRunningTextElement.classList.remove("hidden");
     cachedRunningTextElement.style.display = "";
@@ -1365,7 +1364,6 @@ function restorePesertaBerandaCards() {
     }
   }
 
-  // Tampilkan kembali semua kartu info Beranda yang sebelumnya disembunyikan saat mode Panitia
   hiddenForPanitiaElements.forEach(el => {
     if (el) {
       el.classList.remove("hidden");
@@ -1374,7 +1372,6 @@ function restorePesertaBerandaCards() {
   });
   hiddenForPanitiaElements = [];
 
-  // Pastikan di Kartu Layanan Peserta semua tombol peserta tampil normal (hanya SK, Jobdesk, Meeting Panitia yang disembunyikan untuk Peserta)
   const tabBeranda = document.getElementById("tabContentBeranda");
   const generalServiceCard = tabBeranda?.querySelector(".service-menu-btn")?.closest(".bg-white");
   if (generalServiceCard) {
@@ -1389,6 +1386,448 @@ function restorePesertaBerandaCards() {
       }
     });
   }
+}
+
+function canManageAccounts(user) {
+  if (!user || user.role !== "panitia" || !user.profile) return false;
+  const div = String(user.profile.divisi || "").trim();
+  return [
+    "Seksi Kesekretariatan",
+    "Sekretaris",
+    "Ketua Panitia"
+  ].includes(div);
+}
+
+// =========================================================================
+// MODAL KHUSUS MANAJEMEN AKUN PESERTA & PANITIA (SEKSI KESEKRETARIATAN)
+// =========================================================================
+function openManajemenAkunModal() {
+  rescueWidgetsBeforeModalOverwrite();
+
+  if (!canManageAccounts(activeUser)) {
+    return toast("Akses Ditolak: Menu Manajemen Akun khusus untuk Seksi Kesekretariatan, Sekretaris & Ketua Panitia!");
+  }
+
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-user-gear text-amber-600 mr-1.5"></i> Manajemen Akun & Reset Password`;
+
+  let activeAccTab = "peserta"; // 'peserta' | 'panitia'
+  let filterSr = "ALL";
+  let filterPassType = "ALL"; // 'ALL' | 'CUSTOM' | 'DEFAULT'
+  let filterDivPanitia = "ALL";
+  let searchKeyword = "";
+
+  const renderAccountModalView = () => {
+    const customPassCount = (sekolahList || []).filter(
+      s => s.password_login && String(s.password_login).trim() !== "" && String(s.password_login).trim() !== String(s.npsn).trim()
+    ).length;
+
+    const customPinCount = (panitiaList || []).filter(
+      p => p.pin && String(p.pin).trim() !== "" && String(p.pin).trim() !== "2026" && String(p.pin).trim() !== "123321"
+    ).length;
+
+    const divisiOptions = ["ALL", ...new Set((panitiaList || []).map(p => p.divisi).filter(Boolean))];
+
+    bodyEl.innerHTML = `
+      <!-- Header Ringkasan Otoritas Kesekretariatan -->
+      <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white space-y-3 shadow-lg border border-amber-400/40">
+        <div class="flex items-center justify-between">
+          <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+            Otoritas Seksi Kesekretariatan
+          </span>
+          <button type="button" id="btnExportCredentialsCsv" class="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10px] flex items-center gap-1 shadow transition">
+            <i class="fa-solid fa-file-csv"></i>
+            <span>Backup Akun (.CSV)</span>
+          </button>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-extrabold text-white">Pusat Kendali Akun, Reset Sandi & Bantuan Login</h4>
+          <p class="text-[10px] text-indigo-200 mt-0.5 leading-relaxed">
+            Kelola reset password peserta kembali ke NPSN (8 digit), atur sandi baru, reset PIN panitia ke <b>123321</b>, atau kirim kredensial langsung via WhatsApp.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-center pt-1 border-t border-white/10">
+          <div class="bg-white/10 rounded-2xl p-2 border border-white/10">
+            <div class="text-xs font-extrabold text-amber-300">${sekolahList.length} Akun Peserta</div>
+            <div class="text-[9px] text-indigo-200">${customPassCount} Sandi Kustom • ${sekolahList.length - customPassCount} Default NPSN</div>
+          </div>
+          <div class="bg-white/10 rounded-2xl p-2 border border-white/10">
+            <div class="text-xs font-extrabold text-emerald-300">${panitiaList.length} Akun Panitia</div>
+            <div class="text-[9px] text-indigo-200">${customPinCount} PIN Kustom • ${panitiaList.length - customPinCount} Default (123321)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Switcher: Akun Peserta vs Akun Panitia -->
+      <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl">
+        <button type="button" id="tabBtnAccPeserta" class="py-2 rounded-xl text-xs font-extrabold transition ${
+          activeAccTab === 'peserta' ? 'bg-blue-900 text-amber-300 shadow' : 'text-slate-600'
+        }">
+          <i class="fa-solid fa-school mr-1"></i>Akun Peserta (${sekolahList.length})
+        </button>
+        <button type="button" id="tabBtnAccPanitia" class="py-2 rounded-xl text-xs font-extrabold transition ${
+          activeAccTab === 'panitia' ? 'bg-blue-900 text-amber-300 shadow' : 'text-slate-600'
+        }">
+          <i class="fa-solid fa-user-shield mr-1"></i>Akun Panitia (${panitiaList.length})
+        </button>
+      </div>
+
+      ${activeAccTab === "peserta" ? `
+        <!-- Filter & Aksi Massal Peserta -->
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <select id="selAccFilterSr" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-slate-800">
+              <option value="ALL" ${filterSr === 'ALL' ? 'selected' : ''}>Semua Sub Rayon (${sekolahList.length})</option>
+              ${SUBRAYON_LIST.map(sr => `<option value="${sr}" ${filterSr === sr ? 'selected' : ''}>Rayon ${sr}</option>`).join('')}
+            </select>
+            <select id="selAccFilterPassType" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-800">
+              <option value="ALL" ${filterPassType === 'ALL' ? 'selected' : ''}>Semua Status Sandi</option>
+              <option value="CUSTOM" ${filterPassType === 'CUSTOM' ? 'selected' : ''}>🔑 Sudah Ganti Sandi (${customPassCount})</option>
+              <option value="DEFAULT" ${filterPassType === 'DEFAULT' ? 'selected' : ''}>🛡️ Default NPSN (${sekolahList.length - customPassCount})</option>
+            </select>
+          </div>
+
+          <div class="flex gap-2">
+            <input id="inpAccSearch" type="text" value="${searchKeyword}" placeholder="Cari sekolah, Kepsek, atau NPSN..." class="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900" />
+            ${customPassCount > 0 ? `
+              <button type="button" id="btnResetAllPesertaPass" class="px-3 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-[10px] shrink-0 border border-rose-300 transition" title="Reset seluruh password sekolah kembali ke NPSN">
+                <i class="fa-solid fa-rotate-left mr-1"></i>Reset Massal
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      ` : `
+        <!-- Filter & Aksi Massal Panitia -->
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <select id="selAccFilterDivisi" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-slate-800">
+              ${divisiOptions.map(d => `<option value="${d}" ${filterDivPanitia === d ? 'selected' : ''}>${d === 'ALL' ? `Semua Seksi (${panitiaList.length})` : d}</option>`).join('')}
+            </select>
+            <button type="button" id="btnResetAllPanitiaPin" class="rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-[10px] px-2.5 py-2 border border-rose-300 transition">
+              <i class="fa-solid fa-rotate-left mr-1"></i>Reset Semua PIN (123321)
+            </button>
+          </div>
+          <input id="inpAccSearch" type="text" value="${searchKeyword}" placeholder="Cari nama panitia atau seksi..." class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900" />
+        </div>
+      `}
+
+      <!-- Daftar Akun -->
+      <div id="accountManagerListContainer" class="space-y-2 max-h-80 overflow-y-auto pr-0.5"></div>
+    `;
+
+    const listContainer = document.getElementById("accountManagerListContainer");
+    const kw = searchKeyword.toLowerCase().trim();
+
+    if (activeAccTab === "peserta") {
+      let list = sekolahList || [];
+      if (filterSr !== "ALL") {
+        list = list.filter(s => s.subrayon === filterSr);
+      }
+      if (filterPassType === "CUSTOM") {
+        list = list.filter(s => s.password_login && String(s.password_login).trim() !== "" && String(s.password_login).trim() !== String(s.npsn).trim());
+      } else if (filterPassType === "DEFAULT") {
+        list = list.filter(s => !s.password_login || String(s.password_login).trim() === "" || String(s.password_login).trim() === String(s.npsn).trim());
+      }
+      if (kw) {
+        list = list.filter(s =>
+          (s.nama_sekolah || "").toLowerCase().includes(kw) ||
+          (s.nama_kepsek || "").toLowerCase().includes(kw) ||
+          String(s.npsn || "").includes(kw)
+        );
+      }
+
+      if (list.length === 0) {
+        listContainer.innerHTML = `<div class="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">Tidak ada akun peserta yang sesuai filter.</div>`;
+      } else {
+        listContainer.innerHTML = "";
+        list.forEach((s, idx) => {
+          const customPwd = s.password_login ? String(s.password_login).trim() : "";
+          const hasCustomPwd = customPwd !== "" && customPwd !== String(s.npsn).trim();
+          const activePwd = hasCustomPwd ? customPwd : String(s.npsn || "").trim();
+          const waClean = String(s.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
+
+          const card = document.createElement("div");
+          card.className = `p-3 rounded-2xl bg-white border ${hasCustomPwd ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'} space-y-2 shadow-2xs`;
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
+                  <span class="text-[9px] font-extrabold bg-indigo-50 text-indigo-900 px-1.5 py-0.5 rounded">Rayon ${s.subrayon}</span>
+                  <span class="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">NPSN: ${s.npsn}</span>
+                  <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${hasCustomPwd ? 'bg-amber-200 text-amber-950' : 'bg-emerald-100 text-emerald-800'}">
+                    ${hasCustomPwd ? '🔑 Sandi Kustom' : '🛡️ Default NPSN'}
+                  </span>
+                </div>
+                <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
+                <p class="text-[10px] text-slate-500 truncate">Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b> • WA: ${s.no_hp || '-'}</p>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap">
+              <div class="text-[10px] font-bold text-slate-600">
+                Sandi Aktif: <code class="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 font-mono font-extrabold">${activePwd}</code>
+              </div>
+
+              <div class="flex items-center gap-1">
+                <button type="button" class="btn-reset-peserta-npsn px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[10px] transition" title="Reset Password kembali ke NPSN">
+                  <i class="fa-solid fa-rotate-left mr-0.5"></i>Reset ke NPSN
+                </button>
+                <button type="button" class="btn-set-peserta-pwd px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-extrabold text-[10px] transition" title="Atur Password Baru">
+                  <i class="fa-solid fa-key mr-0.5"></i>Ubah Sandi
+                </button>
+                ${s.no_hp ? `
+                  <button type="button" class="btn-wa-peserta-cred w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs shadow transition" title="Kirim Info Login via WhatsApp">
+                    <i class="fa-brands fa-whatsapp"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          `;
+
+          // Aksi 1: Reset Password Peserta ke NPSN
+          card.querySelector(".btn-reset-peserta-npsn")?.addEventListener("click", async () => {
+            if (!confirm(`Reset password login "${s.nama_sekolah}" kembali ke NPSN (${s.npsn})?`)) return;
+            const { error } = await sb.from("db_sekolah").update({ password_login: null }).eq("id_sekolah", s.id_sekolah);
+            if (error) {
+              await sb.from("db_sekolah").update({ password_login: String(s.npsn) }).eq("id_sekolah", s.id_sekolah);
+            }
+            s.password_login = null;
+            toast(`Password ${s.nama_sekolah} berhasil direset ke NPSN (${s.npsn})!`);
+            renderAccountModalView();
+          });
+
+          // Aksi 2: Setel Password Baru Peserta
+          card.querySelector(".btn-set-peserta-pwd")?.addEventListener("click", async () => {
+            const newPwd = prompt(`Masukkan Password Baru untuk ${s.nama_sekolah}\n(Kosongkan atau ketik ${s.npsn} untuk menggunakan NPSN):`, activePwd);
+            if (newPwd === null) return;
+            const cleanPwd = String(newPwd).trim();
+            const finalVal = (cleanPwd === "" || cleanPwd === String(s.npsn)) ? null : cleanPwd;
+
+            await sb.from("db_sekolah").update({ password_login: finalVal }).eq("id_sekolah", s.id_sekolah);
+            s.password_login = finalVal;
+            toast(`Sandi ${s.nama_sekolah} berhasil diperbarui!`);
+            renderAccountModalView();
+          });
+
+          // Aksi 3: Kirim Info Kredensial via WhatsApp
+          card.querySelector(".btn-wa-peserta-cred")?.addEventListener("click", () => {
+            const msg = `Halo Bapak/Ibu Kepala *${s.nama_sekolah}*,\n\nBerikut informasi akses akun *SIM-RAKOR K3S SD/MI Kota Kupang 2026* Anda:\n• Sub Rayon: *${s.subrayon}*\n• Satuan Pendidikan: *${s.nama_sekolah}*\n• Password / NPSN Login: *${activePwd}*\n\nTerima kasih.\n_Seksi Kesekretariatan Panitia Rakor K3S 2026_`;
+            window.open(`https://wa.me/${waClean}?text=${encodeURIComponent(msg)}`, "_blank");
+          });
+
+          listContainer.appendChild(card);
+        });
+      }
+    } else {
+      // TAB 2: MANAJEMEN AKUN & PIN PANITIA
+      let list = panitiaList || [];
+      if (filterDivPanitia !== "ALL") {
+        list = list.filter(p => p.divisi === filterDivPanitia);
+      }
+      if (kw) {
+        list = list.filter(p =>
+          (p.nama_panitia || "").toLowerCase().includes(kw) ||
+          (p.divisi || "").toLowerCase().includes(kw) ||
+          (p.tugas_subrayon || "").toLowerCase().includes(kw)
+        );
+      }
+
+      listContainer.innerHTML = "";
+      list.forEach((p, idx) => {
+        const rawPin = p.pin ? String(p.pin).trim() : "";
+        const hasCustomPin = rawPin !== "" && rawPin !== "2026" && rawPin !== "123321";
+        const activePin = hasCustomPin ? rawPin : "123321";
+        const waClean = String(p.no_hp || "").replace(/\D/g, "").replace(/^0/, "62");
+
+        const card = document.createElement("div");
+        card.className = `p-3 rounded-2xl bg-white border ${hasCustomPin ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'} space-y-2 shadow-2xs`;
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[9px] font-extrabold text-slate-400">#${p.no || (idx + 1)}</span>
+                <span class="text-[9px] font-extrabold bg-indigo-50 text-indigo-900 px-1.5 py-0.5 rounded">${p.divisi}</span>
+                ${p.tugas_subrayon ? `<span class="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Rayon ${p.tugas_subrayon}</span>` : ''}
+                <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${hasCustomPin ? 'bg-amber-200 text-amber-950' : 'bg-blue-100 text-blue-800'}">
+                  ${hasCustomPin ? '🔑 PIN Kustom' : '🛡️ PIN Default'}
+                </span>
+              </div>
+              <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${p.nama_panitia}</h4>
+              <p class="text-[10px] text-slate-500">WA: ${p.no_hp || 'Belum diisi'}</p>
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 flex-wrap">
+            <div class="text-[10px] font-bold text-slate-600">
+              PIN Aktif: <code class="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 font-mono font-extrabold">${activePin}</code>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button type="button" class="btn-reset-panitia-pin px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[10px] transition">
+                <i class="fa-solid fa-rotate-left mr-0.5"></i>Reset (123321)
+              </button>
+              <button type="button" class="btn-set-panitia-pin px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-extrabold text-[10px] transition">
+                <i class="fa-solid fa-key mr-0.5"></i>Ubah PIN
+              </button>
+              ${p.no_hp ? `
+                <button type="button" class="btn-wa-panitia-cred w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs shadow transition" title="Kirim PIN via WhatsApp">
+                  <i class="fa-brands fa-whatsapp"></i>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+
+        card.querySelector(".btn-reset-panitia-pin")?.addEventListener("click", async () => {
+          if (!confirm(`Reset PIN Panitia "${p.nama_panitia}" kembali ke default (123321)?`)) return;
+          await sb.from("panitia_rakor").update({ pin: "123321" }).eq("id_panitia", p.id_panitia);
+          p.pin = "123321";
+          toast(`PIN ${p.nama_panitia} berhasil direset ke 123321!`);
+          renderAccountModalView();
+        });
+
+        card.querySelector(".btn-set-panitia-pin")?.addEventListener("click", async () => {
+          const newPin = prompt(`Masukkan PIN Baru untuk ${p.nama_panitia}:`, activePin);
+          if (newPin === null) return;
+          const cleanPin = String(newPin).trim() || "123321";
+          await sb.from("panitia_rakor").update({ pin: cleanPin }).eq("id_panitia", p.id_panitia);
+          p.pin = cleanPin;
+          toast(`PIN ${p.nama_panitia} diperbarui menjadi ${cleanPin}!`);
+          renderAccountModalView();
+        });
+
+        card.querySelector(".btn-wa-panitia-cred")?.addEventListener("click", () => {
+          const msg = `Halo *${p.nama_panitia}* (${p.divisi}),\n\nBerikut informasi akses akun Panitia *SIM-RAKOR K3S 2026* Anda:\n• Nama Panitia: *${p.nama_panitia}*\n• PIN Login: *${activePin}*\n\nTerima kasih.\n_Seksi Kesekretariatan Panitia Rakor K3S 2026_`;
+          window.open(`https://wa.me/${waClean}?text=${encodeURIComponent(msg)}`, "_blank");
+        });
+
+        listContainer.appendChild(card);
+      });
+    }
+
+    // Event Listeners Navigasi & Filter di dalam Modal
+    document.getElementById("tabBtnAccPeserta")?.addEventListener("click", () => {
+      activeAccTab = "peserta";
+      renderAccountModalView();
+    });
+
+    document.getElementById("tabBtnAccPanitia")?.addEventListener("click", () => {
+      activeAccTab = "panitia";
+      renderAccountModalView();
+    });
+
+    document.getElementById("selAccFilterSr")?.addEventListener("change", (e) => {
+      filterSr = e.target.value;
+      renderAccountModalView();
+    });
+
+    document.getElementById("selAccFilterPassType")?.addEventListener("change", (e) => {
+      filterPassType = e.target.value;
+      renderAccountModalView();
+    });
+
+    document.getElementById("selAccFilterDivisi")?.addEventListener("change", (e) => {
+      filterDivPanitia = e.target.value;
+      renderAccountModalView();
+    });
+
+    document.getElementById("inpAccSearch")?.addEventListener("input", (e) => {
+      searchKeyword = e.target.value;
+      renderAccountModalView();
+      const inp = document.getElementById("inpAccSearch");
+      if (inp) {
+        inp.focus();
+        inp.setSelectionRange(searchKeyword.length, searchKeyword.length);
+      }
+    });
+
+    document.getElementById("btnResetAllPesertaPass")?.addEventListener("click", async () => {
+      if (!confirm("Reset SELURUH password kustom peserta kembali ke NPSN masing-masing sekolah?")) return;
+      for (const s of sekolahList) {
+        if (s.password_login && String(s.password_login).trim() !== "") {
+          await sb.from("db_sekolah").update({ password_login: null }).eq("id_sekolah", s.id_sekolah);
+          s.password_login = null;
+        }
+      }
+      toast("Seluruh akun peserta berhasil direset kembali ke NPSN!");
+      renderAccountModalView();
+    });
+
+    document.getElementById("btnResetAllPanitiaPin")?.addEventListener("click", async () => {
+      if (!confirm("Reset SELURUH PIN Panitia ke PIN standar 123321?")) return;
+      for (const p of panitiaList) {
+        await sb.from("panitia_rakor").update({ pin: "123321" }).eq("id_panitia", p.id_panitia);
+        p.pin = "123321";
+      }
+      toast("Seluruh PIN Panitia berhasil diseragamkan ke 123321!");
+      renderAccountModalView();
+    });
+
+    document.getElementById("btnExportCredentialsCsv")?.addEventListener("click", () => {
+      const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const headers = ["No", "Tipe Akun", "Sub Rayon / Seksi", "Nama Sekolah / Panitia", "Nama Kepsek / Jabatan", "NPSN / ID", "Password / PIN Aktif", "Status Sandi", "No. WhatsApp"];
+      const rows = [];
+      let no = 1;
+
+      (sekolahList || []).forEach(s => {
+        const customPwd = s.password_login ? String(s.password_login).trim() : "";
+        const isCustom = customPwd !== "" && customPwd !== String(s.npsn).trim();
+        const activePwd = isCustom ? customPwd : String(s.npsn || "");
+        rows.push([
+          no++,
+          "PESERTA",
+          `Sub Rayon ${s.subrayon || '-'}`,
+          s.nama_sekolah || "-",
+          s.nama_kepsek || "Belum Diisi",
+          s.npsn || "-",
+          `'${activePwd}`,
+          isCustom ? "Sandi Kustom" : "Default NPSN",
+          s.no_hp ? `'${s.no_hp}` : "-"
+        ].map(esc).join(","));
+      });
+
+      (panitiaList || []).forEach(p => {
+        const rawPin = p.pin ? String(p.pin).trim() : "";
+        const isCustom = rawPin !== "" && rawPin !== "2026" && rawPin !== "123321";
+        const activePin = isCustom ? rawPin : "123321";
+        rows.push([
+          no++,
+          "PANITIA",
+          p.divisi || "-",
+          p.nama_panitia || "-",
+          p.jabatan || "Anggota",
+          p.id_panitia || "-",
+          `'${activePin}`,
+          isCustom ? "PIN Kustom" : "PIN Default (123321)",
+          p.no_hp ? `'${p.no_hp}` : "-"
+        ].map(esc).join(","));
+      });
+
+      const lineBreak = String.fromCharCode(13, 10);
+      const csvContent = [headers.map(esc).join(","), ...rows].join(lineBreak);
+      const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const blob = new Blob([bom, csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Backup_Akun_dan_Sandi_SIM_RAKOR_2026.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast("File Backup Akun & Sandi (.CSV) berhasil diunduh!");
+    });
+  };
+
+  renderAccountModalView();
 }
 
 async function openDedicatedCatatanEvaluasiModal() {
@@ -1796,13 +2235,11 @@ function reorganizePanitiaWorkspaceCards() {
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (!tabBeranda) return;
 
-  // JIKA LOGIN SEBAGAI PESERTA (ATAU BELUM LOGIN): Pulihkan semua kartu & menu Beranda Peserta!
   if (!activeUser || activeUser.role !== "panitia") {
     restorePesertaBerandaCards();
     return;
   }
 
-  // JIKA LOGIN SEBAGAI PANITIA:
   const generalServiceCard = tabBeranda.querySelector(".service-menu-btn")?.closest(".bg-white");
   if (generalServiceCard) {
     generalServiceCard.querySelectorAll("button, a").forEach(btn => {
@@ -1896,7 +2333,8 @@ function reorganizePanitiaWorkspaceCards() {
   const totalSek = (sekolahList || []).length || 160;
   const ikutCount = (sekolahList || []).filter(s => s.status_ikut === "Ikut").length;
   const panCount = (panitiaList || []).length || 38;
-  const currentSig = `${activeUser.profile?.id_panitia || ''}_${ikutCount}_${panCount}_${totalSek}`;
+  const hasAccPrivilege = canManageAccounts(activeUser);
+  const currentSig = `${activeUser.profile?.id_panitia || ''}_${ikutCount}_${panCount}_${totalSek}_${hasAccPrivilege}`;
 
   if (workspaceCard.dataset.sig !== currentSig || !workspaceCard.querySelector("#panitiaUnifiedGrid6")) {
     workspaceCard.dataset.sig = currentSig;
@@ -1909,15 +2347,16 @@ function reorganizePanitiaWorkspaceCards() {
           <span>Khusus Panitia & Akses Khusus</span>
         </h4>
         <span class="text-[9px] font-extrabold uppercase bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded-full">
-          Internal Panitia
+          9 Menu Internal
         </span>
       </div>
 
       <!-- SLOT RUNNING TEXT DI ATAS GRID MENU KHUSUS PANITIA -->
       <div id="panitiaRunningTextSlot" class="space-y-1.5"></div>
 
-      <!-- GRID MENU KOTAK KHUSUS PANITIA (8 MENU) -->
+      <!-- GRID 3x3 (9 MENU KOTAK KHUSUS PANITIA) -->
       <div id="panitiaUnifiedGrid6" class="grid grid-cols-3 gap-2.5 text-center">
+        <!-- 1. SK Panitia -->
         <button type="button" data-panmenu="sk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-file-signature"></i>
@@ -1926,6 +2365,7 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Surat Keputusan</span>
         </button>
 
+        <!-- 2. Job Deskripsi -->
         <button type="button" data-panmenu="jobdesk" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-list-check"></i>
@@ -1934,6 +2374,7 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Rincian Tugas</span>
         </button>
 
+        <!-- 3. Meeting Panitia -->
         <button type="button" data-panmenu="meeting" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-amber-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-users-gear"></i>
@@ -1942,6 +2383,7 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Jadwal & Rapat</span>
         </button>
 
+        <!-- 4. Catatan & Evaluasi -->
         <button type="button" data-panmenu="catatan" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-clipboard-list"></i>
@@ -1950,6 +2392,7 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Input Temuan</span>
         </button>
 
+        <!-- 5. Layanan Scanner -->
         <button type="button" data-panmenu="scanner_pos" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-violet-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-qrcode"></i>
@@ -1958,6 +2401,7 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-bold text-violet-700">Pos & Absen (${ikutCount})</span>
         </button>
 
+        <!-- 6. Profil Panitia -->
         <button type="button" data-panmenu="profil_panitia" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-indigo-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-id-card-clip"></i>
@@ -1966,6 +2410,7 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">${panCount} Anggota</span>
         </button>
 
+        <!-- 7. Rekap Kepsek -->
         <button type="button" data-panmenu="rekap_kepsek" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-teal-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-user-tie"></i>
@@ -1974,12 +2419,28 @@ function reorganizePanitiaWorkspaceCards() {
           <span class="text-[9px] font-semibold text-slate-500">Per Sub Rayon</span>
         </button>
 
+        <!-- 8. Infografis Sekolah -->
         <button type="button" data-panmenu="infografis_sekolah" class="pan-box-btn p-3 rounded-2xl bg-slate-50 hover:bg-sky-50 border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
           <div class="w-11 h-11 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center text-base shadow-2xs">
             <i class="fa-solid fa-chart-pie"></i>
           </div>
           <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Infografis</span>
           <span class="text-[9px] font-semibold text-slate-500">Profil ${totalSek} Sekolah</span>
+        </button>
+
+        <!-- 9. Manajemen Akun (Khusus Kesekretariatan) -->
+        <button type="button" data-panmenu="manajemen_akun" class="pan-box-btn p-3 rounded-2xl ${
+          hasAccPrivilege ? 'bg-amber-50/70 hover:bg-amber-100 border-amber-300' : 'bg-slate-50 opacity-75 border-slate-200/80'
+        } border flex flex-col items-center justify-center gap-1.5 active:scale-95 transition">
+          <div class="w-11 h-11 rounded-2xl ${
+            hasAccPrivilege ? 'bg-amber-400 text-slate-950' : 'bg-slate-200 text-slate-500'
+          } flex items-center justify-center text-base shadow-2xs">
+            <i class="fa-solid ${hasAccPrivilege ? 'fa-user-gear' : 'fa-user-lock'}"></i>
+          </div>
+          <span class="text-[11px] font-extrabold text-slate-800 leading-tight">Manajemen Akun</span>
+          <span class="text-[9px] font-bold ${hasAccPrivilege ? 'text-amber-800' : 'text-slate-400'}">
+            ${hasAccPrivilege ? 'Reset & Sandi' : 'Kesekretariatan'}
+          </span>
         </button>
       </div>
     `;
@@ -1988,6 +2449,11 @@ function reorganizePanitiaWorkspaceCards() {
       btn.addEventListener("click", () => {
         const code = btn.dataset.panmenu;
         rescueWidgetsBeforeModalOverwrite();
+
+        if (code === "manajemen_akun") {
+          openManajemenAkunModal();
+          return;
+        }
 
         if (code === "profil_panitia") {
           openProfilPanitiaDirectoryModal();
