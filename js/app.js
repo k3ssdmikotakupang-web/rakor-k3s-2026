@@ -3316,3 +3316,177 @@ function reorganizePanitiaWorkspaceCards() {
 }
 
 setInterval(reorganizePanitiaWorkspaceCards, 450);
+
+
+// =========================================================================
+// FITUR BACKGROUND FOTO PANITIA (TRANSPARANSI 20%) DI HALAMAN LOGIN
+// - Menampilkan foto panitia dengan opacity 20% (0.20) di layar #loginScreen
+// - Dilengkapi tombol Upload / Ganti Foto Background Login di menu Manajemen Akun & Profil Panitia
+// =========================================================================
+
+const DEFAULT_PANITIA_BG_URL = "./bg-panitia.jpg";
+let currentLoginBgUrl = "";
+
+async function initAndApplyLoginPanitiaBackground() {
+  const loginScreen = document.getElementById("loginScreen");
+  if (!loginScreen) return;
+
+  // Buat elemen layer gambar latar dengan transparansi 20% (opacity: 0.20) jika belum ada
+  let bgLayer = document.getElementById("loginPanitiaBgLayer");
+  if (!bgLayer) {
+    bgLayer = document.createElement("div");
+    bgLayer.id = "loginPanitiaBgLayer";
+    bgLayer.className = "absolute inset-0 pointer-events-none z-0 overflow-hidden";
+    bgLayer.innerHTML = `
+      <img
+        id="loginPanitiaBgImg"
+        src="${DEFAULT_PANITIA_BG_URL}"
+        alt="Background Panitia Rakor 2026"
+        style="opacity: 0.20;"
+        class="w-full h-full object-cover object-center scale-105 filter contrast-110 transition-opacity duration-700"
+        onerror="this.style.display='none'"
+        onload="this.style.display='block'"
+      />
+      <div class="absolute inset-0 bg-gradient-to-b from-slate-950/50 via-transparent to-blue-950/70"></div>
+    `;
+    loginScreen.prepend(bgLayer);
+  }
+
+  // Cek apakah ada foto background panitia yang disimpan di Supabase (info_layanan)
+  try {
+    const { data } = await sb
+      .from("info_layanan")
+      .select("url_link, deskripsi")
+      .eq("kode_menu", "bg_login_panitia_2026")
+      .maybeSingle();
+
+    const savedUrl = data?.deskripsi || data?.url_link || "";
+    if (savedUrl && String(savedUrl).trim() !== "") {
+      currentLoginBgUrl = String(savedUrl).trim();
+      const imgEl = document.getElementById("loginPanitiaBgImg");
+      if (imgEl) {
+        imgEl.style.display = "block";
+        imgEl.src = currentLoginBgUrl;
+      }
+    }
+  } catch (e) {}
+}
+
+// Fungsi kompresi foto otomatis agar ringan saat diunggah dari Galeri HP/Laptop
+function compressImageFileToDataUrl(file, maxWidth = 1080, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Suntikkan tombol pengatur Foto Background Login Panitia (20%) di dalam Modal Profil Panitia & Manajemen Akun
+function injectLoginBgManagerWidget() {
+  if (!activeUser || activeUser.role !== "panitia") return;
+  const div = String(activeUser.profile?.divisi || "").trim();
+  const canEditBg = ["Ketua Panitia", "Sekretaris", "Seksi Kesekretariatan", "Seksi Perlengkapan, Dokumentasi, dan Publikasi"].includes(div);
+  if (!canEditBg) return;
+
+  const modalBody = document.getElementById("serviceModalBody");
+  const modalTitle = document.getElementById("serviceModalTitle")?.textContent || "";
+  if (!modalBody) return;
+
+  if (
+    (modalTitle.includes("Profil & Direktori Panitia") || modalTitle.includes("Manajemen Akun")) &&
+    !document.getElementById("boxManageLoginBgPanitia")
+  ) {
+    const box = document.createElement("div");
+    box.id = "boxManageLoginBgPanitia";
+    box.className = "p-3.5 rounded-2xl bg-slate-900 text-white border border-amber-400/40 space-y-2.5 shadow-md";
+    box.innerHTML = `
+      <div class="flex items-center justify-between">
+        <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
+          <i class="fa-solid fa-image mr-1"></i>Background Login Panitia (Opacity 20%)
+        </span>
+        <span class="text-[9px] text-slate-300 font-semibold">Tampil di Layar Login</span>
+      </div>
+      <p class="text-[10px] text-slate-300 leading-relaxed">
+        Unggah foto kebersamaan Panitia Rakor 2026 dari galeri untuk dijadikan latar belakang halaman login dengan transparansi 20%.
+      </p>
+      <div class="flex items-center gap-2">
+        <label class="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] text-center cursor-pointer shadow transition">
+          <i class="fa-solid fa-upload mr-1"></i>Pilih Foto Panitia dari Galeri
+          <input type="file" id="inpUploadLoginBgPanitia" accept="image/*" class="hidden" />
+        </label>
+        <button type="button" id="btnSetUrlLoginBgPanitia" class="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-[10px] border border-white/15 transition">
+          Pakai URL
+        </button>
+      </div>
+    `;
+
+    modalBody.prepend(box);
+
+    document.getElementById("inpUploadLoginBgPanitia")?.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      toast("Memproses & mengunggah foto background login...");
+      try {
+        const dataUrl = await compressImageFileToDataUrl(file, 1000, 0.7);
+        await sb.from("info_layanan").upsert([{
+          kode_menu: "bg_login_panitia_2026",
+          judul: "Background Foto Panitia Halaman Login (20%)",
+          deskripsi: dataUrl,
+          url_link: "AKTIF",
+          status_tersedia: "AKTIF"
+        }]);
+        currentLoginBgUrl = dataUrl;
+        const imgEl = document.getElementById("loginPanitiaBgImg");
+        if (imgEl) {
+          imgEl.style.display = "block";
+          imgEl.src = dataUrl;
+        }
+        toast("Foto Background Login Panitia (20%) berhasil diperbarui!");
+      } catch (err) {
+        toast("Gagal memproses gambar.");
+      }
+    });
+
+    document.getElementById("btnSetUrlLoginBgPanitia")?.addEventListener("click", async () => {
+      const url = prompt("Masukkan URL / Link Gambar Foto Panitia (atau ketik ./bg-panitia.jpg jika file ada di GitHub):", currentLoginBgUrl || DEFAULT_PANITIA_BG_URL);
+      if (url === null) return;
+      const cleanUrl = String(url).trim() || DEFAULT_PANITIA_BG_URL;
+      await sb.from("info_layanan").upsert([{
+        kode_menu: "bg_login_panitia_2026",
+        judul: "Background Foto Panitia Halaman Login (20%)",
+        deskripsi: cleanUrl,
+        url_link: cleanUrl,
+        status_tersedia: "AKTIF"
+      }]);
+      currentLoginBgUrl = cleanUrl;
+      const imgEl = document.getElementById("loginPanitiaBgImg");
+      if (imgEl) {
+        imgEl.style.display = "block";
+        imgEl.src = cleanUrl;
+      }
+      toast("Background Login Panitia berhasil disimpan!");
+    });
+  }
+}
+
+initAndApplyLoginPanitiaBackground();
+setInterval(injectLoginBgManagerWidget, 500);
