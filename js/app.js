@@ -2015,20 +2015,6 @@ function canAccessKonsumsiHotel(user) {
   ].includes(div);
 }
 
-function canAccessKonsumsiHotel(user) {
-  if (!user) return false;
-  if (user.role === "hotel_checker") return true;
-  if (user.role !== "panitia" || !user.profile) return false;
-  const div = String(user.profile.divisi || "").trim();
-  return [
-    "Penanggung Jawab",
-    "Ketua Panitia",
-    "Sekretaris",
-    "Bendahara",
-    "Seksi Konsumsi"
-  ].includes(div);
-}
-
 async function openKonsumsiCheckerModalForPanitia() {
   if (!canAccessKonsumsiHotel(activeUser)) {
     return toast("Akses Ditolak: Data Konsumsi Hotel khusus untuk Penanggung Jawab, Ketua, Sekretaris, Bendahara, dan Seksi Konsumsi!");
