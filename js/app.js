@@ -117,7 +117,8 @@ async function loadAllDatabase(showNotif = false) {
     const pSelect = document.getElementById("loginPanitiaSelect");
     if (pSelect) {
       const prev = pSelect.value;
-      pSelect.innerHTML = `<option value="">Pilih Nama Panitia (${panitiaList.length} Orang)</option>`;
+      pSelect.innerHTML = `<option value="">Pilih Nama Panitia / Petugas (${panitiaList.length} Orang)</option>`;
+      pSelect.innerHTML += `<option value="HOTEL-CHECKER">🏨 PETUGAS HOTEL - CHECKER KONSUMSI (Restoran)</option>`;
       panitiaList.forEach(p => {
         const srTag = p.tugas_subrayon ? ` [Ketua Rayon ${p.tugas_subrayon}]` : "";
         pSelect.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${srTag})</option>`;
@@ -132,11 +133,14 @@ async function loadAllDatabase(showNotif = false) {
       if (activeUser.role === "peserta") {
         const updatedSchool = sekolahList.find(s => s.id_sekolah === activeUser.profile.id_sekolah);
         if (updatedSchool) activeUser.profile = updatedSchool;
+        renderAllViews();
+      } else if (activeUser.role === "hotel_checker") {
+        renderHotelMealCheckerFullScreen();
       } else {
         const updatedPanitia = panitiaList.find(p => p.id_panitia === activeUser.profile.id_panitia);
         if (updatedPanitia) activeUser.profile = updatedPanitia;
+        renderAllViews();
       }
-      renderAllViews();
     } else {
       renderBerandaView();
     }
@@ -165,7 +169,10 @@ function bindNavigationAndActions() {
 
   document.getElementById("btnCloseServiceModal")?.addEventListener("click", () => {
     rescueWidgetsBeforeModalOverwrite();
+    stopMealQrCameraScanner();
     document.getElementById("serviceModal")?.classList.add("hidden");
+    const bodyEl = document.getElementById("serviceModalBody");
+    if (bodyEl) bodyEl.innerHTML = "";
   });
 
   document.getElementById("subTabBtnHadir")?.addEventListener("click", () => switchAbsensiSubTab("hadir"));
@@ -175,6 +182,8 @@ function bindNavigationAndActions() {
   document.getElementById("btnRefreshApp")?.addEventListener("click", () => loadAllDatabase(true));
 
   document.getElementById("btnLogout")?.addEventListener("click", () => {
+    stopMealQrCameraScanner();
+    exitHotelCheckerModeUI();
     activeUser = null;
     document.getElementById("mainAppScreen")?.classList.add("hidden");
     document.getElementById("loginScreen")?.classList.remove("hidden");
@@ -217,6 +226,18 @@ async function onLoginSuccess() {
   const fifthIcon = document.getElementById("footerIconFifth");
   const fifthLabel = document.getElementById("footerLabelFifth");
 
+  // MODE KHUSUS TERISOLASI: PETUGAS HOTEL (CHECKER KONSUMSI)
+  if (activeUser.role === "hotel_checker") {
+    if (avatar) avatar.textContent = "🏨";
+    if (nameEl) nameEl.textContent = "Petugas Restoran Hotel";
+    if (roleBadge) roleBadge.textContent = "CHECKER KONSUMSI";
+    if (srBadge) srBadge.classList.add("hidden");
+    renderHotelMealCheckerFullScreen();
+    return;
+  }
+
+  exitHotelCheckerModeUI();
+
   if (activeUser.role === "panitia") {
     const p = activeUser.profile;
     if (avatar) avatar.textContent = p.nama_panitia.charAt(0);
@@ -253,10 +274,16 @@ async function onLoginSuccess() {
 
   await checkSecretaryPrivilege(activeUser);
   filterDay(1);
+  renderAllViews();
   showTab("beranda");
 }
 
 function showTab(name) {
+  if (activeUser && activeUser.role === "hotel_checker") {
+    renderHotelMealCheckerFullScreen();
+    return;
+  }
+
   if (name === "kinerja" && (!activeUser || activeUser.role !== "panitia")) {
     name = "absensi";
   }
@@ -268,8 +295,12 @@ function showTab(name) {
     absensi: "tabContentAbsensi",
     kinerja: "tabContentKinerja"
   };
+
   Object.keys(tabs).forEach(k => {
-    document.getElementById(tabs[k])?.classList.toggle("hidden", k !== name);
+    const el = document.getElementById(tabs[k]);
+    if (!el) return;
+    el.classList.remove("animate-view");
+    el.classList.toggle("hidden", k !== name);
   });
 
   const navMap = {
@@ -302,11 +333,31 @@ function showTab(name) {
       if (span) span.className = "text-[9px] font-extrabold text-white leading-none mt-0.5";
     }
   }
-  renderAllViews();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // Render hanya tab yang sedang dibuka agar perpindahan tab instan & bebas kedipan (anti-ghosting)
+  if (name === "beranda") {
+    renderBerandaView();
+    reorganizePanitiaWorkspaceCards();
+  } else if (name === "jadwal") {
+    renderLiveJadwal();
+  } else if (name === "qr") {
+    renderQrView();
+  } else if (name === "subrayon") {
+    renderSubrayonView();
+  } else if (name === "absensi") {
+    renderAbsensiPesertaView();
+  } else if (name === "kinerja") {
+    renderKinerjaView();
+  }
+
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function renderAllViews() {
+  if (activeUser && activeUser.role === "hotel_checker") {
+    renderHotelMealCheckerFullScreen();
+    return;
+  }
   updateStaticEventDatesToNov2026();
   bindUserProfileTrigger(activeUser, () => loadAllDatabase(false));
   renderBerandaView();
@@ -387,6 +438,10 @@ function renderBerandaView() {
 
 function openServiceModal(serviceCode) {
   rescueWidgetsBeforeModalOverwrite();
+  stopMealQrCameraScanner();
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (bodyEl) bodyEl.innerHTML = "";
+
   if (serviceCode === "kamar") {
     openRoomManagerModal(activeUser, sekolahList, () => loadAllDatabase(false));
     return;
@@ -611,7 +666,7 @@ async function submitPerijinanPeserta() {
 }
 
 function renderQrView() {
-  if (!activeUser) return;
+  if (!activeUser || activeUser.role === "hotel_checker") return;
   const qrBox = document.getElementById("qrCodeCanvas");
   if (!qrBox) return;
   document.getElementById("qrClickZoomHint")?.remove();
@@ -843,15 +898,24 @@ function renderSubrayonView() {
   const canEditThisRayon = canEditPaymentAndParticipation(activeUser, sr);
   const canSeeFinanceBtn = canAccessInfoKeuangan(activeUser);
 
-  const titleEl = document.getElementById("srHeaderTitle");
-  const subTitleEl = document.getElementById("srHeaderSubtitle");
   const ketua = panitiaList.find(p => p.tugas_subrayon === sr);
   const ikutCount = allSr.filter(s => s.status_ikut === "Ikut").length;
+  const pct = allSr.length > 0 ? Math.round((ikutCount / allSr.length) * 100) : 0;
 
-  if (titleEl) titleEl.textContent = `Sub Rayon ${sr}`;
-  if (subTitleEl) {
-    subTitleEl.textContent = `Ketua Rayon: ${ketua ? ketua.nama_panitia : 'Belum Ditentukan'} • ${ikutCount} dari ${allSr.length} Sekolah Ikut`;
+  // SINKRONISASI PENUH DENGAN ID DI INDEX.HTML AGAR BAR PERSENTASE TIDAK 0/0 LAGI!
+  const coordLabel = document.getElementById("srCoordinatorLabel");
+  const progTitle = document.getElementById("srProgressTitle");
+  const progNums = document.getElementById("srProgressNumbers");
+  const progBar = document.getElementById("srProgressBar");
+
+  if (coordLabel) {
+    coordLabel.textContent = ketua
+      ? `Ketua Sub Rayon ${sr}: ${ketua.nama_panitia}`
+      : `Wilayah Sub Rayon ${sr}`;
   }
+  if (progTitle) progTitle.textContent = `Sub Rayon ${sr}`;
+  if (progNums) progNums.textContent = `${ikutCount} / ${allSr.length} Ikut (${pct}%)`;
+  if (progBar) progBar.style.width = `${pct}%`;
 
   const btnMarkAll = document.getElementById("btnMarkAllSr");
   if (btnMarkAll) {
@@ -1275,12 +1339,520 @@ async function saveTaskModal() {
   await loadAllDatabase(false);
 }
 
+// =========================================================================
+// SISTEM CHECKER KONSUMSI HOTEL & DETEKSI TAMU KELUARGA (7 SESI MAKAN)
+// - Akun Terisolasi Petugas Hotel (PIN: 556677)
+// - Terintegrasi juga untuk dipantau oleh Seksi Konsumsi & Panitia Inti
+// =========================================================================
+
+const MEAL_SESSIONS_LIST = [
+  { code: "H1_SIANG", label: "1. Makan Siang H1 (Kamis, 26 Nov)" },
+  { code: "H1_MALAM", label: "2. Makan Malam H1 (Kamis, 26 Nov)" },
+  { code: "H2_PAGI",  label: "3. Sarapan Pagi H2 (Jumat, 27 Nov)" },
+  { code: "H2_SIANG", label: "4. Makan Siang H2 (Jumat, 27 Nov)" },
+  { code: "H2_MALAM", label: "5. Makan Malam H2 (Jumat, 27 Nov)" },
+  { code: "H3_PAGI",  label: "6. Sarapan Pagi H3 (Sabtu, 28 Nov)" },
+  { code: "H3_SIANG", label: "7. Makan Siang H3 (Sabtu, 28 Nov)" }
+];
+
+let selectedMealSessionCode = "H1_SIANG";
+let mealLogsData = [];
+let mealQrScannerInstance = null;
+
+async function loadMealLogsFromSupabase() {
+  try {
+    const { data } = await sb
+      .from("info_layanan")
+      .select("*")
+      .eq("kode_menu", "rekap_konsumsi_hotel_2026")
+      .maybeSingle();
+
+    if (data && data.deskripsi) {
+      const parsed = JSON.parse(data.deskripsi);
+      if (Array.isArray(parsed)) {
+        mealLogsData = parsed;
+        return mealLogsData;
+      }
+    }
+  } catch (e) {}
+  mealLogsData = [];
+  return mealLogsData;
+}
+
+async function saveMealLogsToSupabase() {
+  await sb.from("info_layanan").upsert([{
+    kode_menu: "rekap_konsumsi_hotel_2026",
+    judul: "Data Rekap Scan Konsumsi & Tamu Tambahan Hotel Rakor 2026",
+    deskripsi: JSON.stringify(mealLogsData),
+    url_link: String(mealLogsData.length),
+    status_tersedia: "PANITIA"
+  }]);
+}
+
+function stopMealQrCameraScanner() {
+  if (mealQrScannerInstance) {
+    try {
+      mealQrScannerInstance.stop().then(() => mealQrScannerInstance.clear()).catch(() => {});
+    } catch (e) {}
+    mealQrScannerInstance = null;
+  }
+}
+
+function exitHotelCheckerModeUI() {
+  document.getElementById("hotelCheckerDedicatedScreen")?.remove();
+  document.querySelector("#mainAppScreen nav")?.classList.remove("hidden");
+  document.querySelector("#mainAppScreen main")?.classList.remove("hidden");
+}
+
+function getPersonPhotoForMeal(record, fallbackName = "Peserta") {
+  if (record) {
+    const list = [record.foto_url, record.foto_profil, record.foto_kepsek, record.foto, record.avatar_url];
+    for (const u of list) {
+      if (u && typeof u === "string" && u.trim() !== "") return u.trim();
+    }
+  }
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&background=0f172a&color=fcd34d&bold=true&size=300`;
+}
+
+function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
+  stopMealQrCameraScanner();
+
+  const renderContent = () => {
+    const sessionLogs = mealLogsData.filter(l => l.sesi === selectedMealSessionCode);
+    const pesertaMainLogs = sessionLogs.filter(l => l.tipe === "PESERTA" && !l.is_extra);
+    const panitiaMainLogs = sessionLogs.filter(l => l.tipe === "PANITIA" && !l.is_extra);
+    const extraGuestLogs = sessionLogs.filter(l => l.is_extra);
+
+    const totalIkut = (sekolahList || []).filter(s => s.status_ikut === "Ikut").length || 158;
+    const totalPanitia = (panitiaList || []).length || 38;
+
+    targetContainer.innerHTML = `
+      <div class="space-y-3.5">
+        <!-- Banner Header Checker Restoran Hotel -->
+        <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 text-white space-y-3 shadow-xl border border-teal-400/40">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+              <i class="fa-solid fa-utensils mr-1"></i>Sistem Gatekeeper Restoran Hotel
+            </span>
+            <button type="button" id="btnExportMealLogsCsv" class="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10px] flex items-center gap-1 shadow transition">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>Unduh Rekap (.CSV)</span>
+            </button>
+          </div>
+
+          <div>
+            <h3 class="text-sm font-extrabold text-white">Scan QR Kuota Makan & Deteksi Tamu Keluarga</h3>
+            <p class="text-[10px] text-teal-200 mt-0.5 leading-relaxed">
+              Setiap QR Code hanya berlaku untuk <b>1 Orang (1 Porsi)</b> per sesi makan. Jika ada anggota keluarga/pendamping tambahan yang ikut makan, sistem otomatis mendeteksi dan mencatatnya secara terpisah.
+            </p>
+          </div>
+
+          <!-- Pilihan 7 Sesi Makan -->
+          <div>
+            <label class="block text-[10px] font-extrabold text-amber-300 uppercase mb-1">Pilih Sesi Makan Aktif:</label>
+            <select id="selMealSessionActive" class="w-full rounded-2xl bg-slate-950/90 border border-teal-400/50 px-3 py-2.5 text-xs font-extrabold text-white">
+              ${MEAL_SESSIONS_LIST.map(m => `<option value="${m.code}" ${selectedMealSessionCode === m.code ? 'selected' : ''}>${m.label}</option>`).join('')}
+            </select>
+          </div>
+
+          <!-- Statistik Porsi Sesi Ini -->
+          <div class="grid grid-cols-3 gap-2 text-center pt-1">
+            <div class="bg-white/10 rounded-2xl p-2 border border-white/10">
+              <div class="text-sm font-extrabold text-emerald-300">${pesertaMainLogs.length}/${totalIkut}</div>
+              <div class="text-[9px] text-teal-100">Peserta Makan</div>
+            </div>
+            <div class="bg-white/10 rounded-2xl p-2 border border-white/10">
+              <div class="text-sm font-extrabold text-sky-300">${panitiaMainLogs.length}/${totalPanitia}</div>
+              <div class="text-[9px] text-teal-100">Panitia Makan</div>
+            </div>
+            <div class="bg-rose-500/25 rounded-2xl p-2 border border-rose-400/40">
+              <div class="text-sm font-extrabold text-amber-300">+${extraGuestLogs.length} Porsi</div>
+              <div class="text-[9px] text-rose-200 font-bold">Tamu/Keluarga</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Area Kamera Scanner & Input Cepat -->
+        <div class="p-4 rounded-3xl bg-white border-2 border-teal-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-slate-900">
+              <i class="fa-solid fa-camera text-teal-700 mr-1"></i> Kamera Pemindai QR Meja Makan
+            </span>
+            <button type="button" id="btnToggleMealCamera" class="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-[10px] shadow transition">
+              <i class="fa-solid fa-video mr-1"></i>Buka Kamera Scan
+            </button>
+          </div>
+
+          <div id="mealQrReaderBox" class="hidden w-full overflow-hidden rounded-2xl bg-slate-950 border-2 border-teal-500 min-h-[220px]"></div>
+
+          <!-- Pencarian Manual jika peserta tidak membawa HP -->
+          <div class="pt-1 border-t border-slate-100">
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Atau Pilih Manual Sekolah / Panitia (Jika Lupa Bawa HP):</label>
+            <div class="flex gap-1.5">
+              <select id="selManualMealPerson" class="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-800">
+                <option value="">-- Cari Nama Sekolah / Kepsek / Panitia --</option>
+                <optgroup label="Daftar Peserta Aktif (Ikut)">
+                  ${(sekolahList || []).filter(s => s.status_ikut === "Ikut").map(s => `<option value="PESERTA|${s.npsn}|${s.nama_sekolah}|${s.subrayon}">${s.nama_sekolah} - ${s.nama_kepsek || 'Kepsek'} (Kamar: ${s.nomor_kamar || '-'})</option>`).join('')}
+                </optgroup>
+                <optgroup label="Daftar Panitia Rakor">
+                  ${(panitiaList || []).map(p => `<option value="PANITIA|${p.id_panitia}|${p.nama_panitia}|${p.divisi}">[PANITIA] ${p.nama_panitia} (${p.divisi})</option>`).join('')}
+                </optgroup>
+              </select>
+              <button type="button" id="btnVerifyManualMeal" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-xs shrink-0 shadow">
+                Cek
+              </button>
+            </div>
+          </div>
+
+          <!-- Kotak Hasil Verifikasi Scan (Hijau Valid / Merah Peringatan Keluarga) -->
+          <div id="mealScanResultVerifyBox"></div>
+        </div>
+
+        <!-- Daftar Khusus Tamu Keluarga / Tambahan Porsi (Over-Quota) -->
+        ${extraGuestLogs.length > 0 ? `
+          <div class="p-3.5 rounded-3xl bg-rose-50 border-2 border-rose-300 space-y-2 shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold uppercase text-rose-900">
+                <i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1"></i>Catatan Porsi Tambahan / Keluarga (${extraGuestLogs.length} Orang)
+              </span>
+              <span class="text-[9px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded">Tagihan Ekstra</span>
+            </div>
+            <div class="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+              ${extraGuestLogs.map(ex => `
+                <div class="p-2.5 rounded-2xl bg-white border border-rose-200 flex items-center justify-between gap-2">
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs font-extrabold text-rose-950 truncate">${ex.nama} (+1 Porsi Keluarga/Pendamping)</div>
+                    <div class="text-[10px] font-semibold text-slate-600 truncate">${ex.instansi} • ${ex.keterangan || 'Tamu Tambahan'}</div>
+                    <div class="text-[9px] text-slate-400">Dicatat pukul ${ex.waktu} oleh ${ex.petugas}</div>
+                  </div>
+                  <button type="button" data-logid="${ex.id}" class="btn-del-meal-log w-7 h-7 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs flex items-center justify-center shrink-0" title="Hapus Catatan">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Riwayat Peserta & Panitia yang Sudah Masuk Makan pada Sesi Ini -->
+        <div class="p-4 rounded-3xl bg-white border border-slate-200 space-y-2.5 shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">
+              Riwayat Masuk Makan Sesi Ini (${sessionLogs.length} Total Porsi)
+            </span>
+          </div>
+          <div class="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+            ${sessionLogs.length === 0 ? `
+              <div class="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">
+                Belum ada peserta yang scan makan pada sesi ini.
+              </div>
+            ` : sessionLogs.map(log => `
+              <div class="p-2.5 rounded-2xl ${log.is_extra ? 'bg-rose-50/70 border-rose-300' : 'bg-slate-50 border-slate-200'} border flex items-center justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
+                      log.is_extra ? 'bg-rose-600 text-white' : log.tipe === 'PANITIA' ? 'bg-indigo-100 text-indigo-900' : 'bg-emerald-100 text-emerald-800'
+                    }">${log.is_extra ? 'TAMU / KELUARGA (+1)' : log.tipe}</span>
+                    <span class="text-[9px] font-bold text-slate-400">${log.waktu}</span>
+                  </div>
+                  <div class="text-xs font-extrabold text-slate-900 truncate mt-0.5">${log.nama}</div>
+                  <div class="text-[10px] text-slate-500 truncate">${log.instansi}</div>
+                </div>
+                <button type="button" data-logid="${log.id}" class="btn-del-meal-log text-slate-400 hover:text-rose-600 text-xs px-2 py-1" title="Batalkan Scan">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Handler Ganti Sesi Makan
+    document.getElementById("selMealSessionActive")?.addEventListener("change", (e) => {
+      selectedMealSessionCode = e.target.value;
+      renderContent();
+    });
+
+    // Handler Hapus Log Makan
+    targetContainer.querySelectorAll(".btn-del-meal-log").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Batalkan / hapus catatan scan makan ini?")) return;
+        const id = btn.dataset.logid;
+        mealLogsData = mealLogsData.filter(x => x.id !== id);
+        await saveMealLogsToSupabase();
+        toast("Catatan scan makan dihapus.");
+        renderContent();
+      });
+    });
+
+    // Handler Kamera QR Meja Makan
+    const btnCam = document.getElementById("btnToggleMealCamera");
+    const camBox = document.getElementById("mealQrReaderBox");
+    if (btnCam && camBox) {
+      btnCam.onclick = async () => {
+        if (mealQrScannerInstance) {
+          stopMealQrCameraScanner();
+          camBox.classList.add("hidden");
+          btnCam.innerHTML = `<i class="fa-solid fa-video mr-1"></i>Buka Kamera Scan`;
+          return;
+        }
+        camBox.classList.remove("hidden");
+        btnCam.innerHTML = `<i class="fa-solid fa-video-slash mr-1"></i>Tutup Kamera`;
+        if (typeof window.Html5Qrcode === "function") {
+          try {
+            mealQrScannerInstance = new window.Html5Qrcode("mealQrReaderBox");
+            await mealQrScannerInstance.start(
+              { facingMode: "environment" },
+              { fps: 10, qrbox: { width: 210, height: 210 } },
+              (decodedText) => {
+                processMealQrPayload(decodedText);
+              },
+              () => {}
+            );
+          } catch (err) {
+            toast("Gagal mengakses kamera HP.");
+          }
+        }
+      };
+    }
+
+    // Handler Pilih Manual
+    document.getElementById("btnVerifyManualMeal")?.addEventListener("click", () => {
+      const val = document.getElementById("selManualMealPerson")?.value || "";
+      if (!val) return toast("Pilih nama sekolah atau panitia terlebih dahulu!");
+      processMealQrPayload(val);
+    });
+
+    // Handler Export CSV Rekap Konsumsi
+    document.getElementById("btnExportMealLogsCsv")?.addEventListener("click", () => {
+      const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const headers = ["No", "Kode Sesi", "Nama Sesi Makan", "Status Porsi", "Tipe", "Nama Lengkap", "Asal Sekolah / Divisi", "Sub Rayon / Kamar", "Waktu Scan", "Petugas Checker", "Keterangan"];
+      const rows = mealLogsData.map((l, i) => {
+        const sObj = MEAL_SESSIONS_LIST.find(m => m.code === l.sesi);
+        return [
+          i + 1,
+          l.sesi,
+          sObj ? sObj.label : l.sesi,
+          l.is_extra ? "PORSI TAMBAHAN / KELUARGA" : "KUOTA RESMI (1 PORSI)",
+          l.tipe,
+          l.nama,
+          l.instansi,
+          l.info_kamar || "-",
+          l.waktu,
+          l.petugas || "Petugas Hotel",
+          l.keterangan || "Hadir Makan"
+        ].map(esc).join(",");
+      });
+      const lineBreak = String.fromCharCode(13, 10);
+      const csv = [headers.map(esc).join(","), ...rows].join(lineBreak);
+      const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Rekap_Konsumsi_dan_Tamu_Hotel_Rakor2026.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast("Rekap Konsumsi & Tamu Hotel (.CSV) berhasil diunduh!");
+    });
+  };
+
+  const processMealQrPayload = async (rawQr) => {
+    const clean = String(rawQr || "").trim();
+    if (!clean) return;
+
+    let personKey = "";
+    let tipe = "PESERTA";
+    let nama = "";
+    let instansi = "";
+    let infoKamar = "";
+    let photoUrl = "";
+    let isEligible = true;
+
+    if (clean.startsWith("PANITIA|")) {
+      const parts = clean.split("|");
+      const idPan = parts[1];
+      const p = (panitiaList || []).find(x => String(x.id_panitia) === String(idPan));
+      tipe = "PANITIA";
+      personKey = `PAN_${idPan}`;
+      nama = p ? p.nama_panitia : (parts[2] || "Panitia");
+      instansi = p ? p.divisi : (parts[3] || "Panitia");
+      infoKamar = p?.tugas_subrayon ? `Ketua Rayon ${p.tugas_subrayon}` : "Panitia Rakor";
+      photoUrl = getPersonPhotoForMeal(p, nama);
+    } else {
+      const npsn = clean.startsWith("PESERTA|") ? clean.split("|")[1] : clean;
+      const s = (sekolahList || []).find(x => String(x.npsn) === String(npsn) || String(x.id_sekolah) === String(npsn));
+      if (!s) {
+        return toast("QR Code tidak dikenali dalam database peserta!");
+      }
+      tipe = "PESERTA";
+      personKey = `SEK_${s.id_sekolah}`;
+      nama = s.nama_kepsek || `Kepala ${s.nama_sekolah}`;
+      instansi = s.nama_sekolah;
+      infoKamar = `Sub Rayon ${s.subrayon} • Kamar: ${s.nomor_kamar || 'Belum Ada'}`;
+      photoUrl = getPersonPhotoForMeal(s, nama);
+      if (s.status_ikut !== "Ikut") {
+        isEligible = false;
+      }
+    }
+
+    const resBox = document.getElementById("mealScanResultVerifyBox");
+    if (!resBox) return;
+
+    if (!isEligible) {
+      resBox.innerHTML = `
+        <div class="p-4 rounded-2xl bg-rose-950 text-white border-2 border-rose-500 space-y-2 text-center shadow-lg">
+          <div class="text-xs font-extrabold text-amber-300 uppercase">❌ DITOLAK: SEKOLAH TIDAK TERDAFTAR IKUT</div>
+          <div class="text-sm font-extrabold">${instansi}</div>
+          <p class="text-[11px] text-rose-200">Satuan pendidikan ini berstatus "Tidak Ikut" sehingga tidak memiliki kuota konsumsi hotel.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Cek apakah sudah pernah scan makan pada sesi ini!
+    const existingScan = mealLogsData.find(
+      l => l.sesi === selectedMealSessionCode && l.person_key === personKey && !l.is_extra
+    );
+
+    const petugasName = activeUser?.profile?.nama_panitia || "Petugas Hotel";
+    const nowTime = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WITA";
+
+    if (!existingScan) {
+      // SCAN PERTAMA (VALID 1 ORANG) -> Langsung simpan otomatis!
+      const newEntry = {
+        id: "MEAL-" + Date.now(),
+        sesi: selectedMealSessionCode,
+        person_key: personKey,
+        tipe,
+        nama,
+        instansi,
+        info_kamar: infoKamar,
+        waktu: nowTime,
+        petugas: petugasName,
+        is_extra: false,
+        keterangan: "Kuota Utama (1 Orang)"
+      };
+      mealLogsData.unshift(newEntry);
+      await saveMealLogsToSupabase();
+      renderContent();
+
+      const freshResBox = document.getElementById("mealScanResultVerifyBox");
+      if (freshResBox) {
+        freshResBox.innerHTML = `
+          <div class="p-4 rounded-3xl bg-emerald-950 text-white border-2 border-emerald-400 flex items-center gap-3.5 shadow-xl">
+            <img src="${photoUrl}" alt="${nama}" class="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shrink-0 bg-slate-800" />
+            <div class="min-w-0 flex-1">
+              <span class="text-[9px] font-extrabold uppercase bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full">
+                ✓ VALID • SILAKAN MASUK (1 ORANG)
+              </span>
+              <h4 class="text-sm font-extrabold text-white truncate mt-1">${nama}</h4>
+              <p class="text-xs font-bold text-amber-300 truncate">${instansi}</p>
+              <p class="text-[10px] text-emerald-200">${infoKamar} • Jam: ${nowTime}</p>
+            </div>
+          </div>
+        `;
+      }
+      toast(`✓ Valid (1 Porsi): ${nama}`);
+    } else {
+      // SUDAH PERNAH SCAN MAKAN DI SESI INI! Tampilkan Peringatan Merah Anti-Keluarga / Double Scan
+      resBox.innerHTML = `
+        <div class="p-4 rounded-3xl bg-rose-950 text-white border-4 border-amber-400 space-y-3 shadow-2xl">
+          <div class="flex items-center gap-3">
+            <img src="${photoUrl}" alt="${nama}" class="w-16 h-16 rounded-2xl object-cover border-2 border-rose-400 shrink-0 bg-slate-800" />
+            <div class="min-w-0 flex-1">
+              <span class="text-[9px] font-extrabold uppercase bg-rose-600 text-white px-2.5 py-0.5 rounded-full">
+                ⚠️ PERINGATAN: SUDAH SCAN MAKAN!
+              </span>
+              <h4 class="text-sm font-extrabold text-white truncate mt-1">${nama}</h4>
+              <p class="text-xs font-bold text-amber-300 truncate">${instansi}</p>
+              <p class="text-[10px] text-rose-200">Sudah masuk makan pukul <b>${existingScan.waktu}</b></p>
+            </div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-white/10 border border-white/15 text-[11px] text-rose-100 leading-snug">
+            Jatah kuota panitia hanya berlaku untuk <b>1 Orang (Kepala Sekolah/Panitia bersangkutan)</b>. Jika peserta membawa anggota keluarga/pendamping tambahan, pilih tindakan di bawah:
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btnRejectExtraGuest" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold text-xs border border-white/15">
+              Tolak / Batal
+            </button>
+            <button type="button" id="btnRecordExtraFamilyGuest" class="py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow">
+              + Catat Keluarga (1 Porsi)
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("btnRejectExtraGuest")?.addEventListener("click", () => {
+        resBox.innerHTML = "";
+        toast("Akses tambahan ditolak (Kuota 1 orang).");
+      });
+
+      document.getElementById("btnRecordExtraFamilyGuest")?.addEventListener("click", async () => {
+        const ket = prompt("Keterangan tambahan (misal: Istri / Anak / Sopir / Pendamping):", "Anggota Keluarga / Pendamping") || "Anggota Keluarga";
+        mealLogsData.unshift({
+          id: "MEAL-EXTRA-" + Date.now(),
+          sesi: selectedMealSessionCode,
+          person_key: personKey,
+          tipe,
+          nama: `${nama} (Pendamping)`,
+          instansi,
+          info_kamar: infoKamar,
+          waktu: nowTime,
+          petugas: petugasName,
+          is_extra: true,
+          keterangan: `Keluarga/Tambahan: ${ket}`
+        });
+        await saveMealLogsToSupabase();
+        toast(`Tercatat: +1 Porsi Tambahan atas nama ${instansi}`);
+        renderContent();
+      });
+    }
+  };
+
+  renderContent();
+}
+
+async function renderHotelMealCheckerFullScreen() {
+  await loadMealLogsFromSupabase();
+
+  // Sembunyikan main & nav reguler agar petugas hotel tidak bisa membuka data internal panitia
+  document.querySelector("#mainAppScreen main")?.classList.add("hidden");
+  document.querySelector("#mainAppScreen nav")?.classList.add("hidden");
+
+  let screen = document.getElementById("hotelCheckerDedicatedScreen");
+  if (!screen) {
+    screen = document.createElement("div");
+    screen.id = "hotelCheckerDedicatedScreen";
+    screen.className = "p-4 space-y-4 flex-1 pb-12";
+    document.getElementById("mainAppScreen")?.appendChild(screen);
+  }
+
+  renderMealCheckerInterface(screen, true);
+}
+
+async function openKonsumsiCheckerModalForPanitia() {
+  rescueWidgetsBeforeModalOverwrite();
+  await loadMealLogsFromSupabase();
+
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || !titleEl || !bodyEl) return;
+
+  modal.classList.remove("hidden");
+  titleEl.innerHTML = `<i class="fa-solid fa-utensils text-teal-700 mr-1.5"></i> Pantauan Konsumsi & Checker Porsi Hotel`;
+
+  renderMealCheckerInterface(bodyEl, false);
+}
 
 // =========================================================================
 // PENATAAN ULANG HEADER & KARTU KHUSUS PANITIA (RUNNING TEXT + 9 MENU KOTAK 3x3)
-// - Saat Login PESERTA: Semua info card, Running Text, & menu peserta tampil utuh 100%
-// - Saat Login PANITIA: Menampilkan Card Khusus Panitia (Running Text + 9 Menu Kotak)
-// - Menu ke-9: MANAJEMEN AKUN (Khusus Seksi Kesekretariatan, Sekretaris & Ketua Panitia)
 // =========================================================================
 
 let hiddenPanitiaWidgetsHolder = null;
@@ -1398,9 +1970,6 @@ function canManageAccounts(user) {
   ].includes(div);
 }
 
-// =========================================================================
-// MODAL KHUSUS MANAJEMEN AKUN PESERTA & PANITIA (SEKSI KESEKRETARIATAN)
-// =========================================================================
 function openManajemenAkunModal() {
   rescueWidgetsBeforeModalOverwrite();
 
@@ -1416,9 +1985,9 @@ function openManajemenAkunModal() {
   modal.classList.remove("hidden");
   titleEl.innerHTML = `<i class="fa-solid fa-user-gear text-amber-600 mr-1.5"></i> Manajemen Akun & Reset Password`;
 
-  let activeAccTab = "peserta"; // 'peserta' | 'panitia'
+  let activeAccTab = "peserta";
   let filterSr = "ALL";
-  let filterPassType = "ALL"; // 'ALL' | 'CUSTOM' | 'DEFAULT'
+  let filterPassType = "ALL";
   let filterDivPanitia = "ALL";
   let searchKeyword = "";
 
@@ -1434,7 +2003,6 @@ function openManajemenAkunModal() {
     const divisiOptions = ["ALL", ...new Set((panitiaList || []).map(p => p.divisi).filter(Boolean))];
 
     bodyEl.innerHTML = `
-      <!-- Header Ringkasan Otoritas Kesekretariatan -->
       <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white space-y-3 shadow-lg border border-amber-400/40">
         <div class="flex items-center justify-between">
           <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
@@ -1465,7 +2033,6 @@ function openManajemenAkunModal() {
         </div>
       </div>
 
-      <!-- Tab Switcher: Akun Peserta vs Akun Panitia -->
       <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl">
         <button type="button" id="tabBtnAccPeserta" class="py-2 rounded-xl text-xs font-extrabold transition ${
           activeAccTab === 'peserta' ? 'bg-blue-900 text-amber-300 shadow' : 'text-slate-600'
@@ -1480,7 +2047,6 @@ function openManajemenAkunModal() {
       </div>
 
       ${activeAccTab === "peserta" ? `
-        <!-- Filter & Aksi Massal Peserta -->
         <div class="space-y-2">
           <div class="grid grid-cols-2 gap-2">
             <select id="selAccFilterSr" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-slate-800">
@@ -1504,7 +2070,6 @@ function openManajemenAkunModal() {
           </div>
         </div>
       ` : `
-        <!-- Filter & Aksi Massal Panitia -->
         <div class="space-y-2">
           <div class="grid grid-cols-2 gap-2">
             <select id="selAccFilterDivisi" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-extrabold text-slate-800">
@@ -1518,7 +2083,6 @@ function openManajemenAkunModal() {
         </div>
       `}
 
-      <!-- Daftar Akun -->
       <div id="accountManagerListContainer" class="space-y-2 max-h-80 overflow-y-auto pr-0.5"></div>
     `;
 
@@ -1527,9 +2091,7 @@ function openManajemenAkunModal() {
 
     if (activeAccTab === "peserta") {
       let list = sekolahList || [];
-      if (filterSr !== "ALL") {
-        list = list.filter(s => s.subrayon === filterSr);
-      }
+      if (filterSr !== "ALL") list = list.filter(s => s.subrayon === filterSr);
       if (filterPassType === "CUSTOM") {
         list = list.filter(s => s.password_login && String(s.password_login).trim() !== "" && String(s.password_login).trim() !== String(s.npsn).trim());
       } else if (filterPassType === "DEFAULT") {
@@ -1577,14 +2139,14 @@ function openManajemenAkunModal() {
               </div>
 
               <div class="flex items-center gap-1">
-                <button type="button" class="btn-reset-peserta-npsn px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[10px] transition" title="Reset Password kembali ke NPSN">
+                <button type="button" class="btn-reset-peserta-npsn px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[10px] transition">
                   <i class="fa-solid fa-rotate-left mr-0.5"></i>Reset ke NPSN
                 </button>
-                <button type="button" class="btn-set-peserta-pwd px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-extrabold text-[10px] transition" title="Atur Password Baru">
+                <button type="button" class="btn-set-peserta-pwd px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-extrabold text-[10px] transition">
                   <i class="fa-solid fa-key mr-0.5"></i>Ubah Sandi
                 </button>
                 ${s.no_hp ? `
-                  <button type="button" class="btn-wa-peserta-cred w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs shadow transition" title="Kirim Info Login via WhatsApp">
+                  <button type="button" class="btn-wa-peserta-cred w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs shadow transition">
                     <i class="fa-brands fa-whatsapp"></i>
                   </button>
                 ` : ''}
@@ -1592,7 +2154,6 @@ function openManajemenAkunModal() {
             </div>
           `;
 
-          // Aksi 1: Reset Password Peserta ke NPSN
           card.querySelector(".btn-reset-peserta-npsn")?.addEventListener("click", async () => {
             if (!confirm(`Reset password login "${s.nama_sekolah}" kembali ke NPSN (${s.npsn})?`)) return;
             const { error } = await sb.from("db_sekolah").update({ password_login: null }).eq("id_sekolah", s.id_sekolah);
@@ -1604,7 +2165,6 @@ function openManajemenAkunModal() {
             renderAccountModalView();
           });
 
-          // Aksi 2: Setel Password Baru Peserta
           card.querySelector(".btn-set-peserta-pwd")?.addEventListener("click", async () => {
             const newPwd = prompt(`Masukkan Password Baru untuk ${s.nama_sekolah}\n(Kosongkan atau ketik ${s.npsn} untuk menggunakan NPSN):`, activePwd);
             if (newPwd === null) return;
@@ -1617,7 +2177,6 @@ function openManajemenAkunModal() {
             renderAccountModalView();
           });
 
-          // Aksi 3: Kirim Info Kredensial via WhatsApp
           card.querySelector(".btn-wa-peserta-cred")?.addEventListener("click", () => {
             const msg = `Halo Bapak/Ibu Kepala *${s.nama_sekolah}*,\n\nBerikut informasi akses akun *SIM-RAKOR K3S SD/MI Kota Kupang 2026* Anda:\n• Sub Rayon: *${s.subrayon}*\n• Satuan Pendidikan: *${s.nama_sekolah}*\n• Password / NPSN Login: *${activePwd}*\n\nTerima kasih.\n_Seksi Kesekretariatan Panitia Rakor K3S 2026_`;
             window.open(`https://wa.me/${waClean}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -1627,11 +2186,8 @@ function openManajemenAkunModal() {
         });
       }
     } else {
-      // TAB 2: MANAJEMEN AKUN & PIN PANITIA
       let list = panitiaList || [];
-      if (filterDivPanitia !== "ALL") {
-        list = list.filter(p => p.divisi === filterDivPanitia);
-      }
+      if (filterDivPanitia !== "ALL") list = list.filter(p => p.divisi === filterDivPanitia);
       if (kw) {
         list = list.filter(p =>
           (p.nama_panitia || "").toLowerCase().includes(kw) ||
@@ -1678,7 +2234,7 @@ function openManajemenAkunModal() {
                 <i class="fa-solid fa-key mr-0.5"></i>Ubah PIN
               </button>
               ${p.no_hp ? `
-                <button type="button" class="btn-wa-panitia-cred w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs shadow transition" title="Kirim PIN via WhatsApp">
+                <button type="button" class="btn-wa-panitia-cred w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs shadow transition">
                   <i class="fa-brands fa-whatsapp"></i>
                 </button>
               ` : ''}
@@ -1713,7 +2269,6 @@ function openManajemenAkunModal() {
       });
     }
 
-    // Event Listeners Navigasi & Filter di dalam Modal
     document.getElementById("tabBtnAccPeserta")?.addEventListener("click", () => {
       activeAccTab = "peserta";
       renderAccountModalView();
@@ -2232,6 +2787,10 @@ function extractMisplacedItemsFromCatatan() {
 function reorganizePanitiaWorkspaceCards() {
   cleanUpHeaderClutter();
 
+  if (activeUser && activeUser.role === "hotel_checker") {
+    return;
+  }
+
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (!tabBeranda) return;
 
@@ -2347,12 +2906,28 @@ function reorganizePanitiaWorkspaceCards() {
           <span>Khusus Panitia & Akses Khusus</span>
         </h4>
         <span class="text-[9px] font-extrabold uppercase bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded-full">
-          9 Menu Internal
+          Internal Panitia
         </span>
       </div>
 
       <!-- SLOT RUNNING TEXT DI ATAS GRID MENU KHUSUS PANITIA -->
       <div id="panitiaRunningTextSlot" class="space-y-1.5"></div>
+
+      <!-- PINTAS PANTAUAN KONSUMSI & CHECKER HOTEL (UNTUK SEKSI KONSUMSI & PANITIA) -->
+      <button type="button" id="btnOpenHotelMealMonitorPanitia" class="w-full p-2.5 rounded-2xl bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 text-white flex items-center justify-between px-3.5 shadow active:scale-[0.99] transition">
+        <div class="flex items-center gap-2.5 text-left">
+          <div class="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center text-sm font-extrabold shrink-0">
+            <i class="fa-solid fa-utensils"></i>
+          </div>
+          <div>
+            <div class="text-[11px] font-extrabold text-white">Pantauan Konsumsi & Checker Hotel</div>
+            <div class="text-[9px] text-teal-200">Scan Kuota Makan Peserta & Catatan Tamu Keluarga</div>
+          </div>
+        </div>
+        <span class="text-[9px] font-extrabold bg-white/15 text-amber-300 px-2.5 py-1 rounded-xl shrink-0">
+          Buka &rarr;
+        </span>
+      </button>
 
       <!-- GRID 3x3 (9 MENU KOTAK KHUSUS PANITIA) -->
       <div id="panitiaUnifiedGrid6" class="grid grid-cols-3 gap-2.5 text-center">
@@ -2445,10 +3020,15 @@ function reorganizePanitiaWorkspaceCards() {
       </div>
     `;
 
+    document.getElementById("btnOpenHotelMealMonitorPanitia")?.addEventListener("click", () => {
+      openKonsumsiCheckerModalForPanitia();
+    });
+
     workspaceCard.querySelectorAll(".pan-box-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const code = btn.dataset.panmenu;
         rescueWidgetsBeforeModalOverwrite();
+        stopMealQrCameraScanner();
 
         if (code === "manajemen_akun") {
           openManajemenAkunModal();
