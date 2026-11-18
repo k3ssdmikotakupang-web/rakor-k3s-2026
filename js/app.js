@@ -117,12 +117,13 @@ async function loadAllDatabase(showNotif = false) {
     const pSelect = document.getElementById("loginPanitiaSelect");
     if (pSelect) {
       const prev = pSelect.value;
-      pSelect.innerHTML = `<option value="">Pilih Nama Panitia / Petugas (${panitiaList.length} Orang)</option>`;
-      pSelect.innerHTML += `<option value="HOTEL-CHECKER">🏨 PETUGAS HOTEL - CHECKER KONSUMSI (Restoran)</option>`;
+      pSelect.innerHTML = `<option value="">Pilih Nama Panitia (${panitiaList.length} Orang)</option>`;
       panitiaList.forEach(p => {
         const srTag = p.tugas_subrayon ? ` [Ketua Rayon ${p.tugas_subrayon}]` : "";
         pSelect.innerHTML += `<option value="${p.id_panitia}">${p.no}. ${p.nama_panitia} (${p.divisi}${srTag})</option>`;
       });
+      // Tempatkan PETUGAS HOTEL di urutan paling bawah / terakhir
+      pSelect.innerHTML += `<option value="HOTEL-CHECKER">${panitiaList.length + 1}. 🏨 PETUGAS HOTEL - CHECKER KONSUMSI (Restoran)</option>`;
       if (prev) pSelect.value = prev;
     }
 
@@ -226,7 +227,6 @@ async function onLoginSuccess() {
   const fifthIcon = document.getElementById("footerIconFifth");
   const fifthLabel = document.getElementById("footerLabelFifth");
 
-  // MODE KHUSUS TERISOLASI: PETUGAS HOTEL (CHECKER KONSUMSI)
   if (activeUser.role === "hotel_checker") {
     if (avatar) avatar.textContent = "🏨";
     if (nameEl) nameEl.textContent = "Petugas Restoran Hotel";
@@ -334,7 +334,6 @@ function showTab(name) {
     }
   }
 
-  // Render hanya tab yang sedang dibuka agar perpindahan tab instan & bebas kedipan (anti-ghosting)
   if (name === "beranda") {
     renderBerandaView();
     reorganizePanitiaWorkspaceCards();
@@ -902,7 +901,6 @@ function renderSubrayonView() {
   const ikutCount = allSr.filter(s => s.status_ikut === "Ikut").length;
   const pct = allSr.length > 0 ? Math.round((ikutCount / allSr.length) * 100) : 0;
 
-  // SINKRONISASI PENUH DENGAN ID DI INDEX.HTML AGAR BAR PERSENTASE TIDAK 0/0 LAGI!
   const coordLabel = document.getElementById("srCoordinatorLabel");
   const progTitle = document.getElementById("srProgressTitle");
   const progNums = document.getElementById("srProgressNumbers");
@@ -1340,9 +1338,12 @@ async function saveTaskModal() {
 }
 
 // =========================================================================
-// SISTEM CHECKER KONSUMSI HOTEL & DETEKSI TAMU KELUARGA (7 SESI MAKAN)
-// - Akun Terisolasi Petugas Hotel (PIN: 556677)
-// - Terintegrasi juga untuk dipantau oleh Seksi Konsumsi & Panitia Inti
+// SISTEM CHECKER KONSUMSI HOTEL & INPUT MANUAL TAMU / KELUARGA (7 SESI MAKAN)
+// - Mendukung Scan QR Peserta/Panitia + Form Input Manual Tamu / Keluarga
+// - Membedakan Status Pembayaran:
+//   1. BAYAR_SENDIRI (Bayar Pribadi ke Hotel - Tidak masuk beban panitia)
+//   2. JATAH_RAKOR (Masuk Jatah/Kuota Rakor Panitia)
+//   3. TAGIHAN_PANITIA (Over-Quota / Tagihan Tambahan ke Panitia)
 // =========================================================================
 
 const MEAL_SESSIONS_LIST = [
@@ -1414,6 +1415,16 @@ function getPersonPhotoForMeal(record, fallbackName = "Peserta") {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&background=0f172a&color=fcd34d&bold=true&size=300`;
 }
 
+function getBillingLabelBadge(skema) {
+  if (skema === "BAYAR_SENDIRI") {
+    return { text: "💳 Bayar Sendiri (Pribadi)", cls: "bg-emerald-100 text-emerald-900 border-emerald-300" };
+  }
+  if (skema === "JATAH_RAKOR") {
+    return { text: "🎟️ Masuk Jatah Rakor", cls: "bg-blue-100 text-blue-900 border-blue-300" };
+  }
+  return { text: "⚠️ Tagihan Ekstra Panitia", cls: "bg-rose-100 text-rose-900 border-rose-300" };
+}
+
 function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
   stopMealQrCameraScanner();
 
@@ -1422,6 +1433,20 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
     const pesertaMainLogs = sessionLogs.filter(l => l.tipe === "PESERTA" && !l.is_extra);
     const panitiaMainLogs = sessionLogs.filter(l => l.tipe === "PANITIA" && !l.is_extra);
     const extraGuestLogs = sessionLogs.filter(l => l.is_extra);
+
+    const porsiBayarSendiri = extraGuestLogs
+      .filter(l => l.skema_bayar === "BAYAR_SENDIRI")
+      .reduce((sum, l) => sum + (Number(l.jumlah_porsi) || 1), 0);
+
+    const porsiJatahRakor = extraGuestLogs
+      .filter(l => l.skema_bayar === "JATAH_RAKOR")
+      .reduce((sum, l) => sum + (Number(l.jumlah_porsi) || 1), 0);
+
+    const porsiTagihanPanitia = extraGuestLogs
+      .filter(l => !l.skema_bayar || l.skema_bayar === "TAGIHAN_PANITIA")
+      .reduce((sum, l) => sum + (Number(l.jumlah_porsi) || 1), 0);
+
+    const totalExtraPorsi = porsiBayarSendiri + porsiJatahRakor + porsiTagihanPanitia;
 
     const totalIkut = (sekolahList || []).filter(s => s.status_ikut === "Ikut").length || 158;
     const totalPanitia = (panitiaList || []).length || 38;
@@ -1441,9 +1466,9 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
           </div>
 
           <div>
-            <h3 class="text-sm font-extrabold text-white">Scan QR Kuota Makan & Deteksi Tamu Keluarga</h3>
+            <h3 class="text-sm font-extrabold text-white">Scan QR Kuota Makan & Pencatatan Tamu / Keluarga</h3>
             <p class="text-[10px] text-teal-200 mt-0.5 leading-relaxed">
-              Setiap QR Code hanya berlaku untuk <b>1 Orang (1 Porsi)</b> per sesi makan. Jika ada anggota keluarga/pendamping tambahan yang ikut makan, sistem otomatis mendeteksi dan mencatatnya secara terpisah.
+              Pantau kuota makan peserta & panitia, serta catat tamu/keluarga secara manual beserta status pembayarannya (<b>Bayar Sendiri</b>, <b>Jatah Rakor</b>, atau <b>Tagihan Tambahan Panitia</b>).
             </p>
           </div>
 
@@ -1465,18 +1490,31 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
               <div class="text-sm font-extrabold text-sky-300">${panitiaMainLogs.length}/${totalPanitia}</div>
               <div class="text-[9px] text-teal-100">Panitia Makan</div>
             </div>
-            <div class="bg-rose-500/25 rounded-2xl p-2 border border-rose-400/40">
-              <div class="text-sm font-extrabold text-amber-300">+${extraGuestLogs.length} Porsi</div>
-              <div class="text-[9px] text-rose-200 font-bold">Tamu/Keluarga</div>
+            <div class="bg-amber-500/20 rounded-2xl p-2 border border-amber-400/40">
+              <div class="text-sm font-extrabold text-amber-300">+${totalExtraPorsi} Porsi</div>
+              <div class="text-[9px] text-amber-100 font-bold">Total Tamu/Keluarga</div>
+            </div>
+          </div>
+
+          <!-- Rincian Status Bayar Tamu / Keluarga -->
+          <div class="grid grid-cols-3 gap-1.5 text-center pt-1 border-t border-white/10 text-[9px] font-bold">
+            <div class="bg-emerald-500/20 text-emerald-200 py-1 px-1.5 rounded-xl border border-emerald-400/30">
+              Bayar Sendiri: <b class="text-white">${porsiBayarSendiri}</b>
+            </div>
+            <div class="bg-blue-500/20 text-blue-200 py-1 px-1.5 rounded-xl border border-blue-400/30">
+              Jatah Rakor: <b class="text-white">${porsiJatahRakor}</b>
+            </div>
+            <div class="bg-rose-500/25 text-rose-200 py-1 px-1.5 rounded-xl border border-rose-400/40">
+              Beban Panitia: <b class="text-amber-300">${porsiTagihanPanitia}</b>
             </div>
           </div>
         </div>
 
-        <!-- Area Kamera Scanner & Input Cepat -->
+        <!-- Area 1: Kamera Scanner QR & Pilih Cepat Peserta/Panitia -->
         <div class="p-4 rounded-3xl bg-white border-2 border-teal-200 shadow-sm space-y-3">
           <div class="flex items-center justify-between">
             <span class="text-xs font-extrabold text-slate-900">
-              <i class="fa-solid fa-camera text-teal-700 mr-1"></i> Kamera Pemindai QR Meja Makan
+              <i class="fa-solid fa-qrcode text-teal-700 mr-1"></i> 1. Scan QR Peserta / Panitia
             </span>
             <button type="button" id="btnToggleMealCamera" class="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-extrabold text-[10px] shadow transition">
               <i class="fa-solid fa-video mr-1"></i>Buka Kamera Scan
@@ -1485,84 +1523,149 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
 
           <div id="mealQrReaderBox" class="hidden w-full overflow-hidden rounded-2xl bg-slate-950 border-2 border-teal-500 min-h-[220px]"></div>
 
-          <!-- Pencarian Manual jika peserta tidak membawa HP -->
           <div class="pt-1 border-t border-slate-100">
-            <label class="block text-[10px] font-bold text-slate-600 mb-1">Atau Pilih Manual Sekolah / Panitia (Jika Lupa Bawa HP):</label>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">Atau Cek Manual Peserta / Panitia (Jika Lupa Bawa HP):</label>
             <div class="flex gap-1.5">
               <select id="selManualMealPerson" class="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-800">
-                <option value="">-- Cari Nama Sekolah / Kepsek / Panitia --</option>
+                <option value="">-- Pilih Sekolah / Kepsek / Panitia --</option>
                 <optgroup label="Daftar Peserta Aktif (Ikut)">
-                  ${(sekolahList || []).filter(s => s.status_ikut === "Ikut").map(s => `<option value="PESERTA|${s.npsn}|${s.nama_sekolah}|${s.subrayon}">${s.nama_sekolah} - ${s.nama_kepsek || 'Kepsek'} (Kamar: ${s.nomor_kamar || '-'})</option>`).join('')}
+                  ${(sekolahList || []).filter(s => s.status_ikut === "Ikut").map(s => `<option value="PESERTA|${s.npsn}|${s.nama_sekolah}|${s.subrayon}">${String(s.nama_sekolah).toUpperCase()} - ${s.nama_kepsek || 'Kepsek'} (Kamar: ${s.nomor_kamar || '-'})</option>`).join('')}
                 </optgroup>
                 <optgroup label="Daftar Panitia Rakor">
                   ${(panitiaList || []).map(p => `<option value="PANITIA|${p.id_panitia}|${p.nama_panitia}|${p.divisi}">[PANITIA] ${p.nama_panitia} (${p.divisi})</option>`).join('')}
                 </optgroup>
               </select>
               <button type="button" id="btnVerifyManualMeal" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-xs shrink-0 shadow">
-                Cek
+                Scan/Cek
               </button>
             </div>
           </div>
 
-          <!-- Kotak Hasil Verifikasi Scan (Hijau Valid / Merah Peringatan Keluarga) -->
+          <!-- Kotak Hasil Verifikasi Scan -->
           <div id="mealScanResultVerifyBox"></div>
         </div>
 
-        <!-- Daftar Khusus Tamu Keluarga / Tambahan Porsi (Over-Quota) -->
-        ${extraGuestLogs.length > 0 ? `
-          <div class="p-3.5 rounded-3xl bg-rose-50 border-2 border-rose-300 space-y-2 shadow-2xs">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-extrabold uppercase text-rose-900">
-                <i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1"></i>Catatan Porsi Tambahan / Keluarga (${extraGuestLogs.length} Orang)
-              </span>
-              <span class="text-[9px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded">Tagihan Ekstra</span>
+        <!-- Area 2: FORM INPUT MANUAL KHUSUS TAMU / KELUARGA / PENDAMPING -->
+        <div class="p-4 rounded-3xl bg-amber-50/70 border-2 border-amber-300 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-amber-200 pb-2">
+            <span class="text-xs font-extrabold text-amber-950">
+              <i class="fa-solid fa-user-plus text-amber-700 mr-1"></i> 2. Input Manual Tamu / Keluarga / Pendamping
+            </span>
+            <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded">
+              Catat Manual
+            </span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div class="col-span-2">
+              <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Nama Tamu / Hubungan Keluarga:</label>
+              <input id="inpGuestManualName" type="text" placeholder="Contoh: Istri/Anak Kepsek, Tamu Dinas, Sopir..." class="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-slate-900" />
             </div>
-            <div class="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
-              ${extraGuestLogs.map(ex => `
-                <div class="p-2.5 rounded-2xl bg-white border border-rose-200 flex items-center justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="text-xs font-extrabold text-rose-950 truncate">${ex.nama} (+1 Porsi Keluarga/Pendamping)</div>
-                    <div class="text-[10px] font-semibold text-slate-600 truncate">${ex.instansi} • ${ex.keterangan || 'Tamu Tambahan'}</div>
-                    <div class="text-[9px] text-slate-400">Dicatat pukul ${ex.waktu} oleh ${ex.petugas}</div>
+            <div>
+              <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Jml Porsi:</label>
+              <input id="inpGuestManualQty" type="number" inputmode="numeric" min="1" max="20" value="1" class="w-full rounded-xl border border-amber-300 bg-white px-2.5 py-2 text-xs font-extrabold text-center text-slate-900" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Terkait Peserta Sekolah / Panitia (Opsional):</label>
+            <select id="selGuestAffiliation" class="w-full rounded-xl border border-amber-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-800">
+              <option value="Tamu Umum / Undangan Luar">-- Tamu Umum / Undangan Luar / Lainnya --</option>
+              <optgroup label="Keluarga / Pendamping dari Sekolah Peserta:">
+                ${(sekolahList || []).filter(s => s.status_ikut === "Ikut").map(s => `<option value="${s.nama_sekolah} (${s.nama_kepsek || 'Kepsek'} - Kamar ${s.nomor_kamar || '-'})">${String(s.nama_sekolah).toUpperCase()} - ${s.nama_kepsek || 'Kepsek'}</option>`).join('')}
+              </optgroup>
+              <optgroup label="Keluarga / Pendamping dari Panitia:">
+                ${(panitiaList || []).map(p => `<option value="Panitia: ${p.nama_panitia} (${p.divisi})">[PANITIA] ${p.nama_panitia} (${p.divisi})</option>`).join('')}
+              </optgroup>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Status Pembayaran / Beban Kuota Makan:</label>
+            <select id="selGuestBillingType" class="w-full rounded-xl border-2 border-amber-400 bg-white px-2.5 py-2 text-xs font-extrabold text-slate-900">
+              <option value="BAYAR_SENDIRI">💳 Bayar Sendiri (Lunas Pribadi ke Hotel - Bukan Beban Panitia)</option>
+              <option value="JATAH_RAKOR">🎟️ Masuk Jatah Rakor (Menggunakan Kuota Resmi Panitia)</option>
+              <option value="TAGIHAN_PANITIA">⚠️ Tagihan Tambahan ke Panitia (Over-Quota / Ditagihkan Hotel)</option>
+            </select>
+          </div>
+
+          <button type="button" id="btnSaveManualGuestMeal" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold text-xs shadow flex items-center justify-center gap-1.5 active:scale-[0.99] transition">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Simpan Data Tamu / Keluarga ke Rekap Konsumsi</span>
+          </button>
+        </div>
+
+        <!-- Daftar Khusus Tamu / Keluarga yang Tercatat pada Sesi Ini -->
+        ${extraGuestLogs.length > 0 ? `
+          <div class="p-3.5 rounded-3xl bg-white border-2 border-amber-300 space-y-2 shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold uppercase text-slate-900">
+                <i class="fa-solid fa-users-viewfinder text-amber-600 mr-1"></i>Daftar Tamu & Keluarga Sesi Ini (${totalExtraPorsi} Porsi)
+              </span>
+            </div>
+            <div class="space-y-2 max-h-60 overflow-y-auto pr-0.5">
+              ${extraGuestLogs.map(ex => {
+                const badge = getBillingLabelBadge(ex.skema_bayar);
+                const porsi = Number(ex.jumlah_porsi) || 1;
+                return `
+                  <div class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-2">
+                    <div class="min-w-0 flex-1 space-y-1">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded border ${badge.cls}">
+                          ${badge.text}
+                        </span>
+                        <span class="text-[9px] font-extrabold bg-slate-900 text-amber-300 px-2 py-0.5 rounded">
+                          ${porsi} Porsi
+                        </span>
+                      </div>
+                      <div class="text-xs font-extrabold text-slate-900">${ex.nama}</div>
+                      <div class="text-[10px] font-semibold text-slate-600">${ex.instansi}</div>
+                      <div class="text-[9px] text-slate-400">Jam: ${ex.waktu} • Dicatat oleh: ${ex.petugas}</div>
+                    </div>
+                    <button type="button" data-logid="${ex.id}" class="btn-del-meal-log w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs flex items-center justify-center shrink-0" title="Hapus Catatan">
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
                   </div>
-                  <button type="button" data-logid="${ex.id}" class="btn-del-meal-log w-7 h-7 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs flex items-center justify-center shrink-0" title="Hapus Catatan">
-                    <i class="fa-solid fa-trash"></i>
-                  </button>
-                </div>
-              `).join('')}
+                `;
+              }).join('')}
             </div>
           </div>
         ` : ''}
 
-        <!-- Riwayat Peserta & Panitia yang Sudah Masuk Makan pada Sesi Ini -->
+        <!-- Riwayat Seluruh Scan Makan Sesi Ini -->
         <div class="p-4 rounded-3xl bg-white border border-slate-200 space-y-2.5 shadow-2xs">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">
-              Riwayat Masuk Makan Sesi Ini (${sessionLogs.length} Total Porsi)
+              Riwayat Masuk Makan Sesi Ini (${sessionLogs.length} Transaksi)
             </span>
           </div>
           <div class="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
             ${sessionLogs.length === 0 ? `
               <div class="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">
-                Belum ada peserta yang scan makan pada sesi ini.
+                Belum ada data scan atau tamu makan pada sesi ini.
               </div>
-            ` : sessionLogs.map(log => `
-              <div class="p-2.5 rounded-2xl ${log.is_extra ? 'bg-rose-50/70 border-rose-300' : 'bg-slate-50 border-slate-200'} border flex items-center justify-between gap-2">
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1.5">
-                    <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
-                      log.is_extra ? 'bg-rose-600 text-white' : log.tipe === 'PANITIA' ? 'bg-indigo-100 text-indigo-900' : 'bg-emerald-100 text-emerald-800'
-                    }">${log.is_extra ? 'TAMU / KELUARGA (+1)' : log.tipe}</span>
-                    <span class="text-[9px] font-bold text-slate-400">${log.waktu}</span>
+            ` : sessionLogs.map(log => {
+              const badge = log.is_extra ? getBillingLabelBadge(log.skema_bayar) : null;
+              const porsi = Number(log.jumlah_porsi) || 1;
+              return `
+                <div class="p-2.5 rounded-2xl ${log.is_extra ? 'bg-amber-50/50 border-amber-300' : 'bg-slate-50 border-slate-200'} border flex items-center justify-between gap-2">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
+                        log.is_extra ? 'bg-amber-400 text-slate-950' : log.tipe === 'PANITIA' ? 'bg-indigo-100 text-indigo-900' : 'bg-emerald-100 text-emerald-800'
+                      }">${log.is_extra ? `TAMU (${porsi} PORSI)` : log.tipe}</span>
+                      ${badge ? `<span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded border ${badge.cls}">${badge.text}</span>` : ''}
+                      <span class="text-[9px] font-bold text-slate-400">${log.waktu}</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 truncate mt-0.5">${log.nama}</div>
+                    <div class="text-[10px] text-slate-500 truncate">${log.instansi}</div>
                   </div>
-                  <div class="text-xs font-extrabold text-slate-900 truncate mt-0.5">${log.nama}</div>
-                  <div class="text-[10px] text-slate-500 truncate">${log.instansi}</div>
+                  <button type="button" data-logid="${log.id}" class="btn-del-meal-log text-slate-400 hover:text-rose-600 text-xs px-2 py-1" title="Batalkan Scan">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
                 </div>
-                <button type="button" data-logid="${log.id}" class="btn-del-meal-log text-slate-400 hover:text-rose-600 text-xs px-2 py-1" title="Batalkan Scan">
-                  <i class="fa-solid fa-trash"></i>
-                </button>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         </div>
       </div>
@@ -1574,14 +1677,50 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
       renderContent();
     });
 
+    // Handler Simpan Input Manual Tamu / Keluarga
+    document.getElementById("btnSaveManualGuestMeal")?.addEventListener("click", async () => {
+      const guestName = document.getElementById("inpGuestManualName")?.value.trim() || "";
+      const qty = Math.max(1, parseInt(document.getElementById("inpGuestManualQty")?.value || "1", 10) || 1);
+      const affiliation = document.getElementById("selGuestAffiliation")?.value || "Tamu Umum";
+      const billingType = document.getElementById("selGuestBillingType")?.value || "BAYAR_SENDIRI";
+
+      if (!guestName) {
+        return toast("Tuliskan Nama Tamu atau Keterangan Keluarga terlebih dahulu!");
+      }
+
+      const petugasName = activeUser?.profile?.nama_panitia || "Petugas Hotel";
+      const nowTime = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WITA";
+      const badgeInfo = getBillingLabelBadge(billingType);
+
+      mealLogsData.unshift({
+        id: "MEAL-GUEST-" + Date.now(),
+        sesi: selectedMealSessionCode,
+        person_key: "GUEST_" + Date.now(),
+        tipe: "TAMU/KELUARGA",
+        nama: guestName,
+        instansi: affiliation,
+        info_kamar: affiliation,
+        jumlah_porsi: qty,
+        skema_bayar: billingType,
+        waktu: nowTime,
+        petugas: petugasName,
+        is_extra: true,
+        keterangan: `${badgeInfo.text} (${qty} Porsi)`
+      });
+
+      await saveMealLogsToSupabase();
+      toast(`Tercatat: ${guestName} (${qty} Porsi - ${badgeInfo.text})`);
+      renderContent();
+    });
+
     // Handler Hapus Log Makan
     targetContainer.querySelectorAll(".btn-del-meal-log").forEach(btn => {
       btn.addEventListener("click", async () => {
-        if (!confirm("Batalkan / hapus catatan scan makan ini?")) return;
+        if (!confirm("Batalkan / hapus catatan makan ini?")) return;
         const id = btn.dataset.logid;
         mealLogsData = mealLogsData.filter(x => x.id !== id);
         await saveMealLogsToSupabase();
-        toast("Catatan scan makan dihapus.");
+        toast("Catatan makan dihapus.");
         renderContent();
       });
     });
@@ -1617,31 +1756,48 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
       };
     }
 
-    // Handler Pilih Manual
+    // Handler Pilih Manual Peserta/Panitia
     document.getElementById("btnVerifyManualMeal")?.addEventListener("click", () => {
       const val = document.getElementById("selManualMealPerson")?.value || "";
       if (!val) return toast("Pilih nama sekolah atau panitia terlebih dahulu!");
       processMealQrPayload(val);
     });
 
-    // Handler Export CSV Rekap Konsumsi
+    // Handler Export CSV Rekap Konsumsi Lengkap
     document.getElementById("btnExportMealLogsCsv")?.addEventListener("click", () => {
       const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-      const headers = ["No", "Kode Sesi", "Nama Sesi Makan", "Status Porsi", "Tipe", "Nama Lengkap", "Asal Sekolah / Divisi", "Sub Rayon / Kamar", "Waktu Scan", "Petugas Checker", "Keterangan"];
+      const headers = [
+        "No",
+        "Kode Sesi",
+        "Nama Sesi Makan",
+        "Kategori Penghuni/Tamu",
+        "Jumlah Porsi",
+        "Status Pembayaran / Beban Kuota",
+        "Nama Lengkap / Tamu",
+        "Asal Sekolah / Afiliasi / Divisi",
+        "Waktu Masuk",
+        "Petugas Pencatat"
+      ];
       const rows = mealLogsData.map((l, i) => {
         const sObj = MEAL_SESSIONS_LIST.find(m => m.code === l.sesi);
+        const porsi = Number(l.jumlah_porsi) || 1;
+        let statusBayarText = "KUOTA RESMI RAKOR (1 PORSI)";
+        if (l.is_extra) {
+          if (l.skema_bayar === "BAYAR_SENDIRI") statusBayarText = "BAYAR SENDIRI (PRIBADI KE HOTEL)";
+          else if (l.skema_bayar === "JATAH_RAKOR") statusBayarText = "MASUK JATAH / KUOTA RAKOR";
+          else statusBayarText = "TAGIHAN TAMBAHAN KE PANITIA (OVER-QUOTA)";
+        }
         return [
           i + 1,
           l.sesi,
           sObj ? sObj.label : l.sesi,
-          l.is_extra ? "PORSI TAMBAHAN / KELUARGA" : "KUOTA RESMI (1 PORSI)",
-          l.tipe,
+          l.is_extra ? "TAMU / KELUARGA" : l.tipe,
+          porsi,
+          statusBayarText,
           l.nama,
           l.instansi,
-          l.info_kamar || "-",
           l.waktu,
-          l.petugas || "Petugas Hotel",
-          l.keterangan || "Hadir Makan"
+          l.petugas || "Petugas Hotel"
         ].map(esc).join(",");
       });
       const lineBreak = String.fromCharCode(13, 10);
@@ -1713,7 +1869,6 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
       return;
     }
 
-    // Cek apakah sudah pernah scan makan pada sesi ini!
     const existingScan = mealLogsData.find(
       l => l.sesi === selectedMealSessionCode && l.person_key === personKey && !l.is_extra
     );
@@ -1722,7 +1877,6 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
     const nowTime = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WITA";
 
     if (!existingScan) {
-      // SCAN PERTAMA (VALID 1 ORANG) -> Langsung simpan otomatis!
       const newEntry = {
         id: "MEAL-" + Date.now(),
         sesi: selectedMealSessionCode,
@@ -1731,6 +1885,8 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
         nama,
         instansi,
         info_kamar: infoKamar,
+        jumlah_porsi: 1,
+        skema_bayar: "KUOTA_UTAMA",
         waktu: nowTime,
         petugas: petugasName,
         is_extra: false,
@@ -1758,7 +1914,7 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
       }
       toast(`✓ Valid (1 Porsi): ${nama}`);
     } else {
-      // SUDAH PERNAH SCAN MAKAN DI SESI INI! Tampilkan Peringatan Merah Anti-Keluarga / Double Scan
+      // SUDAH PERNAH SCAN MAKAN DI SESI INI! Tampilkan opsi pencatatan keluarga + status bayar
       resBox.innerHTML = `
         <div class="p-4 rounded-3xl bg-rose-950 text-white border-4 border-amber-400 space-y-3 shadow-2xl">
           <div class="flex items-center gap-3">
@@ -1773,8 +1929,13 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
             </div>
           </div>
 
-          <div class="p-2.5 rounded-xl bg-white/10 border border-white/15 text-[11px] text-rose-100 leading-snug">
-            Jatah kuota panitia hanya berlaku untuk <b>1 Orang (Kepala Sekolah/Panitia bersangkutan)</b>. Jika peserta membawa anggota keluarga/pendamping tambahan, pilih tindakan di bawah:
+          <div class="p-2.5 rounded-xl bg-white/10 border border-white/15 space-y-2 text-left">
+            <div class="text-[10px] font-extrabold text-amber-300 uppercase">Jika Membawa Keluarga / Pendamping, Pilih Status Biayanya:</div>
+            <select id="selQuickDuplicateBilling" class="w-full rounded-xl bg-slate-900 border border-white/20 px-2.5 py-2 text-xs font-extrabold text-white">
+              <option value="BAYAR_SENDIRI">💳 Bayar Sendiri (Pribadi ke Hotel)</option>
+              <option value="JATAH_RAKOR">🎟️ Masuk Jatah Rakor</option>
+              <option value="TAGIHAN_PANITIA">⚠️ Tagihan Tambahan ke Panitia</option>
+            </select>
           </div>
 
           <div class="grid grid-cols-2 gap-2">
@@ -1794,22 +1955,27 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
       });
 
       document.getElementById("btnRecordExtraFamilyGuest")?.addEventListener("click", async () => {
-        const ket = prompt("Keterangan tambahan (misal: Istri / Anak / Sopir / Pendamping):", "Anggota Keluarga / Pendamping") || "Anggota Keluarga";
+        const chosenBilling = document.getElementById("selQuickDuplicateBilling")?.value || "BAYAR_SENDIRI";
+        const ket = prompt("Keterangan nama/hubungan keluarga (misal: Istri / Anak / Pendamping):", "Anggota Keluarga") || "Anggota Keluarga";
+        const badgeInfo = getBillingLabelBadge(chosenBilling);
+
         mealLogsData.unshift({
           id: "MEAL-EXTRA-" + Date.now(),
           sesi: selectedMealSessionCode,
           person_key: personKey,
-          tipe,
-          nama: `${nama} (Pendamping)`,
+          tipe: "TAMU/KELUARGA",
+          nama: `${ket} (${nama})`,
           instansi,
           info_kamar: infoKamar,
+          jumlah_porsi: 1,
+          skema_bayar: chosenBilling,
           waktu: nowTime,
           petugas: petugasName,
           is_extra: true,
-          keterangan: `Keluarga/Tambahan: ${ket}`
+          keterangan: `${badgeInfo.text} - ${ket}`
         });
         await saveMealLogsToSupabase();
-        toast(`Tercatat: +1 Porsi Tambahan atas nama ${instansi}`);
+        toast(`Tercatat: +1 Porsi (${badgeInfo.text}) dari ${instansi}`);
         renderContent();
       });
     }
@@ -1821,7 +1987,6 @@ function renderMealCheckerInterface(targetContainer, isFullHotelMode = false) {
 async function renderHotelMealCheckerFullScreen() {
   await loadMealLogsFromSupabase();
 
-  // Sembunyikan main & nav reguler agar petugas hotel tidak bisa membuka data internal panitia
   document.querySelector("#mainAppScreen main")?.classList.add("hidden");
   document.querySelector("#mainAppScreen nav")?.classList.add("hidden");
 
@@ -2921,7 +3086,7 @@ function reorganizePanitiaWorkspaceCards() {
           </div>
           <div>
             <div class="text-[11px] font-extrabold text-white">Pantauan Konsumsi & Checker Hotel</div>
-            <div class="text-[9px] text-teal-200">Scan Kuota Makan Peserta & Catatan Tamu Keluarga</div>
+            <div class="text-[9px] text-teal-200">Scan Kuota Makan Peserta & Input Tamu/Keluarga</div>
           </div>
         </div>
         <span class="text-[9px] font-extrabold bg-white/15 text-amber-300 px-2.5 py-1 rounded-xl shrink-0">
