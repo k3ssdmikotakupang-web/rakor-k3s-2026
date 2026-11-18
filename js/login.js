@@ -1,7 +1,7 @@
 // js/login.js
-// - Dropdown sekolah hanya menampilkan Nama Sekolah (tanpa membocorkan NPSN)
-// - PIN Panitia dikosongkan otomatis (wajib ketik manual, default 123321)
-// - Mendukung Akun Khusus Terisolasi: PETUGAS HOTEL - CHECKER KONSUMSI (PIN: 556677 / 123321)
+// - Dropdown sekolah menampilkan NAMA SEKOLAH DENGAN HURUF BESAR SEMUA (tanpa NPSN)
+// - Akun PETUGAS HOTEL - CHECKER KONSUMSI berada di urutan paling bawah daftar Panitia
+// - PIN Panitia dikosongkan otomatis (wajib ketik manual, default 123321, Petugas Hotel: 556677)
 import { sb, toast } from './supabase.js';
 
 let cachedSekolahList = [];
@@ -10,7 +10,7 @@ let html5QrScanner = null;
 
 export const HOTEL_CHECKER_PROFILE = {
   id_panitia: "HOTEL-CHECKER",
-  no: 0,
+  no: 99,
   nama_panitia: "Petugas Restoran Hotel",
   divisi: "Petugas Hotel (Konsumsi)",
   jabatan: "Checker Kuota Makan",
@@ -56,6 +56,7 @@ export async function initLogin(onSuccessCallback) {
         togglePinBtn = document.createElement("button");
         togglePinBtn.type = "button";
         togglePinBtn.id = "togglePanitiaPinBtn";
+        togglePinBtn.className = "absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-300 text-xs p-1";
         togglePinBtn.className = "absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-300 text-xs p-1";
         togglePinBtn.innerHTML = `<i class="fa-solid fa-eye"></i>`;
         parentWrap.appendChild(togglePinBtn);
@@ -109,14 +110,9 @@ export async function initLogin(onSuccessCallback) {
     console.error("Gagal memuat data login:", err);
   }
 
-  // 5. Isi Dropdown Panitia + Akun Khusus Petugas Hotel
+  // 5. Isi Dropdown Panitia + Akun Khusus Petugas Hotel DI URUTAN PALING BAWAH
   if (panitiaSelect) {
-    panitiaSelect.innerHTML = `<option value="">Pilih Nama Panitia / Petugas (${cachedPanitiaList.length} Orang)</option>`;
-
-    const hotelOpt = document.createElement("option");
-    hotelOpt.value = "HOTEL-CHECKER";
-    hotelOpt.textContent = "🏨 PETUGAS HOTEL - CHECKER KONSUMSI (Restoran)";
-    panitiaSelect.appendChild(hotelOpt);
+    panitiaSelect.innerHTML = `<option value="">Pilih Nama Panitia (${cachedPanitiaList.length} Orang)</option>`;
 
     cachedPanitiaList.forEach(p => {
       const srTag = p.tugas_subrayon ? ` [Ketua Rayon ${p.tugas_subrayon}]` : "";
@@ -125,13 +121,19 @@ export async function initLogin(onSuccessCallback) {
       opt.textContent = `${p.no}. ${p.nama_panitia} (${p.divisi}${srTag})`;
       panitiaSelect.appendChild(opt);
     });
+
+    const hotelOpt = document.createElement("option");
+    hotelOpt.value = "HOTEL-CHECKER";
+    hotelOpt.textContent = `${cachedPanitiaList.length + 1}. 🏨 PETUGAS HOTEL - CHECKER KONSUMSI (Restoran)`;
+    panitiaSelect.appendChild(hotelOpt);
   }
 
-  // 6. Filter Sub Rayon -> Aktifkan Dropdown Sekolah (Tanpa Menampilkan NPSN)
+  // 6. Filter Sub Rayon -> Aktifkan Dropdown Sekolah (HURUF BESAR SEMUA & Tanpa NPSN)
   const renderSchoolDropdown = (selectedRayon) => {
     if (!schoolSelect) return;
+    schoolSelect.classList.add("uppercase");
     if (!selectedRayon) {
-      schoolSelect.innerHTML = `<option value="">Pilih Sekolah</option>`;
+      schoolSelect.innerHTML = `<option value="">PILIH SEKOLAH</option>`;
       schoolSelect.disabled = true;
       return;
     }
@@ -141,11 +143,11 @@ export async function initLogin(onSuccessCallback) {
     );
 
     schoolSelect.disabled = false;
-    schoolSelect.innerHTML = `<option value="">Pilih Sekolah (${filtered.length} SD/MI)</option>`;
+    schoolSelect.innerHTML = `<option value="">PILIH SEKOLAH (${filtered.length} SD/MI)</option>`;
     filtered.forEach(s => {
       const opt = document.createElement("option");
       opt.value = s.id_sekolah;
-      opt.textContent = s.nama_sekolah;
+      opt.textContent = String(s.nama_sekolah || "").toUpperCase();
       schoolSelect.appendChild(opt);
     });
   };
@@ -184,7 +186,7 @@ export async function initLogin(onSuccessCallback) {
         return toast("NPSN / Password tidak sesuai!");
       }
 
-      toast(`Selamat datang, ${school.nama_sekolah}!`);
+      toast(`Selamat datang, ${String(school.nama_sekolah || "").toUpperCase()}!`);
       onSuccessCallback({ role: "peserta", profile: school });
     };
   }
