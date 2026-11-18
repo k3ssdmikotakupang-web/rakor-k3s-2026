@@ -162,7 +162,7 @@ export async function renderK3sMusicPlayerWidget(activeUser, layananList, reload
 
   const songItem = (layananList || []).find(x => x.kode_menu === 'lagu_k3s') || {
     kode_menu: 'lagu_k3s',
-    judul: 'Mars / Lagu K3S Kota Kupang',
+    judul: 'Official Song K3S Kota Kupang',
     deskripsi: 'Lagu resmi Kelompok Kerja Kepala Sekolah (K3S) SD/MI Kota Kupang.',
     url_link: DEFAULT_DRIVE_VIEW_URL,
     status_tersedia: 'Audio Resmi'
@@ -386,7 +386,7 @@ export function openK3sMusicModal(activeUser, songItem, reloadCallback) {
 
     const updatedRecord = {
       kode_menu: 'lagu_k3s',
-      judul: 'Mars / Lagu Resmi K3S Kota Kupang',
+      judul: 'Official Song K3S Kota Kupang',
       deskripsi: 'Dengarkan dan unduh lagu resmi Kelompok Kerja Kepala Sekolah (K3S) SD/MI Kota Kupang.',
       url_link: mp3PublicUrl,
       status_tersedia: 'MP3 Siap Putar'
