@@ -1,12 +1,23 @@
 // js/login.js
-// Disesuaikan 100% dengan ID elemen pada index.html[cite: 7]:
 // - Dropdown sekolah hanya menampilkan Nama Sekolah (tanpa membocorkan NPSN)
-// - PIN Panitia dikosongkan otomatis, default PIN 123321 + ikon mata
+// - PIN Panitia dikosongkan otomatis (wajib ketik manual, default 123321)
+// - Mendukung Akun Khusus Terisolasi: PETUGAS HOTEL - CHECKER KONSUMSI (PIN: 556677 / 123321)
 import { sb, toast } from './supabase.js';
 
 let cachedSekolahList = [];
 let cachedPanitiaList = [];
 let html5QrScanner = null;
+
+export const HOTEL_CHECKER_PROFILE = {
+  id_panitia: "HOTEL-CHECKER",
+  no: 0,
+  nama_panitia: "Petugas Restoran Hotel",
+  divisi: "Petugas Hotel (Konsumsi)",
+  jabatan: "Checker Kuota Makan",
+  tugas_subrayon: "",
+  no_hp: "",
+  pin: "556677"
+};
 
 export async function initLogin(onSuccessCallback) {
   const btnRolePeserta = document.getElementById("btnRolePeserta");
@@ -30,11 +41,11 @@ export async function initLogin(onSuccessCallback) {
   const btnCloseScanner = document.getElementById("btnCloseScanner");
   const qrFileInput = document.getElementById("qrFileInput");
 
-  // 1. Kosongkan PIN Panitia (hapus value="2026" bawaan HTML) & pasang tombol mata[cite: 7]
+  // 1. Kosongkan PIN Panitia & pasang tombol mata
   if (pinInput) {
     pinInput.value = "";
     pinInput.removeAttribute("value");
-    pinInput.placeholder = "Ketik PIN Panitia";
+    pinInput.placeholder = "Ketik PIN Akses";
     pinInput.classList.remove("pr-4");
     pinInput.classList.add("pr-10");
 
@@ -58,7 +69,7 @@ export async function initLogin(onSuccessCallback) {
     }
   }
 
-  // 2. Tombol mata pada input NPSN Peserta[cite: 7]
+  // 2. Tombol mata pada input NPSN Peserta
   if (togglePswdBtn && npsnInput) {
     togglePswdBtn.onclick = () => {
       const isPwd = npsnInput.type === "password";
@@ -67,7 +78,7 @@ export async function initLogin(onSuccessCallback) {
     };
   }
 
-  // 3. Pindah Tab Peserta <-> Panitia[cite: 7]
+  // 3. Pindah Tab Peserta <-> Panitia
   if (btnRolePeserta && btnRolePanitia) {
     btnRolePeserta.onclick = () => {
       btnRolePeserta.className = "py-2.5 rounded-xl text-xs font-extrabold bg-amber-400 text-slate-950 shadow transition";
@@ -85,7 +96,7 @@ export async function initLogin(onSuccessCallback) {
     };
   }
 
-  // 4. Ambil data Sekolah & Panitia dari Supabase[cite: 1, 5, 8]
+  // 4. Ambil data Sekolah & Panitia dari Supabase
   try {
     const [sekRes, panRes] = await Promise.all([
       sb.from("db_sekolah").select("*").order("nama_sekolah", { ascending: true }),
@@ -98,9 +109,15 @@ export async function initLogin(onSuccessCallback) {
     console.error("Gagal memuat data login:", err);
   }
 
-  // 5. Isi Dropdown Panitia[cite: 1, 5, 8]
-  if (panitiaSelect && cachedPanitiaList.length > 0) {
-    panitiaSelect.innerHTML = `<option value="">Pilih Nama Panitia (${cachedPanitiaList.length} Orang)</option>`;
+  // 5. Isi Dropdown Panitia + Akun Khusus Petugas Hotel
+  if (panitiaSelect) {
+    panitiaSelect.innerHTML = `<option value="">Pilih Nama Panitia / Petugas (${cachedPanitiaList.length} Orang)</option>`;
+
+    const hotelOpt = document.createElement("option");
+    hotelOpt.value = "HOTEL-CHECKER";
+    hotelOpt.textContent = "🏨 PETUGAS HOTEL - CHECKER KONSUMSI (Restoran)";
+    panitiaSelect.appendChild(hotelOpt);
+
     cachedPanitiaList.forEach(p => {
       const srTag = p.tugas_subrayon ? ` [Ketua Rayon ${p.tugas_subrayon}]` : "";
       const opt = document.createElement("option");
@@ -172,14 +189,23 @@ export async function initLogin(onSuccessCallback) {
     };
   }
 
-  // 8. Submit Login Panitia (Wajib isi manual, default PIN: 123321)
+  // 8. Submit Login Panitia & Petugas Hotel
   if (btnSubmitPanitia) {
     btnSubmitPanitia.onclick = async () => {
       const idPanitia = panitiaSelect?.value || "";
       const pin = pinInput?.value.trim() || "";
 
-      if (!idPanitia) return toast("Pilih nama panitia terlebih dahulu!");
-      if (!pin) return toast("Masukkan PIN Akses Panitia secara manual!");
+      if (!idPanitia) return toast("Pilih nama panitia atau petugas terlebih dahulu!");
+      if (!pin) return toast("Masukkan PIN Akses secara manual!");
+
+      if (idPanitia === "HOTEL-CHECKER") {
+        if (pin !== "556677" && pin !== "123321") {
+          return toast("PIN Petugas Hotel salah! Gunakan PIN 556677.");
+        }
+        toast("Login Berhasil: Mode Checker Konsumsi Hotel Aktif!");
+        onSuccessCallback({ role: "hotel_checker", profile: HOTEL_CHECKER_PROFILE });
+        return;
+      }
 
       let panitia = cachedPanitiaList.find(p => String(p.id_panitia) === String(idPanitia));
       if (!panitia) {
@@ -201,7 +227,7 @@ export async function initLogin(onSuccessCallback) {
     };
   }
 
-  // 9. Fitur Masuk dengan Scan QR[cite: 7]
+  // 9. Fitur Masuk dengan Scan QR
   const stopScanner = async () => {
     if (html5QrScanner) {
       try {
