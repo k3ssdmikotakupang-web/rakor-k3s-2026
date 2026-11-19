@@ -336,6 +336,12 @@ function showTab(name) {
 
   if (name === "beranda") {
     renderBerandaView();
+    renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, tarifKontribusiDefault, () => loadAllDatabase(false));
+    renderStatistikSekolahWidget(activeUser, sekolahList, () => loadAllDatabase(false));
+    renderK3sMusicPlayerWidget(activeUser, layananList, () => loadAllDatabase(false));
+    renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+    renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, () => loadAllDatabase(false));
+    renderProdukRakorAndUniformCards(activeUser, layananList, () => loadAllDatabase(false));
     reorganizePanitiaWorkspaceCards();
   } else if (name === "jadwal") {
     renderLiveJadwal();
@@ -2106,6 +2112,7 @@ function cleanUpHeaderClutter() {
 function restorePesertaBerandaCards() {
   document.getElementById("panitiaUnifiedWorkspaceCard")?.classList.add("hidden");
 
+  // Kembalikan Running Text ke posisi aslinya di Beranda Peserta
   if (cachedRunningTextElement && cachedRunningTextOriginalParent) {
     cachedRunningTextElement.classList.remove("hidden");
     cachedRunningTextElement.style.display = "";
@@ -2118,6 +2125,16 @@ function restorePesertaBerandaCards() {
     }
   }
 
+  // Pastikan seluruh kartu & widget di dalam tabContentBeranda tampil penuh untuk Peserta
+  const tabBeranda = document.getElementById("tabContentBeranda");
+  if (tabBeranda) {
+    Array.from(tabBeranda.children).forEach(el => {
+      if (el.id === "panitiaUnifiedWorkspaceCard" || el.id === "liveActiveSessionContainer") return;
+      el.classList.remove("hidden");
+      if (el.style.display === "none") el.style.display = "";
+    });
+  }
+
   hiddenForPanitiaElements.forEach(el => {
     if (el) {
       el.classList.remove("hidden");
@@ -2126,7 +2143,7 @@ function restorePesertaBerandaCards() {
   });
   hiddenForPanitiaElements = [];
 
-  const tabBeranda = document.getElementById("tabContentBeranda");
+  // Di kartu Menu Layanan, tampilkan semua menu peserta dan hanya sembunyikan 3 menu internal panitia
   const generalServiceCard = tabBeranda?.querySelector(".service-menu-btn")?.closest(".bg-white");
   if (generalServiceCard) {
     generalServiceCard.querySelectorAll("button, a").forEach(btn => {
