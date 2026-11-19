@@ -350,14 +350,12 @@ function showTab(name) {
   } else if (name === "subrayon") {
     renderSubrayonView();
   } else if (name === "absensi") {
-    renderAbsensiPesertaView();
-    renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
-    renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, () => loadAllDatabase(false));
-  }
-    renderAbsensiPesertaView();
-  } else if (name === "kinerja") {
-    renderKinerjaView();
-  }
+ renderAbsensiPesertaView();
+ renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+ renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, () => loadAllDatabase(false));
+} else if (name === "kinerja") {
+ renderKinerjaView();
+}
 
   window.scrollTo({ top: 0, behavior: "instant" });
 }
