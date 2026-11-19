@@ -351,6 +351,10 @@ function showTab(name) {
     renderSubrayonView();
   } else if (name === "absensi") {
     renderAbsensiPesertaView();
+    renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+    renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, () => loadAllDatabase(false));
+  }
+    renderAbsensiPesertaView();
   } else if (name === "kinerja") {
     renderKinerjaView();
   }
@@ -491,14 +495,6 @@ function renderAbsensiPesertaView() {
     { key: "hadir_h2", isHadir: h2, dayNum: 2, label: "Hari Ke-2 • Jumat, 27 Nov 2026", desc: "Sidang Komisi & Penyusunan Program" },
     { key: "hadir_h3", isHadir: h3, dayNum: 3, label: "Hari Ke-3 • Sabtu, 28 Nov 2026", desc: "Perumusan Hasil Rakor & Penutupan" }
   ];
-
-  const subViewHadir = document.getElementById("subViewHadirBox");
-  if (subViewHadir && subViewHadir.children.length > 1) {
-    const oldInfoBox = subViewHadir.children[1];
-    if (oldInfoBox && oldInfoBox.id !== "pesertaKitTransportStatusBox") {
-      oldInfoBox.className = "hidden";
-    }
-  }
 
   const box = document.getElementById("absensiDaysContainer");
   if (box) {
