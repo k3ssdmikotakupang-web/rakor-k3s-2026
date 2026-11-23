@@ -1,7 +1,7 @@
 // js/kamar.js
 // Sistem Manajemen Kamar Hotel Rakor K3S 2026:
 // 1. Peserta: Melihat kamarnya sendiri & rekan sekamarnya (Lengkap: Foto Profil yang bisa di-zoom, Nama Kepsek, Asal Sekolah, Sub Rayon, No HP/WA)
-// 2. Ketua Panitia: Menginput nomor kamar, kapasitas, & peruntukan (Kamar Peserta / Kamar Khusus Panitia).
+// 2. Ketua Panitia: Menginput, MENGEDIT (nomor, kapasitas, peruntukan + auto-migrasi penghuni), & menghapus nomor kamar.
 // 3. Panitia Inti (PJ, Ketua, Sekretaris, Bendahara): Melihat data rekapitulasi jumlah kamar hotel.
 // 4. Ketua Sub Rayon (+ Ketua & Sekretaris): Menentukan penghuni kamar peserta (validasi anti-melebihi kapasitas).
 // 5. Ketua Panitia & Sekretaris: Download Dokumen Rekapan Kamar (PDF & Excel/CSV).
@@ -332,7 +332,7 @@ export async function openRoomManagerModal(activeUser, sekolahList, reloadCallba
 }
 
 // =========================================================================
-// 1. TAMPILAN KHUSUS PESERTA (DILENGKAPI FOTO PROFIL TEMAN SEKAMAR + ZOOM)
+// 1. TAMPILAN KHUSUS PESERTA (FOTO PROFIL TEMAN SEKAMAR + ZOOM TANPA LABEL)
 // =========================================================================
 function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
   const mySchool = sekolahList.find(x => x.id_sekolah === activeUser?.profile?.id_sekolah) || activeUser?.profile || {};
@@ -383,12 +383,9 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
         </div>
 
         <div class="p-3.5 rounded-2xl bg-white/10 border border-white/15 text-left space-y-2.5">
-          <div class="flex items-center justify-between">
-            <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-              <i class="fa-solid fa-user-group"></i>
-              <span>Teman Sekamar Anda (${roommates.length} Orang):</span>
-            </div>
-            
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-user-group"></i>
+            <span>Teman Sekamar Anda (${roommates.length} Orang):</span>
           </div>
 
           ${!myRoomNo ? `
@@ -415,7 +412,6 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       <div
                         data-rm-idx="${rIdx}"
-                        title="Ketuk untuk memperbesar foto ${displayName}"
                         class="btn-zoom-roommate-photo relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-amber-400 shrink-0 cursor-pointer group shadow-md transition-transform duration-200 hover:scale-110 active:scale-95 bg-slate-800"
                       >
                         <img
@@ -424,12 +420,6 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
                           class="w-full h-full object-cover"
                           onerror="this.onerror=null;this.src='${fallbackAvatar}';"
                         />
-                        <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <i class="fa-solid fa-magnifying-glass-plus text-white text-xs"></i>
-                        </div>
-                        <span class="absolute bottom-0 right-0 bg-amber-400 text-slate-950 text-[8px] font-extrabold px-1 rounded-tl-md leading-tight">
-                          <i class="fa-solid fa-expand"></i>
-                        </span>
                       </div>
 
                       <div class="min-w-0 flex-1">
@@ -599,7 +589,7 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
         <button type="button" id="tabBtnKamarMaster" class="py-2 px-1 rounded-xl text-[10px] font-extrabold transition ${
           activeRoomTab === 'master_kamar' ? 'bg-violet-900 text-amber-300 shadow' : 'text-slate-600'
         }">
-          <i class="fa-solid fa-hotel mr-1"></i>Input Kamar
+          <i class="fa-solid fa-hotel mr-1"></i>Input & Edit Kamar
         </button>
       ` : ''}
     </div>
@@ -638,6 +628,9 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
   }
 }
 
+// =========================================================================
+// TAB INPUT, EDIT & HAPUS NOMOR KAMAR (KHUSUS KETUA PANITIA)
+// =========================================================================
 function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, bodyEl, reloadCallback) {
   container.innerHTML = `
     <div class="p-4 rounded-2xl bg-violet-50 border-2 border-violet-300 space-y-3 shadow-2xs">
@@ -674,11 +667,13 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
         <span>Tambahkan Kamar (Validasi Anti-Ganda)</span>
       </button>
     </div>
+
     <div class="space-y-2">
       <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-700 uppercase px-1">
         <span>Daftar Kamar Terdaftar (${masterRoomsList.length} Ruangan)</span>
+        <span class="text-[9px] font-semibold text-blue-700 normal-case"><i class="fa-solid fa-pen mr-0.5"></i>Klik ikon pensil untuk edit nomor</span>
       </div>
-      <div class="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-0.5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-0.5">
         ${masterRoomsList.length === 0 ? `
           <div class="col-span-2 p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">
             Belum ada nomor kamar yang diinput oleh Ketua Panitia.
@@ -695,7 +690,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
             <div class="p-2.5 rounded-2xl bg-white border ${
               isPanRoom ? 'border-indigo-300 bg-indigo-50/20' : isFull ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'
             } flex items-center justify-between gap-2 shadow-2xs">
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1 flex-wrap">
                   <span class="font-extrabold text-xs text-slate-900">Kamar ${rm.nomor}</span>
                   <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
@@ -709,16 +704,68 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
                   ${occ.length > 0 ? occNames : 'Masih Kosong'}
                 </div>
               </div>
-              <button type="button" data-rnum="${rm.nomor}" title="Hapus Kamar" class="btn-del-master-room w-7 h-7 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 flex items-center justify-center text-xs shrink-0 transition">
-                <i class="fa-solid fa-trash"></i>
-              </button>
+              <div class="flex items-center gap-1 shrink-0">
+                <button type="button" data-rnum="${rm.nomor}" title="Edit Nomor / Kapasitas Kamar" class="btn-edit-master-room w-7 h-7 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center text-xs transition">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button type="button" data-rnum="${rm.nomor}" title="Hapus Kamar" class="btn-del-master-room w-7 h-7 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 flex items-center justify-center text-xs transition">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
             </div>
           `;
         }).join('')}
       </div>
     </div>
+
+    <!-- Modal Pop-up Edit Kamar (Ketua Panitia) -->
+    <div id="editMasterRoomModalOverlay" class="hidden fixed inset-0 z-[75] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+      <div class="w-full max-w-sm bg-white rounded-3xl p-5 space-y-3.5 shadow-2xl border-2 border-blue-400">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h4 class="text-xs font-extrabold uppercase text-blue-950 flex items-center gap-1.5">
+            <i class="fa-solid fa-pen-to-square text-blue-700"></i>
+            <span id="editRoomModalTitle">Edit Nomor Kamar</span>
+          </h4>
+          <button type="button" id="btnCloseEditRoomModal" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-rose-100 text-slate-600 font-bold text-sm flex items-center justify-center">&times;</button>
+        </div>
+
+        <input type="hidden" id="editRoomOriginalNumber" value="" />
+
+        <div id="editRoomOccupantsWarning" class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-900 leading-snug"></div>
+
+        <div>
+          <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Nomor Kamar Baru:</label>
+          <input id="inpEditRoomNumber" type="text" placeholder="Contoh: 205" class="w-full rounded-xl border-2 border-blue-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-900 uppercase" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Peruntukan Kamar:</label>
+            <select id="selEditRoomCategory" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-800">
+              <option value="PESERTA">🏫 Peserta</option>
+              <option value="PANITIA">🛡 Panitia</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Kapasitas Bed:</label>
+            <input id="inpEditRoomCap" type="number" inputmode="numeric" min="1" max="10" value="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-900 text-center" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button type="button" id="btnCancelEditRoom" class="py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition">
+            Batal
+          </button>
+          <button type="button" id="btnSaveEditRoom" class="py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs shadow flex items-center justify-center gap-1 transition">
+            <i class="fa-solid fa-check"></i>
+            <span>Simpan Perubahan</span>
+          </button>
+        </div>
+      </div>
+    </div>
   `;
 
+  // 1. Tambah Kamar Baru
   document.getElementById("btnAddMasterRoomNow")?.addEventListener("click", async () => {
     const rawInput = document.getElementById("inpNewRoomNumber")?.value.trim() || "";
     const cap = Math.max(1, parseInt(document.getElementById("inpNewRoomCap")?.value || "2", 10) || 2);
@@ -764,13 +811,131 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
     renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback);
   });
 
+  // 2. Buka Modal Edit Kamar
+  const editOverlay = document.getElementById("editMasterRoomModalOverlay");
+  const closeEditModal = () => editOverlay?.classList.add("hidden");
+
+  document.getElementById("btnCloseEditRoomModal")?.addEventListener("click", closeEditModal);
+  document.getElementById("btnCancelEditRoom")?.addEventListener("click", closeEditModal);
+
+  container.querySelectorAll(".btn-edit-master-room").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const oldNo = normalizeRoomNo(btn.dataset.rnum);
+      const rmObj = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === oldNo);
+      if (!rmObj || !editOverlay) return;
+
+      const isPan = rmObj.kategori === "PANITIA";
+      const occPes = getPesertaRoomOccupants(sekolahList, oldNo);
+      const occPan = getPanitiaRoomOccupants(oldNo);
+      const totalOcc = occPes.length + occPan.length;
+
+      document.getElementById("editRoomModalTitle").textContent = `Edit Kamar ${oldNo}`;
+      document.getElementById("editRoomOriginalNumber").value = oldNo;
+      document.getElementById("inpEditRoomNumber").value = oldNo;
+      document.getElementById("selEditRoomCategory").value = isPan ? "PANITIA" : "PESERTA";
+      document.getElementById("inpEditRoomCap").value = rmObj.kapasitas || 2;
+
+      const warnBox = document.getElementById("editRoomOccupantsWarning");
+      if (warnBox) {
+        if (totalOcc > 0) {
+          const names = isPan
+            ? occPan.map(p => p.nama_panitia).join(", ")
+            : occPes.map(s => s.nama_sekolah).join(", ");
+          warnBox.innerHTML = `<i class="fa-solid fa-circle-info mr-1 text-amber-700"></i>Kamar ini sedang dihuni oleh <b>${totalOcc} orang</b> (${names}). Jika nomor kamar diubah, penghuninya akan <b>otomatis dipindahkan</b> ke nomor kamar baru.`;
+        } else {
+          warnBox.innerHTML = `<i class="fa-solid fa-check-circle mr-1 text-emerald-700"></i>Kamar ini masih kosong. Anda bebas mengubah nomor, kapasitas, maupun peruntukannya.`;
+        }
+      }
+
+      editOverlay.classList.remove("hidden");
+    });
+  });
+
+  // 3. Simpan Hasil Edit Kamar & Auto-Migrasi Penghuni
+  document.getElementById("btnSaveEditRoom")?.addEventListener("click", async () => {
+    const oldNo = normalizeRoomNo(document.getElementById("editRoomOriginalNumber")?.value);
+    const newNo = normalizeRoomNo(document.getElementById("inpEditRoomNumber")?.value);
+    const newKat = document.getElementById("selEditRoomCategory")?.value === "PANITIA" ? "PANITIA" : "PESERTA";
+    const newCap = Math.max(1, parseInt(document.getElementById("inpEditRoomCap")?.value || "2", 10) || 2);
+
+    if (!newNo || newNo === "BELUM DITENTUKAN") {
+      return toast("Nomor kamar baru tidak boleh kosong!");
+    }
+
+    // Validasi anti-bentrok jika nomor kamar berubah
+    if (newNo !== oldNo) {
+      const conflict = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === newNo);
+      if (conflict) {
+        return toast(`Ditolak: Nomor Kamar "${newNo}" sudah digunakan! Pilih nomor kamar lain.`);
+      }
+    }
+
+    const occPes = getPesertaRoomOccupants(sekolahList, oldNo);
+    const occPan = getPanitiaRoomOccupants(oldNo);
+    const totalOcc = occPes.length + occPan.length;
+
+    // Validasi kapasitas minimal tidak lebih kecil dari penghuni aktif
+    if (newCap < totalOcc) {
+      return toast(`Ditolak: Kapasitas (${newCap}) tidak boleh lebih kecil dari jumlah penghuni saat ini (${totalOcc} orang)!`);
+    }
+
+    // Validasi perubahan kategori jika sudah terisi penghuni
+    if (occPes.length > 0 && newKat === "PANITIA") {
+      return toast("Kamar sedang dihuni Peserta! Kosongkan peserta terlebih dahulu jika ingin mengubah ke Kamar Panitia.");
+    }
+    if (occPan.length > 0 && newKat === "PESERTA") {
+      return toast("Kamar sedang dihuni Panitia! Kosongkan panitia terlebih dahulu jika ingin mengubah ke Kamar Peserta.");
+    }
+
+    const btnSave = document.getElementById("btnSaveEditRoom");
+    if (btnSave) {
+      btnSave.disabled = true;
+      btnSave.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Menyimpan...`;
+    }
+
+    // Update Master Rooms List
+    const targetRoom = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === oldNo);
+    if (targetRoom) {
+      targetRoom.nomor = newNo;
+      targetRoom.kategori = newKat;
+      targetRoom.kapasitas = newCap;
+    }
+    await saveMasterRoomsConfig(masterRoomsList);
+
+    // Jika nomor kamar berubah, pindahkan otomatis seluruh penghuni lama ke nomor kamar baru!
+    if (newNo !== oldNo) {
+      if (occPes.length > 0) {
+        for (const s of occPes) {
+          await sb.from("db_sekolah").update({ nomor_kamar: newNo }).eq("id_sekolah", s.id_sekolah);
+          s.nomor_kamar = newNo;
+        }
+      }
+      if (occPan.length > 0) {
+        occPan.forEach(p => {
+          panitiaRoomMap[p.id_panitia] = newNo;
+        });
+        await savePanitiaRoomAssignmentMap();
+      }
+    }
+
+    closeEditModal();
+    toast(
+      newNo !== oldNo
+        ? `Kamar ${oldNo} berhasil diubah menjadi Kamar ${newNo}${totalOcc > 0 ? ` (${totalOcc} penghuni ikut dipindahkan)` : ''}!`
+        : `Data Kamar ${newNo} berhasil diperbarui!`
+    );
+    if (reloadCallback) await reloadCallback();
+    renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback);
+  });
+
+  // 4. Hapus Kamar
   container.querySelectorAll(".btn-del-master-room").forEach(btn => {
     btn.addEventListener("click", async () => {
       const rnum = normalizeRoomNo(btn.dataset.rnum);
       const occPes = getPesertaRoomOccupants(sekolahList, rnum);
       const occPan = getPanitiaRoomOccupants(rnum);
       if (occPes.length > 0 || occPan.length > 0) {
-        return toast(`Kamar ${rnum} sedang dihuni! Kosongkan penghuninya terlebih dahulu.`);
+        return toast(`Kamar ${rnum} sedang dihuni! Kosongkan penghuninya terlebih dahulu atau gunakan tombol Edit.`);
       }
       if (!confirm(`Hapus Kamar ${rnum} dari daftar kamar?`)) return;
       masterRoomsList = masterRoomsList.filter(r => normalizeRoomNo(r.nomor) !== rnum);
@@ -865,7 +1030,7 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
       card.className = `p-3 rounded-2xl bg-white border ${currentRoom ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200'} flex items-center justify-between gap-2.5 shadow-2xs`;
       card.innerHTML = `
         <div class="flex items-center gap-2.5 min-w-0 flex-1">
-          <div class="btn-zoom-panitia-photo w-11 h-11 rounded-2xl overflow-hidden border-2 border-indigo-300 shrink-0 cursor-pointer hover:scale-110 transition-transform bg-slate-100" title="Klik untuk memperbesar foto">
+          <div class="btn-zoom-panitia-photo w-11 h-11 rounded-2xl overflow-hidden border-2 border-indigo-300 shrink-0 cursor-pointer hover:scale-110 transition-transform bg-slate-100">
             <img src="${photoUrl}" alt="${p.nama_panitia}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='${fallbackAvatar}';" />
           </div>
           <div class="min-w-0 flex-1">
@@ -1085,7 +1250,7 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
       row.innerHTML = `
         <div class="flex items-start justify-between gap-2.5">
           <div class="flex items-start gap-2.5 min-w-0 flex-1">
-            <div class="btn-zoom-school-photo w-11 h-11 rounded-2xl overflow-hidden border-2 border-violet-300 shrink-0 cursor-pointer hover:scale-110 transition-transform bg-slate-100 mt-0.5" title="Klik untuk memperbesar foto">
+            <div class="btn-zoom-school-photo w-11 h-11 rounded-2xl overflow-hidden border-2 border-violet-300 shrink-0 cursor-pointer hover:scale-110 transition-transform bg-slate-100 mt-0.5">
               <img src="${photoUrl}" alt="${displayName}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='${fallbackAvatar}';" />
             </div>
             <div class="min-w-0 flex-1">
