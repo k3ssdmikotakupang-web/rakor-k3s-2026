@@ -3330,19 +3330,29 @@ setInterval(reorganizePanitiaWorkspaceCards, 450);
 
 
 // =========================================================================
-// FITUR BACKGROUND FOTO PANITIA (TRANSPARANSI 20%) DI HALAMAN LOGIN
-// - Menampilkan foto panitia dengan opacity 20% (0.20) di layar #loginScreen
-// - Dilengkapi tombol Upload / Ganti Foto Background Login di menu Manajemen Akun & Profil Panitia
+// FITUR BACKGROUND FOTO PANITIA DI HALAMAN LOGIN (OPACITY DINAMIS 5% - 80%)
+// - Menampilkan foto panitia di layar #loginScreen dengan opacity yang bisa diatur
+// - Dilengkapi Slider Opacity (+/-) & Upload Foto di menu Profil Panitia & Manajemen Akun
 // =========================================================================
 
 const DEFAULT_PANITIA_BG_URL = "./bg-panitia.jpg";
 let currentLoginBgUrl = "";
+let currentLoginBgOpacityPct = 20; // Default 20%
+
+function applyLoginBgOpacityVisual(pct) {
+  const safePct = Math.max(0, Math.min(100, parseInt(pct, 10) || 20));
+  currentLoginBgOpacityPct = safePct;
+  const imgEl = document.getElementById("loginPanitiaBgImg");
+  if (imgEl) {
+    imgEl.style.opacity = String(safePct / 100);
+  }
+}
 
 async function initAndApplyLoginPanitiaBackground() {
   const loginScreen = document.getElementById("loginScreen");
   if (!loginScreen) return;
 
-  // Buat elemen layer gambar latar dengan transparansi 20% (opacity: 0.20) jika belum ada
+  // Buat elemen layer gambar latar jika belum ada
   let bgLayer = document.getElementById("loginPanitiaBgLayer");
   if (!bgLayer) {
     bgLayer = document.createElement("div");
@@ -3353,8 +3363,8 @@ async function initAndApplyLoginPanitiaBackground() {
         id="loginPanitiaBgImg"
         src="${DEFAULT_PANITIA_BG_URL}"
         alt="Background Panitia Rakor 2026"
-        style="opacity: 0.20;"
-        class="w-full h-full object-cover object-center scale-105 filter contrast-110 transition-opacity duration-700"
+        style="opacity: ${currentLoginBgOpacityPct / 100};"
+        class="w-full h-full object-cover object-center scale-105 filter contrast-110 transition-opacity duration-500"
         onerror="this.style.display='none'"
         onload="this.style.display='block'"
       />
@@ -3363,27 +3373,34 @@ async function initAndApplyLoginPanitiaBackground() {
     loginScreen.prepend(bgLayer);
   }
 
-  // Cek apakah ada foto background panitia yang disimpan di Supabase (info_layanan)
+  // Ambil foto & nilai persentase opacity dari Supabase (info_layanan)
   try {
     const { data } = await sb
       .from("info_layanan")
-      .select("url_link, deskripsi")
+      .select("url_link, deskripsi, status_tersedia")
       .eq("kode_menu", "bg_login_panitia_2026")
       .maybeSingle();
 
-    const savedUrl = data?.deskripsi || data?.url_link || "";
-    if (savedUrl && String(savedUrl).trim() !== "") {
-      currentLoginBgUrl = String(savedUrl).trim();
-      const imgEl = document.getElementById("loginPanitiaBgImg");
-      if (imgEl) {
-        imgEl.style.display = "block";
-        imgEl.src = currentLoginBgUrl;
+    if (data) {
+      // Baca persentase opacity jika tersimpan pada kolom url_link (angka 0-100)
+      const parsedOp = parseInt(String(data.url_link || "").replace(/\D/g, ""), 10);
+      if (!isNaN(parsedOp) && parsedOp >= 5 && parsedOp <= 90) {
+        applyLoginBgOpacityVisual(parsedOp);
+      }
+
+      const savedUrl = data.deskripsi || "";
+      if (savedUrl && String(savedUrl).trim() !== "" && savedUrl !== "AKTIF") {
+        currentLoginBgUrl = String(savedUrl).trim();
+        const imgEl = document.getElementById("loginPanitiaBgImg");
+        if (imgEl) {
+          imgEl.style.display = "block";
+          imgEl.src = currentLoginBgUrl;
+        }
       }
     }
   } catch (e) {}
 }
 
-// Fungsi kompresi foto otomatis agar ringan saat diunggah dari Galeri HP/Laptop
 function compressImageFileToDataUrl(file, maxWidth = 1080, quality = 0.72) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -3411,11 +3428,16 @@ function compressImageFileToDataUrl(file, maxWidth = 1080, quality = 0.72) {
   });
 }
 
-// Suntikkan tombol pengatur Foto Background Login Panitia (20%) di dalam Modal Profil Panitia & Manajemen Akun
+// Suntikkan widget Pengatur Foto & Slider Opacity Background Login di Modal Profil Panitia & Manajemen Akun
 function injectLoginBgManagerWidget() {
   if (!activeUser || activeUser.role !== "panitia") return;
   const div = String(activeUser.profile?.divisi || "").trim();
-  const canEditBg = ["Ketua Panitia", "Sekretaris", "Seksi Kesekretariatan", "Seksi Perlengkapan, Dokumentasi, dan Publikasi"].includes(div);
+  const canEditBg = [
+    "Ketua Panitia",
+    "Sekretaris",
+    "Seksi Kesekretariatan",
+    "Seksi Perlengkapan, Dokumentasi, dan Publikasi"
+  ].includes(div);
   if (!canEditBg) return;
 
   const modalBody = document.getElementById("serviceModalBody");
@@ -3428,17 +3450,33 @@ function injectLoginBgManagerWidget() {
   ) {
     const box = document.createElement("div");
     box.id = "boxManageLoginBgPanitia";
-    box.className = "p-3.5 rounded-2xl bg-slate-900 text-white border border-amber-400/40 space-y-2.5 shadow-md";
+    box.className = "p-3.5 rounded-2xl bg-slate-900 text-white border border-amber-400/40 space-y-3 shadow-md";
     box.innerHTML = `
       <div class="flex items-center justify-between">
-        <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full">
-          <i class="fa-solid fa-image mr-1"></i>Background Login Panitia (Opacity 20%)
+        <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+          <i class="fa-solid fa-image mr-1"></i>Background Login Panitia
         </span>
-        <span class="text-[9px] text-slate-300 font-semibold">Tampil di Layar Login</span>
+        <span id="badgeCurrentLoginOpacityPct" class="text-[10px] font-extrabold text-amber-300 bg-white/10 px-2 py-0.5 rounded-lg">
+          Opacity: ${currentLoginBgOpacityPct}%
+        </span>
       </div>
-      <p class="text-[10px] text-slate-300 leading-relaxed">
-        Unggah foto kebersamaan Panitia Rakor 2026 dari galeri untuk dijadikan latar belakang halaman login dengan transparansi 20%.
-      </p>
+
+      <!-- Kontrol Slider & Tombol +/- Opacity -->
+      <div class="p-2.5 rounded-xl bg-white/10 border border-white/15 space-y-2">
+        <div class="flex items-center justify-between text-[10px] font-bold text-slate-200">
+          <span>Tingkat Transparansi Foto:</span>
+          <span id="lblSliderOpacityVal" class="text-amber-300 font-extrabold">${currentLoginBgOpacityPct}%</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnDecLoginOpacity" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs border border-white/20 shrink-0">-</button>
+          <input id="rngLoginBgOpacity" type="range" min="5" max="80" step="5" value="${currentLoginBgOpacityPct}" class="flex-1 accent-amber-400 cursor-pointer" />
+          <button type="button" id="btnIncLoginOpacity" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs border border-white/20 shrink-0">+</button>
+          <button type="button" id="btnSaveLoginOpacityNow" class="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10px] shrink-0 shadow transition">
+            Simpan
+          </button>
+        </div>
+      </div>
+
       <div class="flex items-center gap-2">
         <label class="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] text-center cursor-pointer shadow transition">
           <i class="fa-solid fa-upload mr-1"></i>Pilih Foto Panitia dari Galeri
@@ -3452,6 +3490,50 @@ function injectLoginBgManagerWidget() {
 
     modalBody.prepend(box);
 
+    const slider = document.getElementById("rngLoginBgOpacity");
+    const lblVal = document.getElementById("lblSliderOpacityVal");
+    const badgeTop = document.getElementById("badgeCurrentLoginOpacityPct");
+
+    const syncSliderDisplay = (newVal) => {
+      const clamped = Math.max(5, Math.min(80, parseInt(newVal, 10) || 20));
+      if (slider) slider.value = clamped;
+      if (lblVal) lblVal.textContent = `${clamped}%`;
+      if (badgeTop) badgeTop.textContent = `Opacity: ${clamped}%`;
+      applyLoginBgOpacityVisual(clamped);
+    };
+
+    slider?.addEventListener("input", (e) => {
+      syncSliderDisplay(e.target.value);
+    });
+
+    document.getElementById("btnDecLoginOpacity")?.addEventListener("click", () => {
+      syncSliderDisplay(currentLoginBgOpacityPct - 5);
+    });
+
+    document.getElementById("btnIncLoginOpacity")?.addEventListener("click", () => {
+      syncSliderDisplay(currentLoginBgOpacityPct + 5);
+    });
+
+    document.getElementById("btnSaveLoginOpacityNow")?.addEventListener("click", async () => {
+      const btn = document.getElementById("btnSaveLoginOpacityNow");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "...";
+      }
+      await sb.from("info_layanan").upsert([{
+        kode_menu: "bg_login_panitia_2026",
+        judul: `Background Foto Panitia Halaman Login (${currentLoginBgOpacityPct}%)`,
+        deskripsi: currentLoginBgUrl || DEFAULT_PANITIA_BG_URL,
+        url_link: String(currentLoginBgOpacityPct),
+        status_tersedia: "AKTIF"
+      }]);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Simpan";
+      }
+      toast(`Opacity Background Login disimpan pada ${currentLoginBgOpacityPct}%!`);
+    });
+
     document.getElementById("inpUploadLoginBgPanitia")?.addEventListener("change", async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -3460,9 +3542,9 @@ function injectLoginBgManagerWidget() {
         const dataUrl = await compressImageFileToDataUrl(file, 1000, 0.7);
         await sb.from("info_layanan").upsert([{
           kode_menu: "bg_login_panitia_2026",
-          judul: "Background Foto Panitia Halaman Login (20%)",
+          judul: `Background Foto Panitia Halaman Login (${currentLoginBgOpacityPct}%)`,
           deskripsi: dataUrl,
-          url_link: "AKTIF",
+          url_link: String(currentLoginBgOpacityPct),
           status_tersedia: "AKTIF"
         }]);
         currentLoginBgUrl = dataUrl;
@@ -3471,21 +3553,22 @@ function injectLoginBgManagerWidget() {
           imgEl.style.display = "block";
           imgEl.src = dataUrl;
         }
-        toast("Foto Background Login Panitia (20%) berhasil diperbarui!");
+        applyLoginBgOpacityVisual(currentLoginBgOpacityPct);
+        toast(`Foto Background Login (${currentLoginBgOpacityPct}%) berhasil diperbarui!`);
       } catch (err) {
         toast("Gagal memproses gambar.");
       }
     });
 
     document.getElementById("btnSetUrlLoginBgPanitia")?.addEventListener("click", async () => {
-      const url = prompt("Masukkan URL / Link Gambar Foto Panitia (atau ketik ./bg-panitia.jpg jika file ada di GitHub):", currentLoginBgUrl || DEFAULT_PANITIA_BG_URL);
+      const url = prompt("Masukkan URL / Link Gambar Foto Panitia (atau ketik ./bg-panitia.jpg):", currentLoginBgUrl || DEFAULT_PANITIA_BG_URL);
       if (url === null) return;
       const cleanUrl = String(url).trim() || DEFAULT_PANITIA_BG_URL;
       await sb.from("info_layanan").upsert([{
         kode_menu: "bg_login_panitia_2026",
-        judul: "Background Foto Panitia Halaman Login (20%)",
+        judul: `Background Foto Panitia Halaman Login (${currentLoginBgOpacityPct}%)`,
         deskripsi: cleanUrl,
-        url_link: cleanUrl,
+        url_link: String(currentLoginBgOpacityPct),
         status_tersedia: "AKTIF"
       }]);
       currentLoginBgUrl = cleanUrl;
@@ -3494,7 +3577,8 @@ function injectLoginBgManagerWidget() {
         imgEl.style.display = "block";
         imgEl.src = cleanUrl;
       }
-      toast("Background Login Panitia berhasil disimpan!");
+      applyLoginBgOpacityVisual(currentLoginBgOpacityPct);
+      toast(`Background Login Panitia (${currentLoginBgOpacityPct}%) berhasil disimpan!`);
     });
   }
 }
