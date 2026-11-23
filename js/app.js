@@ -336,6 +336,7 @@ function showTab(name) {
 
   if (name === "beranda") {
     renderBerandaView();
+    renderLiveJadwal();
     renderInfoKeuanganWidget(activeUser, sekolahList, panitiaList, tarifKontribusiDefault, () => loadAllDatabase(false));
     renderStatistikSekolahWidget(activeUser, sekolahList, () => loadAllDatabase(false));
     renderK3sMusicPlayerWidget(activeUser, layananList, () => loadAllDatabase(false));
@@ -343,6 +344,7 @@ function showTab(name) {
     renderFiturEkstraWidgets(activeUser, sekolahList, panitiaList, layananList, () => loadAllDatabase(false));
     renderProdukRakorAndUniformCards(activeUser, layananList, () => loadAllDatabase(false));
     reorganizePanitiaWorkspaceCards();
+  
   } else if (name === "jadwal") {
     renderLiveJadwal();
   } else if (name === "qr") {
@@ -2119,14 +2121,21 @@ function restorePesertaBerandaCards() {
     }
   }
 
-  // Pastikan seluruh kartu & widget di dalam tabContentBeranda tampil penuh untuk Peserta
+  // Pastikan seluruh kartu & Info Live di dalam tabContentBeranda tampil penuh untuk Peserta
   const tabBeranda = document.getElementById("tabContentBeranda");
   if (tabBeranda) {
     Array.from(tabBeranda.children).forEach(el => {
-      if (el.id === "panitiaUnifiedWorkspaceCard" || el.id === "liveActiveSessionContainer") return;
+      if (el.id === "panitiaUnifiedWorkspaceCard") return;
       el.classList.remove("hidden");
       if (el.style.display === "none") el.style.display = "";
     });
+  }
+
+  // Pastikan container Info Live Peserta terbuka & ter-render
+  const liveBox = document.getElementById("liveActiveSessionContainer");
+  if (liveBox) {
+    liveBox.classList.remove("hidden");
+    if (liveBox.style.display === "none") liveBox.style.display = "";
   }
 
   hiddenForPanitiaElements.forEach(el => {
@@ -2137,7 +2146,6 @@ function restorePesertaBerandaCards() {
   });
   hiddenForPanitiaElements = [];
 
-  // Di kartu Menu Layanan, tampilkan semua menu peserta dan hanya sembunyikan 3 menu internal panitia
   const generalServiceCard = tabBeranda?.querySelector(".service-menu-btn")?.closest(".bg-white");
   if (generalServiceCard) {
     generalServiceCard.querySelectorAll("button, a").forEach(btn => {
