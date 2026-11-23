@@ -3501,3 +3501,230 @@ function injectLoginBgManagerWidget() {
 
 initAndApplyLoginPanitiaBackground();
 setInterval(injectLoginBgManagerWidget, 500);
+
+
+// =========================================================================
+// PANEL OTORISASI DOKUMEN SPJ BOSP PESERTA (E-KWITANSI & DAFTAR HADIR)
+// - Bendahara (+ Ketua Panitia): Mengaktifkan akses download E-Kwitansi BOSP
+// - Sekretaris & Seksi Kesekretariatan (+ Ketua Panitia): Mengaktifkan akses
+//   download Daftar Hadir Individu & Kolektif Sub Rayon bagi Peserta
+// =========================================================================
+
+let spjAuthStateCache = {
+  kwitansi_open: false,
+  absensi_open: false,
+  loaded: false
+};
+
+async function loadSpjBospAuthState() {
+  try {
+    const { data } = await sb
+      .from("info_layanan")
+      .select("kode_menu, status_tersedia, url_link")
+      .in("kode_menu", ["akses_spj_kwitansi", "akses_spj_absensi", "spj_bosp_config"]);
+
+    if (Array.isArray(data)) {
+      const kwRec = data.find(r => r.kode_menu === "akses_spj_kwitansi");
+      const abRec = data.find(r => r.kode_menu === "akses_spj_absensi");
+      if (kwRec) {
+        spjAuthStateCache.kwitansi_open = ["AKTIF", "BUKA", "OPEN", "TRUE"].includes(
+          String(kwRec.status_tersedia || kwRec.url_link || "").toUpperCase()
+        );
+      }
+      if (abRec) {
+        spjAuthStateCache.absensi_open = ["AKTIF", "BUKA", "OPEN", "TRUE"].includes(
+          String(abRec.status_tersedia || abRec.url_link || "").toUpperCase()
+        );
+      }
+    }
+    spjAuthStateCache.loaded = true;
+  } catch (e) {}
+}
+
+function getSpjAuthPermissions(user) {
+  if (!user || user.role !== "panitia" || !user.profile) {
+    return { canToggleKwitansi: false, canToggleAbsensi: false };
+  }
+  const div = String(user.profile.divisi || "").trim();
+  return {
+    canToggleKwitansi: ["Bendahara", "Ketua Panitia"].includes(div),
+    canToggleAbsensi: ["Sekretaris", "Seksi Kesekretariatan", "Ketua Panitia"].includes(div)
+  };
+}
+
+async function renderSpjBospActivatorPanelInPanitiaCard() {
+  if (!activeUser || activeUser.role !== "panitia") return;
+
+  const perms = getSpjAuthPermissions(activeUser);
+  if (!perms.canToggleKwitansi && !perms.canToggleAbsensi) return;
+
+  const workspaceCard = document.getElementById("panitiaUnifiedWorkspaceCard");
+  const gridBox = document.getElementById("panitiaUnifiedGrid6");
+  if (!workspaceCard || !gridBox) return;
+
+  if (!spjAuthStateCache.loaded) {
+    await loadSpjBospAuthState();
+  }
+
+  let panel = document.getElementById("panitiaSpjBospAuthActivatorBox");
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.id = "panitiaSpjBospAuthActivatorBox";
+    gridBox.insertAdjacentElement("beforebegin", panel);
+  }
+
+  const sig = `${perms.canToggleKwitansi}_${perms.canToggleAbsensi}_${spjAuthStateCache.kwitansi_open}_${spjAuthStateCache.absensi_open}`;
+  if (panel.dataset.sig === sig) return;
+  panel.dataset.sig = sig;
+
+  panel.className = "p-3 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white border border-amber-400/50 space-y-2.5 shadow-md";
+  panel.innerHTML = `
+    <div class="flex items-center justify-between">
+      <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+        <i class="fa-solid fa-key mr-1"></i>Otorisasi Dokumen SPJ BOSP Peserta
+      </span>
+      <span class="text-[9px] text-blue-200 font-semibold">${activeUser.profile?.divisi || ''}</span>
+    </div>
+
+    <div class="space-y-2">
+      ${perms.canToggleKwitansi ? `
+        <div class="p-2.5 rounded-xl bg-white/10 border border-white/15 flex items-center justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="text-[11px] font-extrabold text-white">Akses Download E-Kwitansi BOSP</div>
+            <div class="text-[9px] text-amber-200 leading-snug">
+              ${spjAuthStateCache.kwitansi_open
+                ? 'Status: <b>TERBUKA</b> (Peserta berstatus Lunas dapat mengunduh E-Kwitansi)'
+                : 'Status: <b>TERKUNCI</b> (Klik tombol untuk membuka akses bagi Peserta Lunas)'}
+            </div>
+          </div>
+          <button type="button" id="btnToggleSpjKwitansiAuth" class="px-3 py-1.5 rounded-xl font-extrabold text-[10px] shrink-0 shadow transition ${
+            spjAuthStateCache.kwitansi_open
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+              : 'bg-rose-600 hover:bg-rose-500 text-white'
+          }">
+            <i class="fa-solid ${spjAuthStateCache.kwitansi_open ? 'fa-lock-open' : 'fa-lock'} mr-1"></i>
+            ${spjAuthStateCache.kwitansi_open ? 'Aktif (Buka)' : 'Terkunci'}
+          </button>
+        </div>
+      ` : ''}
+
+      ${perms.canToggleAbsensi ? `
+        <div class="p-2.5 rounded-xl bg-white/10 border border-white/15 flex items-center justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="text-[11px] font-extrabold text-white">Daftar Hadir Individu & Kolektif Rayon</div>
+            <div class="text-[9px] text-sky-200 leading-snug">
+              ${spjAuthStateCache.absensi_open
+                ? 'Status: <b>TERBUKA</b> (Peserta dapat mengunduh Daftar Hadir Individu & Rayon)'
+                : 'Status: <b>TERKUNCI</b> (Aktifkan setelah rekap absensi H1–H3 selesai)'}
+            </div>
+          </div>
+          <button type="button" id="btnToggleSpjAbsensiAuth" class="px-3 py-1.5 rounded-xl font-extrabold text-[10px] shrink-0 shadow transition ${
+            spjAuthStateCache.absensi_open
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+              : 'bg-rose-600 hover:bg-rose-500 text-white'
+          }">
+            <i class="fa-solid ${spjAuthStateCache.absensi_open ? 'fa-lock-open' : 'fa-lock'} mr-1"></i>
+            ${spjAuthStateCache.absensi_open ? 'Aktif (Buka)' : 'Terkunci'}
+          </button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  document.getElementById("btnToggleSpjKwitansiAuth")?.addEventListener("click", async () => {
+    const nextState = !spjAuthStateCache.kwitansi_open;
+    const statusStr = nextState ? "AKTIF" : "TERKUNCI";
+    const petugas = activeUser.profile?.nama_panitia || "Bendahara";
+
+    await sb.from("info_layanan").upsert([{
+      kode_menu: "akses_spj_kwitansi",
+      judul: "Otorisasi Akses Download E-Kwitansi BOSP Peserta",
+      deskripsi: `Diatur oleh ${petugas} pada ${new Date().toLocaleString("id-ID")}`,
+      url_link: statusStr,
+      status_tersedia: statusStr
+    }]);
+
+    spjAuthStateCache.kwitansi_open = nextState;
+    panel.dataset.sig = "";
+    toast(
+      nextState
+        ? "Akses Download E-Kwitansi BOSP DIBUKA untuk Peserta Lunas!"
+        : "Akses Download E-Kwitansi BOSP dikunci kembali."
+    );
+    renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+    renderSpjBospActivatorPanelInPanitiaCard();
+  });
+
+  document.getElementById("btnToggleSpjAbsensiAuth")?.addEventListener("click", async () => {
+    const nextState = !spjAuthStateCache.absensi_open;
+    const statusStr = nextState ? "AKTIF" : "TERKUNCI";
+    const petugas = activeUser.profile?.nama_panitia || "Sekretaris / Kesekretariatan";
+
+    await sb.from("info_layanan").upsert([{
+      kode_menu: "akses_spj_absensi",
+      judul: "Otorisasi Akses Download Daftar Hadir Individu & Kolektif Rayon",
+      deskripsi: `Diatur oleh ${petugas} pada ${new Date().toLocaleString("id-ID")}`,
+      url_link: statusStr,
+      status_tersedia: statusStr
+    }]);
+
+    spjAuthStateCache.absensi_open = nextState;
+    panel.dataset.sig = "";
+    toast(
+      nextState
+        ? "Akses Download Daftar Hadir Individu & Kolektif Rayon DIBUKA untuk Peserta!"
+        : "Akses Download Daftar Hadir SPJ dikunci kembali."
+    );
+    renderSpjBospWidgets(activeUser, sekolahList, panitiaList);
+    renderSpjBospActivatorPanelInPanitiaCard();
+  });
+}
+
+// Pengawal kunci di sisi Peserta agar tombol download Daftar Hadir SPJ & E-Kwitansi
+// hanya terbuka jika sudah diaktifkan oleh Bendahara / Sekretaris / Kesekretariatan
+async function enforcePesertaSpjDownloadLocks() {
+  if (!activeUser || activeUser.role !== "peserta") return;
+  if (!spjAuthStateCache.loaded) {
+    await loadSpjBospAuthState();
+  }
+
+  const targetRoots = [
+    document.getElementById("tabContentBeranda"),
+    document.getElementById("tabContentAbsensi")
+  ].filter(Boolean);
+
+  targetRoots.forEach(root => {
+    root.querySelectorAll("button, a").forEach(btn => {
+      const txt = (btn.textContent || "").toLowerCase();
+
+      // Kunci tombol E-Kwitansi jika Bendahara belum membuka akses
+      if (txt.includes("kwitansi") && (txt.includes("download") || txt.includes("unduh") || txt.includes("cetak"))) {
+        if (!spjAuthStateCache.kwitansi_open) {
+          btn.disabled = true;
+          btn.classList.add("opacity-50", "cursor-not-allowed");
+          btn.title = "Menunggu aktivasi oleh Bendahara Panitia";
+        } else {
+          btn.disabled = false;
+          btn.classList.remove("opacity-50", "cursor-not-allowed");
+        }
+      }
+
+      // Kunci tombol Daftar Hadir Individu & Kolektif Rayon jika Sekretaris/Kesekretariatan belum membuka akses
+      if ((txt.includes("daftar hadir") || txt.includes("absensi manual") || txt.includes("kolektif")) && (txt.includes("download") || txt.includes("unduh") || txt.includes("cetak") || txt.includes("pdf"))) {
+        if (!spjAuthStateCache.absensi_open) {
+          btn.disabled = true;
+          btn.classList.add("opacity-50", "cursor-not-allowed");
+          btn.title = "Menunggu aktivasi oleh Sekretaris / Seksi Kesekretariatan";
+        } else {
+          btn.disabled = false;
+          btn.classList.remove("opacity-50", "cursor-not-allowed");
+        }
+      }
+    });
+  });
+}
+
+setInterval(() => {
+  renderSpjBospActivatorPanelInPanitiaCard();
+  enforcePesertaSpjDownloadLocks();
+}, 600);
