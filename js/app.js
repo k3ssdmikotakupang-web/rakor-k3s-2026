@@ -4283,3 +4283,626 @@ setInterval(() => {
   renderSpjBospActivatorPanelInPanitiaCard();
   enforcePesertaSpjDownloadLocks();
 }, 600);
+
+
+// =========================================================================
+// DASHBOARD INFOGRAFIS & DATABASE 160 SEKOLAH (FULL-SCREEN LAPTOP EDITION)
+// - Membuka layar penuh (96vw) berisi Infografis Sub Rayon, 48 Kelurahan,
+//   Jenjang (SD/MI), Status (Negeri/Swasta), & Bedah Detail Sekolah Tidak Ikut
+// - Otomatis mencegat klik tombol Infografis di Beranda Peserta maupun Panitia
+// =========================================================================
+
+function openFullScreenInfografisDatabaseModal() {
+  rescueWidgetsBeforeModalOverwrite();
+  stopMealQrCameraScanner();
+
+  const listAll = Array.isArray(sekolahList) ? sekolahList : [];
+  if (listAll.length === 0) {
+    return toast("Data sekolah sedang dimuat, silakan coba beberapa detik lagi...");
+  }
+
+  let overlay = document.getElementById("fullScreenInfografisOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "fullScreenInfografisOverlay";
+    document.body.appendChild(overlay);
+  }
+
+  // State Filter Interaktif
+  let filterRayon = "ALL";
+  let filterKelurahan = "ALL";
+  let filterJenjang = "ALL"; // ALL | SD | MI
+  let filterStatusSek = "ALL"; // ALL | Negeri | Swasta
+  let filterIkut = "ALL"; // ALL | IKUT | TIDAK_IKUT
+  let searchQuery = "";
+
+  const isSchoolNotParticipating = (s) => s.status_ikut !== "Ikut";
+
+  const renderInfografisDashboard = () => {
+    const totalAll = listAll.length;
+    const listIkut = listAll.filter(s => s.status_ikut === "Ikut");
+    const listTidak = listAll.filter(isSchoolNotParticipating);
+
+    const sdAll = listAll.filter(s => getJenjang(s.nama_sekolah) === "SD");
+    const miAll = listAll.filter(s => getJenjang(s.nama_sekolah) === "MI");
+    const negeriAll = listAll.filter(s => String(s.status_sekolah || "").toLowerCase() === "negeri");
+    const swastaAll = listAll.filter(s => String(s.status_sekolah || "").toLowerCase() !== "negeri");
+
+    // Bedah Detail Sekolah Tidak Ikut berdasarkan Jenjang & Status
+    const tidakSd = listTidak.filter(s => getJenjang(s.nama_sekolah) === "SD").length;
+    const tidakMi = listTidak.filter(s => getJenjang(s.nama_sekolah) === "MI").length;
+    const tidakNegeri = listTidak.filter(s => String(s.status_sekolah || "").toLowerCase() === "negeri").length;
+    const tidakSwasta = listTidak.filter(s => String(s.status_sekolah || "").toLowerCase() !== "negeri").length;
+
+    const pctIkutGlobal = totalAll > 0 ? Math.round((listIkut.length / totalAll) * 100) : 0;
+
+    // Agregasi Per Kelurahan
+    const kelurahanMap = {};
+    listAll.forEach(s => {
+      const kel = String(s.kelurahan || "Belum Diisi").trim();
+      const sr = String(s.subrayon || "-").trim();
+      if (!kelurahanMap[kel]) {
+        kelurahanMap[kel] = { kelurahan: kel, subrayon: sr, total: 0, ikut: 0, tidak: 0 };
+      }
+      kelurahanMap[kel].total++;
+      if (s.status_ikut === "Ikut") kelurahanMap[kel].ikut++;
+      else kelurahanMap[kel].tidak++;
+    });
+
+    const allKelurahanArr = Object.values(kelurahanMap).sort((a, b) => {
+      const srCmp = a.subrayon.localeCompare(b.subrayon);
+      if (srCmp !== 0) return srCmp;
+      return a.kelurahan.localeCompare(b.kelurahan);
+    });
+
+    const displayedKelurahanArr = filterRayon === "ALL"
+      ? allKelurahanArr
+      : allKelurahanArr.filter(k => k.subrayon === filterRayon);
+
+    // Filter Tabel Sekolah di bagian bawah
+    let filteredSchools = listAll;
+    if (filterRayon !== "ALL") {
+      filteredSchools = filteredSchools.filter(s => s.subrayon === filterRayon);
+    }
+    if (filterKelurahan !== "ALL") {
+      filteredSchools = filteredSchools.filter(s => String(s.kelurahan || "Belum Diisi").trim() === filterKelurahan);
+    }
+    if (filterJenjang !== "ALL") {
+      filteredSchools = filteredSchools.filter(s => getJenjang(s.nama_sekolah) === filterJenjang);
+    }
+    if (filterStatusSek !== "ALL") {
+      filteredSchools = filteredSchools.filter(s => {
+        const isNeg = String(s.status_sekolah || "").toLowerCase() === "negeri";
+        return filterStatusSek === "Negeri" ? isNeg : !isNeg;
+      });
+    }
+    if (filterIkut === "IKUT") {
+      filteredSchools = filteredSchools.filter(s => s.status_ikut === "Ikut");
+    } else if (filterIkut === "TIDAK_IKUT") {
+      filteredSchools = filteredSchools.filter(isSchoolNotParticipating);
+    }
+    if (searchQuery.trim() !== "") {
+      const kw = searchQuery.toLowerCase().trim();
+      filteredSchools = filteredSchools.filter(s =>
+        (s.nama_sekolah || "").toLowerCase().includes(kw) ||
+        (s.nama_kepsek || "").toLowerCase().includes(kw) ||
+        (s.kelurahan || "").toLowerCase().includes(kw) ||
+        String(s.npsn || "").includes(kw)
+      );
+    }
+
+    overlay.className = "fixed inset-0 z-[80] bg-slate-950/85 backdrop-blur-md overflow-y-auto p-2 sm:p-4 lg:p-6";
+    overlay.innerHTML = `
+      <div class="w-full max-w-[1540px] mx-auto bg-slate-100 rounded-3xl shadow-2xl border border-slate-300 overflow-hidden flex flex-col">
+        <!-- TOP BAR EXECUTIVE HEADER -->
+        <div class="bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-amber-400/30">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center text-lg font-extrabold shadow-lg shrink-0">
+              <i class="fa-solid fa-chart-pie"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+                  Executive Analytics • Full-Screen
+                </span>
+                <span class="text-[10px] text-blue-200 font-bold">Rakor Kepala SD/MI Kota Kupang 2026</span>
+              </div>
+              <h2 class="text-base lg:text-lg font-extrabold text-white mt-0.5">
+                Infografis & Database Lengkap ${totalAll} Satuan Pendidikan (Per Sub Rayon & Kelurahan)
+              </h2>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button type="button" id="btnResetAllInfografisFilters" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 font-extrabold text-xs border border-white/15 transition">
+              <i class="fa-solid fa-rotate-left mr-1"></i>Reset Filter
+            </button>
+            <button type="button" id="btnExportInfografisFilteredCsv" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>Unduh Data (${filteredSchools.length})</span>
+            </button>
+            <button type="button" id="btnCloseFullScreenInfografis" class="w-10 h-10 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-base flex items-center justify-center shadow transition" title="Tutup Layar Penuh">
+              &times;
+            </button>
+          </div>
+        </div>
+
+        <!-- BODY KONTEN INFOGRAFIS -->
+        <div class="p-4 lg:p-6 space-y-5">
+          <!-- BARIS 1: 5 KARTU KPI RINGKASAN EKSEKUTIF -->
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div data-kpi="ALL" class="kpi-quick-filter cursor-pointer p-4 rounded-2xl bg-white border-2 ${filterIkut === 'ALL' && filterJenjang === 'ALL' && filterStatusSek === 'ALL' ? 'border-blue-600 shadow-md' : 'border-slate-200'} hover:border-blue-400 transition">
+              <div class="text-[10px] font-extrabold uppercase text-slate-500">Total Database Sekolah</div>
+              <div class="text-2xl font-extrabold text-slate-900 mt-1">${totalAll} <span class="text-xs font-bold text-slate-500">SD/MI</span></div>
+              <div class="text-[10px] text-blue-700 font-bold mt-1">6 Kecamatan • ${allKelurahanArr.length} Kelurahan</div>
+            </div>
+
+            <div data-kpi="IKUT" class="kpi-quick-filter cursor-pointer p-4 rounded-2xl bg-emerald-50/70 border-2 ${filterIkut === 'IKUT' ? 'border-emerald-600 shadow-md' : 'border-emerald-200'} hover:border-emerald-500 transition">
+              <div class="text-[10px] font-extrabold uppercase text-emerald-800">Terdaftar Ikut Rakor</div>
+              <div class="text-2xl font-extrabold text-emerald-700 mt-1">${listIkut.length} <span class="text-xs font-extrabold">(${pctIkutGlobal}%)</span></div>
+              <div class="text-[10px] text-emerald-800 font-semibold mt-1">Klik untuk filter peserta ikut</div>
+            </div>
+
+            <div data-kpi="TIDAK_IKUT" class="kpi-quick-filter cursor-pointer p-4 rounded-2xl bg-rose-50/80 border-2 ${filterIkut === 'TIDAK_IKUT' ? 'border-rose-600 shadow-md' : 'border-rose-200'} hover:border-rose-500 transition">
+              <div class="text-[10px] font-extrabold uppercase text-rose-800">Tidak Ikut / Belum Hadir</div>
+              <div class="text-2xl font-extrabold text-rose-700 mt-1">${listTidak.length} <span class="text-xs font-extrabold">(${100 - pctIkutGlobal}%)</span></div>
+              <div class="text-[10px] text-rose-800 font-semibold mt-1">Klik untuk lihat daftar sekolah</div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white border border-slate-200">
+              <div class="text-[10px] font-extrabold uppercase text-slate-500">Komposisi Jenjang</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-xl font-extrabold text-blue-900">${sdAll.length} SD</span>
+                <span class="text-xs font-bold text-slate-400">•</span>
+                <span class="text-xl font-extrabold text-emerald-700">${miAll.length} MI</span>
+              </div>
+              <div class="w-full bg-emerald-200 h-2 rounded-full overflow-hidden mt-2 flex">
+                <div class="bg-blue-700 h-full" style="width:${Math.round((sdAll.length / totalAll) * 100)}%"></div>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white border border-slate-200">
+              <div class="text-[10px] font-extrabold uppercase text-slate-500">Status Satuan Pendidikan</div>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-xl font-extrabold text-indigo-900">${negeriAll.length} Negeri</span>
+                <span class="text-xs font-bold text-slate-400">•</span>
+                <span class="text-xl font-extrabold text-amber-600">${swastaAll.length} Swasta</span>
+              </div>
+              <div class="w-full bg-amber-200 h-2 rounded-full overflow-hidden mt-2 flex">
+                <div class="bg-indigo-700 h-full" style="width:${Math.round((negeriAll.length / totalAll) * 100)}%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BARIS 2: 3 KOLOM ANALITIK (SUB RAYON + ANALISIS TIDAK IKUT + KOMPOSISI JENJANG/STATUS) -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- KOLOM KIRI (5 KOLOM): INFOGRAFIS 6 SUB RAYON -->
+            <div class="lg:col-span-5 bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 class="text-xs font-extrabold uppercase text-slate-900 flex items-center gap-1.5">
+                  <i class="fa-solid fa-layer-group text-blue-700"></i>
+                  <span>Infografis Partisipasi 6 Sub Rayon</span>
+                </h3>
+                <span class="text-[9px] font-bold text-slate-400">Klik baris untuk filter</span>
+              </div>
+
+              <div class="space-y-2.5">
+                ${SUBRAYON_LIST.map(sr => {
+                  const srSchools = listAll.filter(s => s.subrayon === sr);
+                  const srIkut = srSchools.filter(s => s.status_ikut === "Ikut").length;
+                  const srTidak = srSchools.length - srIkut;
+                  const srPct = srSchools.length > 0 ? Math.round((srIkut / srSchools.length) * 100) : 0;
+                  const isActiveSr = filterRayon === sr;
+
+                  return `
+                    <div data-sr="${sr}" class="infografis-sr-bar cursor-pointer p-2.5 rounded-2xl border ${isActiveSr ? 'bg-blue-50 border-blue-500 shadow-xs' : 'bg-slate-50 border-slate-200 hover:bg-blue-50/40'} transition">
+                      <div class="flex items-center justify-between text-xs font-extrabold mb-1">
+                        <span class="text-slate-900">Sub Rayon ${sr}</span>
+                        <div class="flex items-center gap-2 text-[10px]">
+                          <span class="text-emerald-700">✓ ${srIkut} Ikut</span>
+                          <span class="text-rose-600">✕ ${srTidak} Tidak</span>
+                          <span class="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 font-extrabold">${srPct}%</span>
+                        </div>
+                      </div>
+                      <div class="w-full bg-rose-200 h-2.5 rounded-full overflow-hidden flex">
+                        <div class="bg-emerald-500 h-full transition-all duration-300" style="width:${srPct}%"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- KOLOM TENGAH (4 KOLOM): BEDAH DETAIL SEKOLAH YANG TIDAK IKUT -->
+            <div class="lg:col-span-4 bg-gradient-to-br from-rose-950 via-slate-900 to-rose-950 text-white rounded-3xl p-4 border border-rose-500/40 shadow-md flex flex-col justify-between space-y-3">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[9px] font-extrabold uppercase bg-rose-600 text-white px-2.5 py-0.5 rounded-full">
+                    <i class="fa-solid fa-user-xmark mr-1"></i>Analisis Sekolah Tidak Ikut
+                  </span>
+                  <span class="text-xs font-extrabold text-amber-300">${listTidak.length} Sekolah</span>
+                </div>
+
+                <h3 class="text-sm font-extrabold text-white">Rincian Tidak Ikut Berdasarkan Jenjang & Status</h3>
+                <p class="text-[10px] text-rose-200 leading-relaxed">
+                  Klik salah satu kategori di bawah untuk langsung melihat daftar sekolah yang tidak mengikuti Rakor:
+                </p>
+
+                <!-- 2x2 Matrix Tidak Ikut -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                  <button type="button" data-notikut-jenjang="SD" data-notikut-status="ALL" class="btn-filter-tidak-detail p-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-left transition">
+                    <div class="text-[10px] text-rose-200 font-bold">Jenjang SD Tidak Ikut</div>
+                    <div class="text-xl font-extrabold text-amber-300 mt-0.5">${tidakSd} <span class="text-[10px] font-normal text-white">dari ${sdAll.length} SD</span></div>
+                  </button>
+
+                  <button type="button" data-notikut-jenjang="MI" data-notikut-status="ALL" class="btn-filter-tidak-detail p-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-left transition">
+                    <div class="text-[10px] text-rose-200 font-bold">Jenjang MI Tidak Ikut</div>
+                    <div class="text-xl font-extrabold text-amber-300 mt-0.5">${tidakMi} <span class="text-[10px] font-normal text-white">dari ${miAll.length} MI</span></div>
+                  </button>
+
+                  <button type="button" data-notikut-jenjang="ALL" data-notikut-status="Negeri" class="btn-filter-tidak-detail p-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-left transition">
+                    <div class="text-[10px] text-rose-200 font-bold">Sekolah Negeri Tidak Ikut</div>
+                    <div class="text-xl font-extrabold text-sky-300 mt-0.5">${tidakNegeri} <span class="text-[10px] font-normal text-white">dari ${negeriAll.length}</span></div>
+                  </button>
+
+                  <button type="button" data-notikut-jenjang="ALL" data-notikut-status="Swasta" class="btn-filter-tidak-detail p-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-left transition">
+                    <div class="text-[10px] text-rose-200 font-bold">Sekolah Swasta Tidak Ikut</div>
+                    <div class="text-xl font-extrabold text-rose-300 mt-0.5">${tidakSwasta} <span class="text-[10px] font-normal text-white">dari ${swastaAll.length}</span></div>
+                  </button>
+                </div>
+              </div>
+
+              <button type="button" id="btnShowAllTidakIkutSchools" class="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow flex items-center justify-center gap-1.5 transition">
+                <i class="fa-solid fa-list-ul"></i>
+                <span>Tampilkan Semua ${listTidak.length} Sekolah Tidak Ikut</span>
+              </button>
+            </div>
+
+            <!-- KOLOM KANAN (3 KOLOM): GRAFIK KOMPOSISI JENJANG & STATUS -->
+            <div class="lg:col-span-3 bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="border-b border-slate-100 pb-2">
+                  <h3 class="text-xs font-extrabold uppercase text-slate-900 flex items-center gap-1.5">
+                    <i class="fa-solid fa-chart-column text-indigo-700"></i>
+                    <span>Matriks Jenjang & Status</span>
+                  </h3>
+                </div>
+
+                <!-- SD Negeri vs SD Swasta vs MI -->
+                <div class="space-y-2.5 text-xs">
+                  ${[
+                    { label: "SD Negeri", total: listAll.filter(s => getJenjang(s.nama_sekolah) === "SD" && String(s.status_sekolah || "").toLowerCase() === "negeri").length, ikut: listIkut.filter(s => getJenjang(s.nama_sekolah) === "SD" && String(s.status_sekolah || "").toLowerCase() === "negeri").length, color: "bg-indigo-600" },
+                    { label: "SD Swasta", total: listAll.filter(s => getJenjang(s.nama_sekolah) === "SD" && String(s.status_sekolah || "").toLowerCase() !== "negeri").length, ikut: listIkut.filter(s => getJenjang(s.nama_sekolah) === "SD" && String(s.status_sekolah || "").toLowerCase() !== "negeri").length, color: "bg-blue-500" },
+                    { label: "Madrasah Ibtidaiyah (MI)", total: miAll.length, ikut: listIkut.filter(s => getJenjang(s.nama_sekolah) === "MI").length, color: "bg-emerald-600" }
+                  ].map(item => {
+                    const pct = item.total > 0 ? Math.round((item.ikut / item.total) * 100) : 0;
+                    return `
+                      <div class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                        <div class="flex justify-between font-extrabold text-[11px]">
+                          <span class="text-slate-800">${item.label}</span>
+                          <span class="text-slate-900">${item.ikut}/${item.total} (${pct}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                          <div class="${item.color} h-full rounded-full" style="width:${pct}%"></div>
+                        </div>
+                        <div class="text-[9px] text-rose-600 font-bold">Tidak ikut: ${item.total - item.ikut} sekolah</div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-[10px] text-indigo-950 font-semibold text-center">
+                Data tersinkronisasi real-time dengan Database K3S Kota Kupang
+              </div>
+            </div>
+          </div>
+
+          <!-- BARIS 3: INFOGRAFIS DETAIL PER KELURAHAN (48 KELURAHAN) -->
+          <div class="bg-white rounded-3xl p-4 lg:p-5 border border-slate-200 shadow-xs space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div>
+                <h3 class="text-xs lg:text-sm font-extrabold uppercase text-slate-900 flex items-center gap-1.5">
+                  <i class="fa-solid fa-map-location-dot text-emerald-600"></i>
+                  <span>Infografis Sebaran & Partisipasi Per Kelurahan (${displayedKelurahanArr.length} Kelurahan)</span>
+                </h3>
+                <p class="text-[10px] text-slate-500">Klik kartu kelurahan mana saja untuk menyaring daftar sekolah di kelurahan tersebut.</p>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <select id="selInfografisKelRayonFilter" class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-extrabold text-slate-800">
+                  <option value="ALL" ${filterRayon === 'ALL' ? 'selected' : ''}>Semua Kecamatan / Sub Rayon (${allKelurahanArr.length} Kel)</option>
+                  ${SUBRAYON_LIST.map(sr => `<option value="${sr}" ${filterRayon === sr ? 'selected' : ''}>Kec. / Rayon ${sr}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 max-h-72 overflow-y-auto pr-1">
+              ${displayedKelurahanArr.map(k => {
+                const kPct = k.total > 0 ? Math.round((k.ikut / k.total) * 100) : 0;
+                const isSelectedKel = filterKelurahan === k.kelurahan;
+                return `
+                  <div data-kel="${k.kelurahan}" data-kelsr="${k.subrayon}" class="infografis-kel-card cursor-pointer p-2.5 rounded-2xl border ${
+                    isSelectedKel ? 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-400/40' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-white'
+                  } space-y-1.5 transition">
+                    <div class="flex items-center justify-between gap-1">
+                      <span class="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-900 truncate">${k.subrayon}</span>
+                      <span class="text-[9px] font-extrabold ${kPct === 100 ? 'text-emerald-700' : 'text-amber-700'}">${kPct}%</span>
+                    </div>
+                    <div class="text-xs font-extrabold text-slate-900 truncate" title="${k.kelurahan}">Kel. ${k.kelurahan}</div>
+                    <div class="w-full bg-rose-200 h-1.5 rounded-full overflow-hidden">
+                      <div class="bg-emerald-500 h-full" style="width:${kPct}%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[9px] font-bold text-slate-500">
+                      <span>Total: <b>${k.total}</b></span>
+                      <span class="text-emerald-700">${k.ikut} Ikut</span>
+                      ${k.tidak > 0 ? `<span class="text-rose-600">${k.tidak} Tdk</span>` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- BARIS 4: TABEL / GRID DATABASE SEKOLAH INTERAKTIF -->
+          <div id="infografisSchoolTableSection" class="bg-white rounded-3xl p-4 lg:p-5 border border-slate-200 shadow-xs space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h3 class="text-xs lg:text-sm font-extrabold uppercase text-slate-900 flex items-center gap-1.5">
+                  <i class="fa-solid fa-table-list text-blue-800"></i>
+                  <span>Daftar Database Satuan Pendidikan (${filteredSchools.length} Sekolah Ditampilkan)</span>
+                </h3>
+              </div>
+
+              <!-- Bar Filter Lengkap -->
+              <div class="flex flex-wrap items-center gap-2">
+                <select id="selInfTableRayon" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-800">
+                  <option value="ALL" ${filterRayon === 'ALL' ? 'selected' : ''}>Semua Rayon</option>
+                  ${SUBRAYON_LIST.map(sr => `<option value="${sr}" ${filterRayon === sr ? 'selected' : ''}>Rayon ${sr}</option>`).join('')}
+                </select>
+
+                <select id="selInfTableKelurahan" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-800">
+                  <option value="ALL" ${filterKelurahan === 'ALL' ? 'selected' : ''}>Semua Kelurahan</option>
+                  ${displayedKelurahanArr.map(k => `<option value="${k.kelurahan}" ${filterKelurahan === k.kelurahan ? 'selected' : ''}>Kel. ${k.kelurahan} (${k.total})</option>`).join('')}
+                </select>
+
+                <select id="selInfTableJenjang" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-800">
+                  <option value="ALL" ${filterJenjang === 'ALL' ? 'selected' : ''}>SD & MI</option>
+                  <option value="SD" ${filterJenjang === 'SD' ? 'selected' : ''}>Jenjang SD</option>
+                  <option value="MI" ${filterJenjang === 'MI' ? 'selected' : ''}>Jenjang MI</option>
+                </select>
+
+                <select id="selInfTableStatusSek" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-800">
+                  <option value="ALL" ${filterStatusSek === 'ALL' ? 'selected' : ''}>Negeri & Swasta</option>
+                  <option value="Negeri" ${filterStatusSek === 'Negeri' ? 'selected' : ''}>Negeri</option>
+                  <option value="Swasta" ${filterStatusSek === 'Swasta' ? 'selected' : ''}>Swasta</option>
+                </select>
+
+                <select id="selInfTableIkut" class="rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-extrabold text-slate-800">
+                  <option value="ALL" ${filterIkut === 'ALL' ? 'selected' : ''}>Semua Keikutsertaan</option>
+                  <option value="IKUT" ${filterIkut === 'IKUT' ? 'selected' : ''}>✓ Ikut Rakor</option>
+                  <option value="TIDAK_IKUT" ${filterIkut === 'TIDAK_IKUT' ? 'selected' : ''}>✕ Tidak Ikut</option>
+                </select>
+
+                <input id="inpInfTableSearch" type="text" value="${searchQuery}" placeholder="Cari sekolah / Kepsek / NPSN..." class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-900 min-w-[200px]" />
+              </div>
+            </div>
+
+            <!-- Grid Kartu Sekolah 3 Kolom di Laptop -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
+              ${filteredSchools.length === 0 ? `
+                <div class="col-span-3 p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border">
+                  Tidak ada sekolah yang sesuai dengan kombinasi filter saat ini.
+                </div>
+              ` : filteredSchools.map((s, idx) => {
+                const isIkut = s.status_ikut === "Ikut";
+                const jenjang = getJenjang(s.nama_sekolah);
+                const isNegeri = String(s.status_sekolah || "").toLowerCase() === "negeri";
+                return `
+                  <div class="p-3 rounded-2xl border ${isIkut ? 'bg-white border-slate-200' : 'bg-rose-50/40 border-rose-300'} flex flex-col justify-between gap-2 shadow-2xs">
+                    <div>
+                      <div class="flex items-center justify-between gap-1 flex-wrap">
+                        <div class="flex items-center gap-1 flex-wrap">
+                          <span class="text-[9px] font-extrabold text-slate-400">#${idx + 1}</span>
+                          <span class="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${s.npsn}</span>
+                          <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded ${jenjang === 'MI' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">${jenjang}</span>
+                          <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${isNegeri ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'}">${s.status_sekolah || 'Swasta'}</span>
+                        </div>
+                        <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full ${isIkut ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-600 text-white'}">
+                          ${isIkut ? '✓ IKUT' : (s.status_ikut || 'TIDAK IKUT')}
+                        </span>
+                      </div>
+                      <h4 class="font-extrabold text-xs text-slate-900 mt-1.5 leading-snug">${s.nama_sekolah}</h4>
+                      <p class="text-[10px] text-slate-600 mt-0.5">Kepsek: <b>${s.nama_kepsek || 'Belum Diisi'}</b></p>
+                    </div>
+                    <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[9px] font-bold text-slate-500">
+                      <span><i class="fa-solid fa-location-dot text-rose-500 mr-1"></i>Kel. ${s.kelurahan || '-'} (Rayon ${s.subrayon || '-'})</span>
+                      ${s.nomor_kamar && s.nomor_kamar !== 'Belum Ditentukan' ? `<span class="text-indigo-700">Kamar ${s.nomor_kamar}</span>` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Event Listeners Interaktif di dalam Infografis Full-Screen
+    document.getElementById("btnCloseFullScreenInfografis")?.addEventListener("click", () => {
+      overlay.classList.add("hidden");
+    });
+
+    document.getElementById("btnResetAllInfografisFilters")?.addEventListener("click", () => {
+      filterRayon = "ALL";
+      filterKelurahan = "ALL";
+      filterJenjang = "ALL";
+      filterStatusSek = "ALL";
+      filterIkut = "ALL";
+      searchQuery = "";
+      renderInfografisDashboard();
+    });
+
+    // Klik Kartu KPI Atas
+    overlay.querySelectorAll(".kpi-quick-filter").forEach(card => {
+      card.addEventListener("click", () => {
+        const mode = card.dataset.kpi;
+        filterIkut = mode;
+        renderInfografisDashboard();
+      });
+    });
+
+    // Klik Bar Sub Rayon
+    overlay.querySelectorAll(".infografis-sr-bar").forEach(bar => {
+      bar.addEventListener("click", () => {
+        const sr = bar.dataset.sr;
+        filterRayon = filterRayon === sr ? "ALL" : sr;
+        filterKelurahan = "ALL";
+        renderInfografisDashboard();
+      });
+    });
+
+    // Klik Tombol Bedah Sekolah Tidak Ikut (Jenjang / Status)
+    overlay.querySelectorAll(".btn-filter-tidak-detail").forEach(btn => {
+      btn.addEventListener("click", () => {
+        filterIkut = "TIDAK_IKUT";
+        filterJenjang = btn.dataset.notikutJenjang || "ALL";
+        filterStatusSek = btn.dataset.notikutStatus || "ALL";
+        renderInfografisDashboard();
+        document.getElementById("infografisSchoolTableSection")?.scrollIntoView({ behavior: "smooth" });
+      });
+    });
+
+    document.getElementById("btnShowAllTidakIkutSchools")?.addEventListener("click", () => {
+      filterIkut = "TIDAK_IKUT";
+      filterJenjang = "ALL";
+      filterStatusSek = "ALL";
+      renderInfografisDashboard();
+      document.getElementById("infografisSchoolTableSection")?.scrollIntoView({ behavior: "smooth" });
+    });
+
+    // Klik Kartu Kelurahan
+    overlay.querySelectorAll(".infografis-kel-card").forEach(card => {
+      card.addEventListener("click", () => {
+        const kel = card.dataset.kel;
+        const kelSr = card.dataset.kelsr;
+        if (filterKelurahan === kel) {
+          filterKelurahan = "ALL";
+        } else {
+          filterKelurahan = kel;
+          if (kelSr && kelSr !== "-") filterRayon = kelSr;
+        }
+        renderInfografisDashboard();
+        document.getElementById("infografisSchoolTableSection")?.scrollIntoView({ behavior: "smooth" });
+      });
+    });
+
+    // Dropdown & Input Pencarian Tabel
+    document.getElementById("selInfografisKelRayonFilter")?.addEventListener("change", (e) => {
+      filterRayon = e.target.value;
+      filterKelurahan = "ALL";
+      renderInfografisDashboard();
+    });
+
+    document.getElementById("selInfTableRayon")?.addEventListener("change", (e) => {
+      filterRayon = e.target.value;
+      filterKelurahan = "ALL";
+      renderInfografisDashboard();
+    });
+
+    document.getElementById("selInfTableKelurahan")?.addEventListener("change", (e) => {
+      filterKelurahan = e.target.value;
+      renderInfografisDashboard();
+    });
+
+    document.getElementById("selInfTableJenjang")?.addEventListener("change", (e) => {
+      filterJenjang = e.target.value;
+      renderInfografisDashboard();
+    });
+
+    document.getElementById("selInfTableStatusSek")?.addEventListener("change", (e) => {
+      filterStatusSek = e.target.value;
+      renderInfografisDashboard();
+    });
+
+    document.getElementById("selInfTableIkut")?.addEventListener("change", (e) => {
+      filterIkut = e.target.value;
+      renderInfografisDashboard();
+    });
+
+    document.getElementById("inpInfTableSearch")?.addEventListener("input", (e) => {
+      searchQuery = e.target.value;
+      renderInfografisDashboard();
+      const inp = document.getElementById("inpInfTableSearch");
+      if (inp) {
+        inp.focus();
+        inp.setSelectionRange(searchQuery.length, searchQuery.length);
+      }
+    });
+
+    // Ekspor CSV Data Terfilter
+    document.getElementById("btnExportInfografisFilteredCsv")?.addEventListener("click", () => {
+      const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const headers = ["No", "Sub Rayon", "Kelurahan", "NPSN", "Jenjang", "Status Sekolah", "Nama Satuan Pendidikan", "Nama Kepala Sekolah", "Status Keikutsertaan", "Nomor Kamar"];
+      const rows = filteredSchools.map((s, i) => [
+        i + 1,
+        s.subrayon || "-",
+        s.kelurahan || "-",
+        s.npsn || "-",
+        getJenjang(s.nama_sekolah),
+        s.status_sekolah || "Swasta",
+        s.nama_sekolah || "-",
+        s.nama_kepsek || "Belum Diisi",
+        s.status_ikut || "Belum Konfirmasi",
+        s.nomor_kamar || "Belum Ditentukan"
+      ].map(esc).join(","));
+
+      const lineBreak = String.fromCharCode(13, 10);
+      const csv = [headers.map(esc).join(","), ...rows].join(lineBreak);
+      const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Database_Infografis_Sekolah_Rakor2026_${filteredSchools.length}_Data.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast(`Berhasil mengunduh ${filteredSchools.length} data sekolah (.CSV)!`);
+    });
+  };
+
+  renderInfografisDashboard();
+}
+
+// Capture-Phase Interceptor: Otomatis membuka Infografis Full-Screen saat tombol
+// "Infografis & Profil 160 Sekolah" (di Beranda Peserta) atau kotak "Infografis" (di Panitia) diklik!
+if (!window.__FULLSCREEN_INFOGRAFIS_INTERCEPTOR_BOUND) {
+  window.__FULLSCREEN_INFOGRAFIS_INTERCEPTOR_BOUND = true;
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target.closest("button, a, [data-panmenu='infografis_sekolah'], .cursor-pointer");
+      if (!target) return;
+
+      // Abaikan klik yang berasal dari dalam overlay infografis itu sendiri
+      if (target.closest("#fullScreenInfografisOverlay")) return;
+
+      const panCode = target.getAttribute("data-panmenu");
+      const txt = (target.textContent || "").toLowerCase();
+
+      const isInfografisTrigger =
+        panCode === "infografis_sekolah" ||
+        (txt.includes("infografis") && (txt.includes("sekolah") || txt.includes("profil")));
+
+      if (isInfografisTrigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openFullScreenInfografisDatabaseModal();
+      }
+    },
+    true
+  );
+}
