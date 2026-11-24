@@ -3923,9 +3923,8 @@ setInterval(() => {
 
 // =========================================================================
 // ADAPTIVE RESPONSIVE FULL-SCREEN DESKTOP MODE (LAPTOP >= 1024px)
-// - Mengubah tampilan kolom HP menjadi Full-Screen Dashboard saat dibuka di Laptop
-// - Memindahkan Bottom Nav menjadi Left Sidebar tanpa mengubah ID maupun event listener
-// - Mengatur Multi-Column Grid untuk Beranda, Sub Rayon, Kinerja, & Modal
+// - Membebaskan seluruh wrapper luar (body, max-w-md, max-w-lg, dll.) agar 100% Full-Screen
+// - Memperbaiki transform: none pada Left Sidebar agar tidak terpotong ke kiri
 // - Tampilan HP (< 1024px) tetap 100% asli seperti semula
 // =========================================================================
 
@@ -3936,28 +3935,59 @@ function initResponsiveDesktopFullScreenLayout() {
   styleEl.id = "simRakorDesktopAdaptiveStyles";
   styleEl.textContent = `
     @media (min-width: 1024px) {
-      /* 1. Halaman Login: Lebarkan kartu login agar proporsional di tengah layar laptop */
+      /* 1. Bebaskan kunci lebar pada html, body, dan semua pembungkus utama */
+      html, body {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background-color: #f1f5f9 !important;
+        overflow-x: hidden !important;
+      }
+
+      /* Lepas batasan max-w-md / max-w-lg / max-w-xl pada pembungkus aplikasi utama */
+      body > div,
+      #app,
+      #appContainer,
+      #mainAppScreen {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+
+      /* 2. Halaman Login: Rapi & proporsional di tengah layar laptop */
       #loginScreen {
+        min-height: 100vh !important;
+        width: 100% !important;
+        max-width: 100% !important;
         padding: 2.5rem !important;
+        display: flex !important;
+        align-items: center !important;
         justify-content: center !important;
+      }
+      #loginScreen.hidden {
+        display: none !important;
       }
       #loginScreen > div:not(#loginPanitiaBgLayer) {
         max-width: 520px !important;
         width: 100% !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
+        margin: 0 auto !important;
       }
 
-      /* 2. Wadah Utama Aplikasi: Lepas batasan lebar HP (max-w-md/lg) menjadi Full-Screen */
+      /* 3. Layar Utama Setelah Login: Full-Screen dengan ruang Left Sidebar 260px */
       #mainAppScreen {
-        max-width: 100% !important;
-        width: 100% !important;
         min-height: 100vh !important;
-        padding-left: 250px !important; /* Ruang untuk Left Sidebar */
+        padding-left: 260px !important;
         background-color: #f1f5f9 !important;
+        display: block !important;
+      }
+      #mainAppScreen.hidden {
+        display: none !important;
       }
 
-      /* 3. Header Atas: Melebar rapi mengikuti area kerja kanan sidebar */
+      /* 4. Header Atas: Melebar penuh di sebelah kanan Left Sidebar */
       #mainAppScreen > header {
         max-width: 100% !important;
         width: 100% !important;
@@ -3968,16 +3998,20 @@ function initResponsiveDesktopFullScreenLayout() {
         z-index: 30 !important;
       }
 
-      /* 4. Transformasi Bottom Navigation menjadi Left Sidebar Vertikal */
+      /* 5. Left Sidebar: Reset transform (-translate-x-1/2) agar tampil penuh & tidak terpotong! */
       #mainAppScreen > nav {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
         bottom: 0 !important;
         right: auto !important;
-        width: 250px !important;
+        transform: none !important;
+        -webkit-transform: none !important;
+        width: 260px !important;
+        min-width: 260px !important;
+        max-width: 260px !important;
         height: 100vh !important;
-        max-width: 250px !important;
+        margin: 0 !important;
         border-radius: 0 !important;
         border-top: none !important;
         border-right: 1px solid #cbd5e1 !important;
@@ -3987,21 +4021,20 @@ function initResponsiveDesktopFullScreenLayout() {
         display: flex !important;
         flex-direction: column !important;
         justify-content: flex-start !important;
-        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.12) !important;
+        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.14) !important;
       }
 
-      /* Judul Branding di bagian atas Left Sidebar */
       #mainAppScreen > nav::before {
         content: "SIM-RAKOR K3S 2026\\A Kota Kupang • Dashboard";
         white-space: pre-line;
         display: block;
         color: #fcd34d;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         font-weight: 800;
-        line-height: 1.35;
+        line-height: 1.4;
         padding: 0.5rem 0.75rem 1.25rem 0.75rem;
         margin-bottom: 1rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
         letter-spacing: 0.02em;
       }
 
@@ -4009,12 +4042,11 @@ function initResponsiveDesktopFullScreenLayout() {
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
-        gap: 0.5rem !important;
+        gap: 0.55rem !important;
         width: 100% !important;
         height: auto !important;
       }
 
-      /* Tata ulang setiap tombol menu di Left Sidebar menjadi horizontal */
       #mainAppScreen > nav button {
         flex-direction: row !important;
         justify-content: flex-start !important;
@@ -4025,14 +4057,14 @@ function initResponsiveDesktopFullScreenLayout() {
         width: 100% !important;
         height: auto !important;
         margin-top: 0 !important;
-        font-size: 0.82rem !important;
+        font-size: 0.85rem !important;
         text-align: left !important;
-        color: #cbd5e1 !important;
-        background: rgba(255, 255, 255, 0.04) !important;
+        color: #e2e8f0 !important;
+        background: rgba(255, 255, 255, 0.05) !important;
       }
 
       #mainAppScreen > nav button:hover {
-        background: rgba(255, 255, 255, 0.12) !important;
+        background: rgba(255, 255, 255, 0.14) !important;
         color: #ffffff !important;
         transform: translateX(3px) !important;
       }
@@ -4044,11 +4076,10 @@ function initResponsiveDesktopFullScreenLayout() {
       }
 
       #mainAppScreen > nav button span {
-        font-size: 0.8rem !important;
+        font-size: 0.82rem !important;
         margin-top: 0 !important;
       }
 
-      /* Tombol QR di Sidebar diselaraskan ukurannya */
       #footerBtnQr {
         width: 100% !important;
         height: auto !important;
@@ -4057,39 +4088,34 @@ function initResponsiveDesktopFullScreenLayout() {
         padding: 0.85rem 1rem !important;
       }
 
-      /* 5. Area Konten Utama (<main>): Lebar Penuh dengan Padding Lega */
+      /* 6. Area Konten Utama (<main>): Melebar Penuh di Kanan Sidebar */
       #mainAppScreen > main {
-        max-width: 1440px !important;
+        max-width: 100% !important;
         width: 100% !important;
-        margin: 0 auto !important;
-        padding: 1.75rem 2.25rem 3rem 2.25rem !important;
+        margin: 0 !important;
+        padding: 1.75rem 2.25rem 3.5rem 2.25rem !important;
       }
 
-      /* 6. Grid 2 Kolom Sejajar di Beranda (Menu Layanan & Khusus Panitia berdampingan!) */
+      /* 7. Beranda: Grid 2 Kolom Sejajar yang Lega */
       #tabContentBeranda {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 1.25rem !important;
         align-items: start !important;
+        width: 100% !important;
       }
       #tabContentBeranda.hidden {
         display: none !important;
       }
 
-      /* Banner Utama & Info Live melebar penuh 2 kolom di bagian atas Beranda */
+      /* Banner Utama & Info Live melebar penuh 2 kolom di bagian atas */
       #tabContentBeranda > div:first-child,
       #liveActiveSessionContainer {
-        grid-column: span 2 / span 2 !important;
+        grid-column: 1 / -1 !important;
       }
 
-      /* 7. Tab Sub Rayon: Daftar Sekolah menjadi Grid 2 Kolom di Laptop */
-      #srSchoolCardsContainer {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 0.85rem !important;
-      }
-
-      /* 8. Tab Kinerja: Daftar Tugas Kepanitiaan menjadi Grid 2 Kolom di Laptop */
+      /* 8. Tab Sub Rayon & Kinerja: Grid 2 Kolom di Laptop */
+      #srSchoolCardsContainer,
       #taskCardsContainer {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -4098,19 +4124,19 @@ function initResponsiveDesktopFullScreenLayout() {
 
       /* 9. Layar Checker Hotel Full-Screen di Laptop */
       #hotelCheckerDedicatedScreen {
-        max-width: 1280px !important;
-        margin: 0 auto !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
         padding: 2rem !important;
       }
 
-      /* 10. Perlebar Pop-up Modal (Info Kamar, Manajemen Akun, Konsumsi, Keuangan) */
+      /* 10. Pop-up Modal Lebih Lega di Laptop */
       #serviceModal > div,
       #taskModal > div {
-        max-width: 54rem !important; /* ~864px di layar laptop */
-        width: 92% !important;
+        max-width: 56rem !important;
+        width: 90% !important;
       }
 
-      /* Grid daftar kamar & daftar akun di dalam modal menjadi 2 kolom di laptop */
       #accountManagerListContainer,
       #panitiaRoomRowsContainer,
       #kamarAssignmentListContainer {
