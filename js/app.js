@@ -3919,3 +3919,210 @@ setInterval(() => {
   renderSpjBospActivatorPanelInPanitiaCard();
   enforcePesertaSpjDownloadLocks();
 }, 600);
+
+
+// =========================================================================
+// ADAPTIVE RESPONSIVE FULL-SCREEN DESKTOP MODE (LAPTOP >= 1024px)
+// - Mengubah tampilan kolom HP menjadi Full-Screen Dashboard saat dibuka di Laptop
+// - Memindahkan Bottom Nav menjadi Left Sidebar tanpa mengubah ID maupun event listener
+// - Mengatur Multi-Column Grid untuk Beranda, Sub Rayon, Kinerja, & Modal
+// - Tampilan HP (< 1024px) tetap 100% asli seperti semula
+// =========================================================================
+
+function initResponsiveDesktopFullScreenLayout() {
+  if (document.getElementById("simRakorDesktopAdaptiveStyles")) return;
+
+  const styleEl = document.createElement("style");
+  styleEl.id = "simRakorDesktopAdaptiveStyles";
+  styleEl.textContent = `
+    @media (min-width: 1024px) {
+      /* 1. Halaman Login: Lebarkan kartu login agar proporsional di tengah layar laptop */
+      #loginScreen {
+        padding: 2.5rem !important;
+        justify-content: center !important;
+      }
+      #loginScreen > div:not(#loginPanitiaBgLayer) {
+        max-width: 520px !important;
+        width: 100% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+
+      /* 2. Wadah Utama Aplikasi: Lepas batasan lebar HP (max-w-md/lg) menjadi Full-Screen */
+      #mainAppScreen {
+        max-width: 100% !important;
+        width: 100% !important;
+        min-height: 100vh !important;
+        padding-left: 250px !important; /* Ruang untuk Left Sidebar */
+        background-color: #f1f5f9 !important;
+      }
+
+      /* 3. Header Atas: Melebar rapi mengikuti area kerja kanan sidebar */
+      #mainAppScreen > header {
+        max-width: 100% !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+        padding: 1rem 2rem !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 30 !important;
+      }
+
+      /* 4. Transformasi Bottom Navigation menjadi Left Sidebar Vertikal */
+      #mainAppScreen > nav {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        right: auto !important;
+        width: 250px !important;
+        height: 100vh !important;
+        max-width: 250px !important;
+        border-radius: 0 !important;
+        border-top: none !important;
+        border-right: 1px solid #cbd5e1 !important;
+        background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%) !important;
+        padding: 1.5rem 1rem !important;
+        z-index: 40 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.12) !important;
+      }
+
+      /* Judul Branding di bagian atas Left Sidebar */
+      #mainAppScreen > nav::before {
+        content: "SIM-RAKOR K3S 2026\\A Kota Kupang • Dashboard";
+        white-space: pre-line;
+        display: block;
+        color: #fcd34d;
+        font-size: 0.85rem;
+        font-weight: 800;
+        line-height: 1.35;
+        padding: 0.5rem 0.75rem 1.25rem 0.75rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+        letter-spacing: 0.02em;
+      }
+
+      #mainAppScreen > nav > div {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+        height: auto !important;
+      }
+
+      /* Tata ulang setiap tombol menu di Left Sidebar menjadi horizontal */
+      #mainAppScreen > nav button {
+        flex-direction: row !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        gap: 0.85rem !important;
+        padding: 0.85rem 1rem !important;
+        border-radius: 0.9rem !important;
+        width: 100% !important;
+        height: auto !important;
+        margin-top: 0 !important;
+        font-size: 0.82rem !important;
+        text-align: left !important;
+        color: #cbd5e1 !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+      }
+
+      #mainAppScreen > nav button:hover {
+        background: rgba(255, 255, 255, 0.12) !important;
+        color: #ffffff !important;
+        transform: translateX(3px) !important;
+      }
+
+      #mainAppScreen > nav button i {
+        font-size: 1rem !important;
+        width: 1.25rem !important;
+        text-align: center !important;
+      }
+
+      #mainAppScreen > nav button span {
+        font-size: 0.8rem !important;
+        margin-top: 0 !important;
+      }
+
+      /* Tombol QR di Sidebar diselaraskan ukurannya */
+      #footerBtnQr {
+        width: 100% !important;
+        height: auto !important;
+        margin-top: 0 !important;
+        border-radius: 0.9rem !important;
+        padding: 0.85rem 1rem !important;
+      }
+
+      /* 5. Area Konten Utama (<main>): Lebar Penuh dengan Padding Lega */
+      #mainAppScreen > main {
+        max-width: 1440px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        padding: 1.75rem 2.25rem 3rem 2.25rem !important;
+      }
+
+      /* 6. Grid 2 Kolom Sejajar di Beranda (Menu Layanan & Khusus Panitia berdampingan!) */
+      #tabContentBeranda {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 1.25rem !important;
+        align-items: start !important;
+      }
+      #tabContentBeranda.hidden {
+        display: none !important;
+      }
+
+      /* Banner Utama & Info Live melebar penuh 2 kolom di bagian atas Beranda */
+      #tabContentBeranda > div:first-child,
+      #liveActiveSessionContainer {
+        grid-column: span 2 / span 2 !important;
+      }
+
+      /* 7. Tab Sub Rayon: Daftar Sekolah menjadi Grid 2 Kolom di Laptop */
+      #srSchoolCardsContainer {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.85rem !important;
+      }
+
+      /* 8. Tab Kinerja: Daftar Tugas Kepanitiaan menjadi Grid 2 Kolom di Laptop */
+      #taskCardsContainer {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.85rem !important;
+      }
+
+      /* 9. Layar Checker Hotel Full-Screen di Laptop */
+      #hotelCheckerDedicatedScreen {
+        max-width: 1280px !important;
+        margin: 0 auto !important;
+        padding: 2rem !important;
+      }
+
+      /* 10. Perlebar Pop-up Modal (Info Kamar, Manajemen Akun, Konsumsi, Keuangan) */
+      #serviceModal > div,
+      #taskModal > div {
+        max-width: 54rem !important; /* ~864px di layar laptop */
+        width: 92% !important;
+      }
+
+      /* Grid daftar kamar & daftar akun di dalam modal menjadi 2 kolom di laptop */
+      #accountManagerListContainer,
+      #panitiaRoomRowsContainer,
+      #kamarAssignmentListContainer {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.75rem !important;
+        max-height: 28rem !important;
+      }
+    }
+  `;
+
+  document.head.appendChild(styleEl);
+}
+
+initResponsiveDesktopFullScreenLayout();
