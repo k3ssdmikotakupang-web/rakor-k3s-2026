@@ -4106,23 +4106,29 @@ function initResponsiveDesktopFullScreenLayout() {
         padding: 1.5rem 2rem 3.5rem 2rem !important;
       }
 
-      /* 7. BERANDA ZERO-GAP GRID: Padat & Sejajar Tanpa Lubang Kosong! */
+      /* 7. BERANDA MASONRY 2-KOLOM PADAT: Mengalir rapat tanpa lubang kosong! */
       #tabContentBeranda {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        grid-auto-flow: dense !important;
-        gap: 1.25rem !important;
-        align-items: start !important;
+        display: block !important;
+        column-count: 2 !important;
+        column-gap: 1.25rem !important;
         width: 100% !important;
       }
       #tabContentBeranda.hidden {
         display: none !important;
       }
 
-      /* Banner Info Live & Jadwal Aktif melebar penuh 2 kolom di bagian atas */
+      /* Setiap kartu di Beranda tidak terpotong di tengah kolom & punya jarak vertikal rapi */
+      #tabContentBeranda > div {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        margin-bottom: 1.25rem !important;
+        width: 100% !important;
+      }
+
+      /* Banner Info Live & Jadwal Aktif di paling atas membentang penuh 2 kolom */
       #tabContentBeranda > div:first-child,
       #liveActiveSessionContainer {
-        grid-column: 1 / -1 !important;
+        column-span: all !important;
       }
 
       /* 8. Tab Sub Rayon, Jadwal & Kinerja: Grid 2 Kolom Rapi di Laptop */
