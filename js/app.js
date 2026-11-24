@@ -3338,29 +3338,51 @@ setInterval(reorganizePanitiaWorkspaceCards, 450);
 
 
 // =========================================================================
-// FITUR BACKGROUND FOTO PANITIA DI HALAMAN LOGIN (OPACITY DINAMIS 5% - 80%)
-// - Menampilkan foto panitia di layar #loginScreen dengan opacity yang bisa diatur
-// - Dilengkapi Slider Opacity (+/-) & Upload Foto di menu Profil Panitia & Manajemen Akun
+// FITUR DUAL-BACKGROUND FOTO PANITIA (VERSI HP & VERSI LAPTOP LANDSCAPE)
+// - Mendukung upload terpisah: Foto HP (Portrait) & Foto Laptop (Landscape 16:9)
+// - Dilengkapi Slider Opacity (5% - 80%) & Pilihan Fokus Foto (Atas/Tengah)
 // =========================================================================
 
 const DEFAULT_PANITIA_BG_URL = "./bg-panitia.jpg";
-let currentLoginBgUrl = "";
-let currentLoginBgOpacityPct = 20; // Default 20%
+let currentLoginBgMobileUrl = "";
+let currentLoginBgDesktopUrl = "";
+let currentLoginBgOpacityPct = 20;
+let currentLoginBgPosition = "object-top"; // 'object-top' | 'object-center'
 
-function applyLoginBgOpacityVisual(pct) {
-  const safePct = Math.max(0, Math.min(100, parseInt(pct, 10) || 20));
+function isDesktopViewport() {
+  return window.innerWidth >= 1024;
+}
+
+function getActiveLoginBgUrl() {
+  if (isDesktopViewport() && currentLoginBgDesktopUrl && currentLoginBgDesktopUrl.trim() !== "") {
+    return currentLoginBgDesktopUrl.trim();
+  }
+  if (currentLoginBgMobileUrl && currentLoginBgMobileUrl.trim() !== "") {
+    return currentLoginBgMobileUrl.trim();
+  }
+  return DEFAULT_PANITIA_BG_URL;
+}
+
+function applyLoginBgVisualState() {
+  const safePct = Math.max(5, Math.min(85, parseInt(currentLoginBgOpacityPct, 10) || 20));
   currentLoginBgOpacityPct = safePct;
   const imgEl = document.getElementById("loginPanitiaBgImg");
-  if (imgEl) {
-    imgEl.style.opacity = String(safePct / 100);
+  if (!imgEl) return;
+
+  const targetSrc = getActiveLoginBgUrl();
+  if (imgEl.getAttribute("src") !== targetSrc) {
+    imgEl.style.display = "block";
+    imgEl.src = targetSrc;
   }
+  imgEl.style.opacity = String(safePct / 100);
+  imgEl.classList.remove("object-top", "object-center", "object-bottom");
+  imgEl.classList.add(currentLoginBgPosition || "object-top");
 }
 
 async function initAndApplyLoginPanitiaBackground() {
   const loginScreen = document.getElementById("loginScreen");
   if (!loginScreen) return;
 
-  // Buat elemen layer gambar latar jika belum ada
   let bgLayer = document.getElementById("loginPanitiaBgLayer");
   if (!bgLayer) {
     bgLayer = document.createElement("div");
@@ -3372,44 +3394,52 @@ async function initAndApplyLoginPanitiaBackground() {
         src="${DEFAULT_PANITIA_BG_URL}"
         alt="Background Panitia Rakor 2026"
         style="opacity: ${currentLoginBgOpacityPct / 100};"
-        class="w-full h-full object-cover object-center scale-105 filter contrast-110 transition-opacity duration-500"
+        class="w-full h-full object-cover object-top transition-all duration-500"
         onerror="this.style.display='none'"
         onload="this.style.display='block'"
       />
-      <div class="absolute inset-0 bg-gradient-to-b from-slate-950/50 via-transparent to-blue-950/70"></div>
+      <div class="absolute inset-0 bg-gradient-to-b lg:bg-gradient-to-r from-slate-950/65 via-slate-950/45 to-slate-950/85"></div>
     `;
     loginScreen.prepend(bgLayer);
   }
 
-  // Ambil foto & nilai persentase opacity dari Supabase (info_layanan)
   try {
     const { data } = await sb
       .from("info_layanan")
-      .select("url_link, deskripsi, status_tersedia")
-      .eq("kode_menu", "bg_login_panitia_2026")
-      .maybeSingle();
+      .select("kode_menu, url_link, deskripsi, status_tersedia")
+      .in("kode_menu", ["bg_login_panitia_2026", "bg_login_panitia_desktop_2026"]);
 
-    if (data) {
-      // Baca persentase opacity jika tersimpan pada kolom url_link (angka 0-100)
-      const parsedOp = parseInt(String(data.url_link || "").replace(/\D/g, ""), 10);
-      if (!isNaN(parsedOp) && parsedOp >= 5 && parsedOp <= 90) {
-        applyLoginBgOpacityVisual(parsedOp);
+    if (Array.isArray(data)) {
+      const mobRec = data.find(r => r.kode_menu === "bg_login_panitia_2026");
+      const deskRec = data.find(r => r.kode_menu === "bg_login_panitia_desktop_2026");
+
+      if (mobRec) {
+        const parsedOp = parseInt(String(mobRec.url_link || "").replace(/\D/g, ""), 10);
+        if (!isNaN(parsedOp) && parsedOp >= 5 && parsedOp <= 85) {
+          currentLoginBgOpacityPct = parsedOp;
+        }
+        if (mobRec.status_tersedia && mobRec.status_tersedia.startsWith("object-")) {
+          currentLoginBgPosition = mobRec.status_tersedia;
+        }
+        if (mobRec.deskripsi && mobRec.deskripsi.trim() !== "" && mobRec.deskripsi !== "AKTIF") {
+          currentLoginBgMobileUrl = mobRec.deskripsi.trim();
+        }
       }
 
-      const savedUrl = data.deskripsi || "";
-      if (savedUrl && String(savedUrl).trim() !== "" && savedUrl !== "AKTIF") {
-        currentLoginBgUrl = String(savedUrl).trim();
-        const imgEl = document.getElementById("loginPanitiaBgImg");
-        if (imgEl) {
-          imgEl.style.display = "block";
-          imgEl.src = currentLoginBgUrl;
-        }
+      if (deskRec && deskRec.deskripsi && deskRec.deskripsi.trim() !== "" && deskRec.deskripsi !== "AKTIF") {
+        currentLoginBgDesktopUrl = deskRec.deskripsi.trim();
       }
     }
   } catch (e) {}
+
+  applyLoginBgVisualState();
 }
 
-function compressImageFileToDataUrl(file, maxWidth = 1080, quality = 0.72) {
+window.addEventListener("resize", () => {
+  applyLoginBgVisualState();
+});
+
+function compressImageFileToDataUrl(file, maxWidth = 1280, quality = 0.76) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -3436,7 +3466,6 @@ function compressImageFileToDataUrl(file, maxWidth = 1080, quality = 0.72) {
   });
 }
 
-// Suntikkan widget Pengatur Foto & Slider Opacity Background Login di Modal Profil Panitia & Manajemen Akun
 function injectLoginBgManagerWidget() {
   if (!activeUser || activeUser.role !== "panitia") return;
   const div = String(activeUser.profile?.divisi || "").trim();
@@ -3462,18 +3491,21 @@ function injectLoginBgManagerWidget() {
     box.innerHTML = `
       <div class="flex items-center justify-between">
         <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
-          <i class="fa-solid fa-image mr-1"></i>Background Login Panitia
+          <i class="fa-solid fa-panorama mr-1"></i>Background Login (HP & Laptop)
         </span>
         <span id="badgeCurrentLoginOpacityPct" class="text-[10px] font-extrabold text-amber-300 bg-white/10 px-2 py-0.5 rounded-lg">
           Opacity: ${currentLoginBgOpacityPct}%
         </span>
       </div>
 
-      <!-- Kontrol Slider & Tombol +/- Opacity -->
+      <!-- Kontrol Opacity & Posisi Fokus Foto -->
       <div class="p-2.5 rounded-xl bg-white/10 border border-white/15 space-y-2">
         <div class="flex items-center justify-between text-[10px] font-bold text-slate-200">
-          <span>Tingkat Transparansi Foto:</span>
-          <span id="lblSliderOpacityVal" class="text-amber-300 font-extrabold">${currentLoginBgOpacityPct}%</span>
+          <span>Transparansi & Fokus Foto:</span>
+          <select id="selLoginBgFocusPos" class="rounded-lg bg-slate-800 border border-white/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+            <option value="object-top" ${currentLoginBgPosition === 'object-top' ? 'selected' : ''}>Fokus Atas (Wajah Aman)</option>
+            <option value="object-center" ${currentLoginBgPosition === 'object-center' ? 'selected' : ''}>Fokus Tengah</option>
+          </select>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" id="btnDecLoginOpacity" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs border border-white/20 shrink-0">-</button>
@@ -3485,41 +3517,42 @@ function injectLoginBgManagerWidget() {
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <label class="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] text-center cursor-pointer shadow transition">
-          <i class="fa-solid fa-upload mr-1"></i>Pilih Foto Panitia dari Galeri
-          <input type="file" id="inpUploadLoginBgPanitia" accept="image/*" class="hidden" />
+      <!-- 2 Tombol Upload Terpisah: Versi HP vs Versi Laptop -->
+      <div class="grid grid-cols-2 gap-2">
+        <label class="py-2.5 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] text-center cursor-pointer shadow flex flex-col items-center justify-center gap-0.5 transition">
+          <span><i class="fa-solid fa-mobile-screen-button mr-1"></i>Foto Versi HP</span>
+          <span class="text-[8px] font-bold opacity-80">Portrait / Vertikal</span>
+          <input type="file" id="inpUploadLoginBgMobile" accept="image/*" class="hidden" />
         </label>
-        <button type="button" id="btnSetUrlLoginBgPanitia" class="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-[10px] border border-white/15 transition">
-          Pakai URL
-        </button>
+
+        <label class="py-2.5 px-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-extrabold text-[10px] text-center cursor-pointer shadow flex flex-col items-center justify-center gap-0.5 transition">
+          <span><i class="fa-solid fa-laptop mr-1"></i>Foto Versi Laptop</span>
+          <span class="text-[8px] font-bold opacity-80">${currentLoginBgDesktopUrl ? '✓ Terpasang (Ganti)' : 'Landscape / Melebar'}</span>
+          <input type="file" id="inpUploadLoginBgDesktop" accept="image/*" class="hidden" />
+        </label>
       </div>
     `;
 
     modalBody.prepend(box);
 
     const slider = document.getElementById("rngLoginBgOpacity");
-    const lblVal = document.getElementById("lblSliderOpacityVal");
     const badgeTop = document.getElementById("badgeCurrentLoginOpacityPct");
 
     const syncSliderDisplay = (newVal) => {
       const clamped = Math.max(5, Math.min(80, parseInt(newVal, 10) || 20));
       if (slider) slider.value = clamped;
-      if (lblVal) lblVal.textContent = `${clamped}%`;
       if (badgeTop) badgeTop.textContent = `Opacity: ${clamped}%`;
-      applyLoginBgOpacityVisual(clamped);
+      currentLoginBgOpacityPct = clamped;
+      applyLoginBgVisualState();
     };
 
-    slider?.addEventListener("input", (e) => {
-      syncSliderDisplay(e.target.value);
-    });
+    slider?.addEventListener("input", (e) => syncSliderDisplay(e.target.value));
+    document.getElementById("btnDecLoginOpacity")?.addEventListener("click", () => syncSliderDisplay(currentLoginBgOpacityPct - 5));
+    document.getElementById("btnIncLoginOpacity")?.addEventListener("click", () => syncSliderDisplay(currentLoginBgOpacityPct + 5));
 
-    document.getElementById("btnDecLoginOpacity")?.addEventListener("click", () => {
-      syncSliderDisplay(currentLoginBgOpacityPct - 5);
-    });
-
-    document.getElementById("btnIncLoginOpacity")?.addEventListener("click", () => {
-      syncSliderDisplay(currentLoginBgOpacityPct + 5);
+    document.getElementById("selLoginBgFocusPos")?.addEventListener("change", (e) => {
+      currentLoginBgPosition = e.target.value;
+      applyLoginBgVisualState();
     });
 
     document.getElementById("btnSaveLoginOpacityNow")?.addEventListener("click", async () => {
@@ -3530,69 +3563,400 @@ function injectLoginBgManagerWidget() {
       }
       await sb.from("info_layanan").upsert([{
         kode_menu: "bg_login_panitia_2026",
-        judul: `Background Foto Panitia Halaman Login (${currentLoginBgOpacityPct}%)`,
-        deskripsi: currentLoginBgUrl || DEFAULT_PANITIA_BG_URL,
+        judul: `Background Foto Panitia HP (${currentLoginBgOpacityPct}%)`,
+        deskripsi: currentLoginBgMobileUrl || DEFAULT_PANITIA_BG_URL,
         url_link: String(currentLoginBgOpacityPct),
-        status_tersedia: "AKTIF"
+        status_tersedia: currentLoginBgPosition
       }]);
       if (btn) {
         btn.disabled = false;
         btn.textContent = "Simpan";
       }
-      toast(`Opacity Background Login disimpan pada ${currentLoginBgOpacityPct}%!`);
+      toast(`Pengaturan Opacity (${currentLoginBgOpacityPct}%) & Fokus Foto disimpan!`);
     });
 
-    document.getElementById("inpUploadLoginBgPanitia")?.addEventListener("change", async (e) => {
+    // Upload Foto Khusus Versi HP
+    document.getElementById("inpUploadLoginBgMobile")?.addEventListener("change", async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      toast("Memproses & mengunggah foto background login...");
+      toast("Mengunggah Foto Background Versi HP...");
       try {
-        const dataUrl = await compressImageFileToDataUrl(file, 1000, 0.7);
+        const dataUrl = await compressImageFileToDataUrl(file, 960, 0.72);
         await sb.from("info_layanan").upsert([{
           kode_menu: "bg_login_panitia_2026",
-          judul: `Background Foto Panitia Halaman Login (${currentLoginBgOpacityPct}%)`,
+          judul: `Background Foto Panitia HP (${currentLoginBgOpacityPct}%)`,
+          deskripsi: dataUrl,
+          url_link: String(currentLoginBgOpacityPct),
+          status_tersedia: currentLoginBgPosition
+        }]);
+        currentLoginBgMobileUrl = dataUrl;
+        applyLoginBgVisualState();
+        toast("Foto Background Versi HP berhasil disimpan!");
+      } catch (err) {
+        toast("Gagal memproses gambar HP.");
+      }
+    });
+
+    // Upload Foto Khusus Versi Laptop (Landscape Resolusi Tinggi)
+    document.getElementById("inpUploadLoginBgDesktop")?.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      toast("Mengunggah Foto Background Versi Laptop (Landscape)...");
+      try {
+        const dataUrl = await compressImageFileToDataUrl(file, 1600, 0.78);
+        await sb.from("info_layanan").upsert([{
+          kode_menu: "bg_login_panitia_desktop_2026",
+          judul: "Background Foto Panitia Laptop Landscape",
           deskripsi: dataUrl,
           url_link: String(currentLoginBgOpacityPct),
           status_tersedia: "AKTIF"
         }]);
-        currentLoginBgUrl = dataUrl;
-        const imgEl = document.getElementById("loginPanitiaBgImg");
-        if (imgEl) {
-          imgEl.style.display = "block";
-          imgEl.src = dataUrl;
-        }
-        applyLoginBgOpacityVisual(currentLoginBgOpacityPct);
-        toast(`Foto Background Login (${currentLoginBgOpacityPct}%) berhasil diperbarui!`);
+        currentLoginBgDesktopUrl = dataUrl;
+        applyLoginBgVisualState();
+        toast("Foto Background Versi Laptop (Landscape) berhasil disimpan!");
       } catch (err) {
-        toast("Gagal memproses gambar.");
+        toast("Gagal memproses gambar Laptop.");
       }
-    });
-
-    document.getElementById("btnSetUrlLoginBgPanitia")?.addEventListener("click", async () => {
-      const url = prompt("Masukkan URL / Link Gambar Foto Panitia (atau ketik ./bg-panitia.jpg):", currentLoginBgUrl || DEFAULT_PANITIA_BG_URL);
-      if (url === null) return;
-      const cleanUrl = String(url).trim() || DEFAULT_PANITIA_BG_URL;
-      await sb.from("info_layanan").upsert([{
-        kode_menu: "bg_login_panitia_2026",
-        judul: `Background Foto Panitia Halaman Login (${currentLoginBgOpacityPct}%)`,
-        deskripsi: cleanUrl,
-        url_link: String(currentLoginBgOpacityPct),
-        status_tersedia: "AKTIF"
-      }]);
-      currentLoginBgUrl = cleanUrl;
-      const imgEl = document.getElementById("loginPanitiaBgImg");
-      if (imgEl) {
-        imgEl.style.display = "block";
-        imgEl.src = cleanUrl;
-      }
-      applyLoginBgOpacityVisual(currentLoginBgOpacityPct);
-      toast(`Background Login Panitia (${currentLoginBgOpacityPct}%) berhasil disimpan!`);
     });
   }
 }
 
 initAndApplyLoginPanitiaBackground();
 setInterval(injectLoginBgManagerWidget, 500);
+
+// =========================================================================
+// ADAPTIVE RESPONSIVE FULL-SCREEN DESKTOP MODE + AUTO-HIDE LEFT SIDEBAR
+// - Halaman Login Laptop: Split-Screen elegan (Foto Panitia luas di kiri, Form di kanan)
+// - Dashboard Utama: Auto-Hide Left Sidebar + Masonry 2-Kolom Padat + Hover Lift
+// - Tampilan HP (< 1024px) tetap 100% asli seperti semula
+// =========================================================================
+
+function initResponsiveDesktopFullScreenLayout() {
+  if (document.getElementById("simRakorDesktopAdaptiveStyles")) return;
+
+  const styleEl = document.createElement("style");
+  styleEl.id = "simRakorDesktopAdaptiveStyles";
+  styleEl.textContent = `
+    @media (min-width: 1024px) {
+      html, body {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background-color: #eef2f6 !important;
+        overflow-x: hidden !important;
+      }
+
+      body > div,
+      #app,
+      #appContainer,
+      #mainAppScreen {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+
+      /* Halaman Login Laptop: Posisikan Form Login agak ke kanan agar Foto Panitia di kiri terlihat luas & tidak ketutup! */
+      #loginScreen {
+        min-height: 100vh !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 2.5rem 5rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+      }
+      #loginScreen.hidden {
+        display: none !important;
+      }
+      #loginScreen > div:not(#loginPanitiaBgLayer) {
+        max-width: 460px !important;
+        width: 100% !important;
+        margin: 0 !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65) !important;
+      }
+
+      /* Badge Info Kegiatan di Sisi Kiri Layar Login Laptop */
+      #loginScreen::after {
+        content: "SIM-RAKOR K3S SD/MI 2026\\A Kota Kupang • Nusa Tenggara Timur\\A\\A Hotel Neo by Aston Kupang\\A 26 – 28 November 2026";
+        white-space: pre-line;
+        position: fixed;
+        left: 4.5rem;
+        bottom: 3.5rem;
+        color: #f8fafc;
+        font-size: 1.15rem;
+        font-weight: 800;
+        line-height: 1.5;
+        text-shadow: 0 4px 16px rgba(0, 0, 0, 0.85);
+        border-left: 4px solid #fbbf24;
+        padding-left: 1.25rem;
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      /* Layar Utama Setelah Login: Auto-Hide Sidebar (pita ramping 72px) */
+      #mainAppScreen {
+        min-height: 100vh !important;
+        padding-left: 72px !important;
+        background: radial-gradient(circle at top right, #e0e7ff 0%, #f1f5f9 45%, #f8fafc 100%) !important;
+        display: block !important;
+        transition: padding-left 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      #mainAppScreen.sidebar-pinned {
+        padding-left: 250px !important;
+      }
+      #mainAppScreen.hidden {
+        display: none !important;
+      }
+
+      #mainAppScreen > header {
+        max-width: 100% !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+        padding: 0.85rem 2rem !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 30 !important;
+        backdrop-filter: blur(12px) !important;
+        box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08) !important;
+      }
+
+      /* Left Sidebar dengan Fitur AUTO-HIDE + Indikator Aktif Emas */
+      #mainAppScreen > nav {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        right: auto !important;
+        transform: none !important;
+        -webkit-transform: none !important;
+        width: 72px !important;
+        min-width: 72px !important;
+        max-width: 72px !important;
+        height: 100vh !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border-top: none !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+        background: linear-gradient(180deg, #090d16 0%, #17153b 60%, #0f172a 100%) !important;
+        padding: 1rem 0.65rem !important;
+        z-index: 50 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        overflow: hidden !important;
+        box-shadow: 6px 0 30px rgba(15, 23, 42, 0.22) !important;
+        transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.28s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      #mainAppScreen > nav:hover,
+      #mainAppScreen.sidebar-pinned > nav {
+        width: 250px !important;
+        min-width: 250px !important;
+        max-width: 250px !important;
+        padding: 1rem 0.9rem !important;
+      }
+
+      #mainAppScreen > nav > div {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.55rem !important;
+        width: 100% !important;
+        height: auto !important;
+      }
+
+      #mainAppScreen > nav button {
+        flex-direction: row !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        gap: 0.95rem !important;
+        padding: 0.85rem 0.85rem !important;
+        border-radius: 0.9rem !important;
+        width: 100% !important;
+        height: auto !important;
+        margin-top: 0 !important;
+        font-size: 0.82rem !important;
+        text-align: left !important;
+        color: #cbd5e1 !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border-left: 3px solid transparent !important;
+        white-space: nowrap !important;
+        transition: all 0.2s ease !important;
+      }
+
+      #mainAppScreen > nav button.text-blue-900,
+      #mainAppScreen > nav button.from-amber-400 {
+        background: linear-gradient(90deg, rgba(251, 191, 36, 0.22) 0%, rgba(251, 191, 36, 0.05) 100%) !important;
+        color: #fcd34d !important;
+        border-left: 3px solid #fbbf24 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+      }
+
+      #mainAppScreen > nav button:hover {
+        background: rgba(255, 255, 255, 0.14) !important;
+        color: #ffffff !important;
+      }
+
+      #mainAppScreen > nav button i {
+        font-size: 1.05rem !important;
+        width: 1.5rem !important;
+        min-width: 1.5rem !important;
+        text-align: center !important;
+      }
+
+      #mainAppScreen > nav button span {
+        font-size: 0.82rem !important;
+        margin-top: 0 !important;
+        opacity: 0 !important;
+        transition: opacity 0.2s ease !important;
+      }
+      #mainAppScreen > nav:hover button span,
+      #mainAppScreen.sidebar-pinned > nav button span {
+        opacity: 1 !important;
+      }
+
+      #footerBtnQr {
+        width: 100% !important;
+        height: auto !important;
+        margin-top: 0 !important;
+        border-radius: 0.9rem !important;
+        padding: 0.85rem 0.85rem !important;
+      }
+
+      /* Area Konten Utama (<main>) */
+      #mainAppScreen > main {
+        max-width: 1520px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        padding: 1.5rem 2.25rem 3.5rem 2.25rem !important;
+      }
+
+      /* Beranda Masonry 2-Kolom Padat + Hover Elevation */
+      #tabContentBeranda {
+        display: block !important;
+        column-count: 2 !important;
+        column-gap: 1.35rem !important;
+        width: 100% !important;
+      }
+      #tabContentBeranda.hidden {
+        display: none !important;
+      }
+
+      #tabContentBeranda > div {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        margin-bottom: 1.35rem !important;
+        width: 100% !important;
+        box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.06) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+      }
+
+      #tabContentBeranda > div:first-child,
+      #liveActiveSessionContainer {
+        column-span: all !important;
+      }
+
+      .service-menu-btn,
+      .pan-box-btn {
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+      }
+      .service-menu-btn:hover,
+      .pan-box-btn:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 10px 20px -5px rgba(30, 58, 138, 0.14) !important;
+        border-color: #93c5fd !important;
+      }
+
+      /* Tab Sub Rayon, Jadwal & Kinerja: Grid 2 Kolom Rapi di Laptop */
+      #srSchoolCardsContainer,
+      #taskCardsContainer,
+      #jadwalListContainer {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.95rem !important;
+      }
+
+      /* Layar Checker Hotel Full-Screen di Laptop */
+      #hotelCheckerDedicatedScreen {
+        max-width: 1360px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        padding: 1.75rem 2.25rem !important;
+      }
+
+      /* Pop-up Modal Lebih Lega di Laptop */
+      #serviceModal > div,
+      #taskModal > div {
+        max-width: 60rem !important;
+        width: 90% !important;
+      }
+
+      #accountManagerListContainer,
+      #panitiaRoomRowsContainer,
+      #kamarAssignmentListContainer {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.75rem !important;
+        max-height: 29rem !important;
+      }
+    }
+  `;
+
+  document.head.appendChild(styleEl);
+
+  const nav = document.querySelector("#mainAppScreen > nav");
+  if (nav && !document.getElementById("desktopSidebarPinHeader")) {
+    const topPinBar = document.createElement("div");
+    topPinBar.id = "desktopSidebarPinHeader";
+    topPinBar.className = "hidden lg:flex items-center justify-between pb-3 mb-3 border-b border-white/15 px-1.5";
+    topPinBar.innerHTML = `
+      <div class="flex items-center gap-2.5 overflow-hidden whitespace-nowrap">
+        <div class="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 font-extrabold flex items-center justify-center text-xs shrink-0 shadow">
+          K3S
+        </div>
+        <div class="sidebar-brand-text opacity-0 transition-opacity duration-200">
+          <div class="text-xs font-extrabold text-amber-300 leading-tight">SIM-RAKOR 2026</div>
+          <div class="text-[9px] text-slate-300">Kota Kupang</div>
+        </div>
+      </div>
+      <button type="button" id="btnTogglePinDesktopSidebar" title="Kunci / Auto-Hide Sidebar" class="sidebar-pin-btn opacity-0 transition-opacity duration-200 w-7 h-7 rounded-lg bg-white/10 hover:bg-amber-400 hover:text-slate-950 text-amber-300 flex items-center justify-center text-xs shrink-0">
+        <i class="fa-solid fa-thumbtack"></i>
+      </button>
+    `;
+    nav.prepend(topPinBar);
+
+    const extraPinStyle = document.createElement("style");
+    extraPinStyle.textContent = `
+      @media (min-width: 1024px) {
+        #mainAppScreen > nav:hover .sidebar-brand-text,
+        #mainAppScreen.sidebar-pinned > nav .sidebar-brand-text,
+        #mainAppScreen > nav:hover .sidebar-pin-btn,
+        #mainAppScreen.sidebar-pinned > nav .sidebar-pin-btn {
+          opacity: 1 !important;
+        }
+      }
+    `;
+    document.head.appendChild(extraPinStyle);
+
+    document.getElementById("btnTogglePinDesktopSidebar")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const appScreen = document.getElementById("mainAppScreen");
+      const btn = document.getElementById("btnTogglePinDesktopSidebar");
+      if (!appScreen) return;
+      const isPinned = appScreen.classList.toggle("sidebar-pinned");
+      if (btn) {
+        btn.classList.toggle("bg-amber-400", isPinned);
+        btn.classList.toggle("text-slate-950", isPinned);
+      }
+      toast(isPinned ? "Sidebar dikunci tetap terbuka." : "Mode Auto-Hide Sidebar aktif.");
+    });
+  }
+}
+
+initResponsiveDesktopFullScreenLayout();
 
 
 // =========================================================================
