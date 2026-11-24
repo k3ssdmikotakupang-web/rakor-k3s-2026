@@ -3922,9 +3922,10 @@ setInterval(() => {
 
 
 // =========================================================================
-// ADAPTIVE RESPONSIVE FULL-SCREEN DESKTOP MODE (LAPTOP >= 1024px)
-// - Membebaskan seluruh wrapper luar (body, max-w-md, max-w-lg, dll.) agar 100% Full-Screen
-// - Memperbaiki transform: none pada Left Sidebar agar tidak terpotong ke kiri
+// ADAPTIVE RESPONSIVE FULL-SCREEN DESKTOP MODE + AUTO-HIDE LEFT SIDEBAR
+// - Left Sidebar dilengkapi fitur Auto-Hide (melipat otomatis menjadi ikon
+//   ramping & meluncur keluar saat kursor diarahkan ke sisi kiri layar)
+// - Layout utama menggunakan grid-auto-flow: dense sehingga bebas lubang putih
 // - Tampilan HP (< 1024px) tetap 100% asli seperti semula
 // =========================================================================
 
@@ -3935,7 +3936,7 @@ function initResponsiveDesktopFullScreenLayout() {
   styleEl.id = "simRakorDesktopAdaptiveStyles";
   styleEl.textContent = `
     @media (min-width: 1024px) {
-      /* 1. Bebaskan kunci lebar pada html, body, dan semua pembungkus utama */
+      /* 1. Bebaskan kunci lebar pada html, body, dan pembungkus aplikasi */
       html, body {
         max-width: 100% !important;
         width: 100% !important;
@@ -3945,7 +3946,6 @@ function initResponsiveDesktopFullScreenLayout() {
         overflow-x: hidden !important;
       }
 
-      /* Lepas batasan max-w-md / max-w-lg / max-w-xl pada pembungkus aplikasi utama */
       body > div,
       #app,
       #appContainer,
@@ -3976,29 +3976,33 @@ function initResponsiveDesktopFullScreenLayout() {
         margin: 0 auto !important;
       }
 
-      /* 3. Layar Utama Setelah Login: Full-Screen dengan ruang Left Sidebar 260px */
+      /* 3. Layar Utama Setelah Login: Default Auto-Hide Sidebar (pita ramping 72px) */
       #mainAppScreen {
         min-height: 100vh !important;
-        padding-left: 260px !important;
+        padding-left: 72px !important;
         background-color: #f1f5f9 !important;
         display: block !important;
+        transition: padding-left 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      #mainAppScreen.sidebar-pinned {
+        padding-left: 250px !important;
       }
       #mainAppScreen.hidden {
         display: none !important;
       }
 
-      /* 4. Header Atas: Melebar penuh di sebelah kanan Left Sidebar */
+      /* 4. Header Atas: Melebar penuh & proporsional */
       #mainAppScreen > header {
         max-width: 100% !important;
         width: 100% !important;
         border-radius: 0 !important;
-        padding: 1rem 2rem !important;
+        padding: 0.85rem 2rem !important;
         position: sticky !important;
         top: 0 !important;
         z-index: 30 !important;
       }
 
-      /* 5. Left Sidebar: Reset transform (-translate-x-1/2) agar tampil penuh & tidak terpotong! */
+      /* 5. Left Sidebar dengan Fitur AUTO-HIDE (Melipat jadi 72px & Mekar 250px saat Hover/Pin) */
       #mainAppScreen > nav {
         position: fixed !important;
         top: 0 !important;
@@ -4007,99 +4011,106 @@ function initResponsiveDesktopFullScreenLayout() {
         right: auto !important;
         transform: none !important;
         -webkit-transform: none !important;
-        width: 260px !important;
-        min-width: 260px !important;
-        max-width: 260px !important;
+        width: 72px !important;
+        min-width: 72px !important;
+        max-width: 72px !important;
         height: 100vh !important;
         margin: 0 !important;
         border-radius: 0 !important;
         border-top: none !important;
-        border-right: 1px solid #cbd5e1 !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
         background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%) !important;
-        padding: 1.5rem 1rem !important;
-        z-index: 40 !important;
+        padding: 1rem 0.65rem !important;
+        z-index: 50 !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: flex-start !important;
-        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.14) !important;
+        overflow: hidden !important;
+        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
+        transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.28s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
       }
 
-      #mainAppScreen > nav::before {
-        content: "SIM-RAKOR K3S 2026\\A Kota Kupang • Dashboard";
-        white-space: pre-line;
-        display: block;
-        color: #fcd34d;
-        font-size: 0.9rem;
-        font-weight: 800;
-        line-height: 1.4;
-        padding: 0.5rem 0.75rem 1.25rem 0.75rem;
-        margin-bottom: 1rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-        letter-spacing: 0.02em;
+      /* Mekar penuh saat kursor menyentuh Sidebar ATAU saat tombol Pin dikunci */
+      #mainAppScreen > nav:hover,
+      #mainAppScreen.sidebar-pinned > nav {
+        width: 250px !important;
+        min-width: 250px !important;
+        max-width: 250px !important;
+        padding: 1rem 0.9rem !important;
       }
 
       #mainAppScreen > nav > div {
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
-        gap: 0.55rem !important;
+        gap: 0.5rem !important;
         width: 100% !important;
         height: auto !important;
       }
 
+      /* Tombol Menu di Sidebar: Rapi saat terlipat (hanya ikon) & jelas saat mekar */
       #mainAppScreen > nav button {
         flex-direction: row !important;
         justify-content: flex-start !important;
         align-items: center !important;
-        gap: 0.85rem !important;
-        padding: 0.85rem 1rem !important;
-        border-radius: 0.9rem !important;
+        gap: 0.95rem !important;
+        padding: 0.8rem 0.85rem !important;
+        border-radius: 0.85rem !important;
         width: 100% !important;
         height: auto !important;
         margin-top: 0 !important;
-        font-size: 0.85rem !important;
+        font-size: 0.82rem !important;
         text-align: left !important;
         color: #e2e8f0 !important;
         background: rgba(255, 255, 255, 0.05) !important;
+        white-space: nowrap !important;
       }
 
       #mainAppScreen > nav button:hover {
-        background: rgba(255, 255, 255, 0.14) !important;
+        background: rgba(255, 255, 255, 0.15) !important;
         color: #ffffff !important;
-        transform: translateX(3px) !important;
       }
 
       #mainAppScreen > nav button i {
-        font-size: 1rem !important;
-        width: 1.25rem !important;
+        font-size: 1.05rem !important;
+        width: 1.5rem !important;
+        min-width: 1.5rem !important;
         text-align: center !important;
       }
 
+      /* Sembunyikan teks label saat sidebar terlipat, munculkan halus saat hover/pin */
       #mainAppScreen > nav button span {
         font-size: 0.82rem !important;
         margin-top: 0 !important;
+        opacity: 0 !important;
+        transition: opacity 0.2s ease !important;
+      }
+      #mainAppScreen > nav:hover button span,
+      #mainAppScreen.sidebar-pinned > nav button span {
+        opacity: 1 !important;
       }
 
       #footerBtnQr {
         width: 100% !important;
         height: auto !important;
         margin-top: 0 !important;
-        border-radius: 0.9rem !important;
-        padding: 0.85rem 1rem !important;
+        border-radius: 0.85rem !important;
+        padding: 0.8rem 0.85rem !important;
       }
 
-      /* 6. Area Konten Utama (<main>): Melebar Penuh di Kanan Sidebar */
+      /* 6. Area Konten Utama (<main>): Lebar Penuh & Terpusat Rapi */
       #mainAppScreen > main {
-        max-width: 100% !important;
+        max-width: 1480px !important;
         width: 100% !important;
-        margin: 0 !important;
-        padding: 1.75rem 2.25rem 3.5rem 2.25rem !important;
+        margin: 0 auto !important;
+        padding: 1.5rem 2rem 3.5rem 2rem !important;
       }
 
-      /* 7. Beranda: Grid 2 Kolom Sejajar yang Lega */
+      /* 7. BERANDA ZERO-GAP GRID: Padat & Sejajar Tanpa Lubang Kosong! */
       #tabContentBeranda {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        grid-auto-flow: dense !important;
         gap: 1.25rem !important;
         align-items: start !important;
         width: 100% !important;
@@ -4108,32 +4119,32 @@ function initResponsiveDesktopFullScreenLayout() {
         display: none !important;
       }
 
-      /* Banner Utama & Info Live melebar penuh 2 kolom di bagian atas */
+      /* Banner Info Live & Jadwal Aktif melebar penuh 2 kolom di bagian atas */
       #tabContentBeranda > div:first-child,
       #liveActiveSessionContainer {
         grid-column: 1 / -1 !important;
       }
 
-      /* 8. Tab Sub Rayon & Kinerja: Grid 2 Kolom di Laptop */
+      /* 8. Tab Sub Rayon, Jadwal & Kinerja: Grid 2 Kolom Rapi di Laptop */
       #srSchoolCardsContainer,
       #taskCardsContainer {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 0.85rem !important;
+        gap: 0.9rem !important;
       }
 
       /* 9. Layar Checker Hotel Full-Screen di Laptop */
       #hotelCheckerDedicatedScreen {
-        max-width: 100% !important;
+        max-width: 1320px !important;
         width: 100% !important;
-        margin: 0 !important;
-        padding: 2rem !important;
+        margin: 0 auto !important;
+        padding: 1.75rem 2rem !important;
       }
 
       /* 10. Pop-up Modal Lebih Lega di Laptop */
       #serviceModal > div,
       #taskModal > div {
-        max-width: 56rem !important;
+        max-width: 58rem !important;
         width: 90% !important;
       }
 
@@ -4149,6 +4160,55 @@ function initResponsiveDesktopFullScreenLayout() {
   `;
 
   document.head.appendChild(styleEl);
+
+  // Tambahkan tombol Pin / Auto-Hide di bagian atas Left Sidebar (khusus layar laptop)
+  const nav = document.querySelector("#mainAppScreen > nav");
+  if (nav && !document.getElementById("desktopSidebarPinHeader")) {
+    const topPinBar = document.createElement("div");
+    topPinBar.id = "desktopSidebarPinHeader";
+    topPinBar.className = "hidden lg:flex items-center justify-between pb-3 mb-3 border-b border-white/15 px-1.5";
+    topPinBar.innerHTML = `
+      <div class="flex items-center gap-2.5 overflow-hidden whitespace-nowrap">
+        <div class="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 font-extrabold flex items-center justify-center text-xs shrink-0 shadow">
+          K3S
+        </div>
+        <div class="sidebar-brand-text opacity-0 transition-opacity duration-200">
+          <div class="text-xs font-extrabold text-amber-300 leading-tight">SIM-RAKOR 2026</div>
+          <div class="text-[9px] text-slate-300">Kota Kupang</div>
+        </div>
+      </div>
+      <button type="button" id="btnTogglePinDesktopSidebar" title="Kunci / Auto-Hide Sidebar" class="sidebar-pin-btn opacity-0 transition-opacity duration-200 w-7 h-7 rounded-lg bg-white/10 hover:bg-amber-400 hover:text-slate-950 text-amber-300 flex items-center justify-center text-xs shrink-0">
+        <i class="fa-solid fa-thumbtack"></i>
+      </button>
+    `;
+    nav.prepend(topPinBar);
+
+    const extraPinStyle = document.createElement("style");
+    extraPinStyle.textContent = `
+      @media (min-width: 1024px) {
+        #mainAppScreen > nav:hover .sidebar-brand-text,
+        #mainAppScreen.sidebar-pinned > nav .sidebar-brand-text,
+        #mainAppScreen > nav:hover .sidebar-pin-btn,
+        #mainAppScreen.sidebar-pinned > nav .sidebar-pin-btn {
+          opacity: 1 !important;
+        }
+      }
+    `;
+    document.head.appendChild(extraPinStyle);
+
+    document.getElementById("btnTogglePinDesktopSidebar")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const appScreen = document.getElementById("mainAppScreen");
+      const btn = document.getElementById("btnTogglePinDesktopSidebar");
+      if (!appScreen) return;
+      const isPinned = appScreen.classList.toggle("sidebar-pinned");
+      if (btn) {
+        btn.classList.toggle("bg-amber-400", isPinned);
+        btn.classList.toggle("text-slate-950", isPinned);
+      }
+      toast(isPinned ? "Sidebar dikunci tetap terbuka." : "Mode Auto-Hide Sidebar aktif.");
+    });
+  }
 }
 
 initResponsiveDesktopFullScreenLayout();
