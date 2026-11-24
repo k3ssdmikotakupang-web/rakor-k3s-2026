@@ -3922,10 +3922,10 @@ setInterval(() => {
 
 
 // =========================================================================
-// ADAPTIVE RESPONSIVE FULL-SCREEN DESKTOP MODE + AUTO-HIDE LEFT SIDEBAR
-// - Left Sidebar dilengkapi fitur Auto-Hide (melipat otomatis menjadi ikon
-//   ramping & meluncur keluar saat kursor diarahkan ke sisi kiri layar)
-// - Layout utama menggunakan grid-auto-flow: dense sehingga bebas lubang putih
+// ADAPTIVE RESPONSIVE FULL-SCREEN DESKTOP MODE + AUTO-HIDE LEFT SIDEBAR (PRO)
+// - Auto-Hide Left Sidebar dengan indikator menu aktif emas
+// - Beranda Masonry 2-Kolom Padat + Hover Micro-Interactions
+// - Tab Jadwal, Sub Rayon, Kinerja, & QR otomatis teroptimasi untuk Laptop
 // - Tampilan HP (< 1024px) tetap 100% asli seperti semula
 // =========================================================================
 
@@ -3942,7 +3942,7 @@ function initResponsiveDesktopFullScreenLayout() {
         width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
-        background-color: #f1f5f9 !important;
+        background-color: #eef2f6 !important;
         overflow-x: hidden !important;
       }
 
@@ -3976,11 +3976,11 @@ function initResponsiveDesktopFullScreenLayout() {
         margin: 0 auto !important;
       }
 
-      /* 3. Layar Utama Setelah Login: Default Auto-Hide Sidebar (pita ramping 72px) */
+      /* 3. Layar Utama Setelah Login: Auto-Hide Sidebar (pita ramping 72px) */
       #mainAppScreen {
         min-height: 100vh !important;
         padding-left: 72px !important;
-        background-color: #f1f5f9 !important;
+        background: radial-gradient(circle at top right, #e0e7ff 0%, #f1f5f9 45%, #f8fafc 100%) !important;
         display: block !important;
         transition: padding-left 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
       }
@@ -3991,7 +3991,7 @@ function initResponsiveDesktopFullScreenLayout() {
         display: none !important;
       }
 
-      /* 4. Header Atas: Melebar penuh & proporsional */
+      /* 4. Header Atas: Glassmorphism Sticky Header */
       #mainAppScreen > header {
         max-width: 100% !important;
         width: 100% !important;
@@ -4000,9 +4000,11 @@ function initResponsiveDesktopFullScreenLayout() {
         position: sticky !important;
         top: 0 !important;
         z-index: 30 !important;
+        backdrop-filter: blur(12px) !important;
+        box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08) !important;
       }
 
-      /* 5. Left Sidebar dengan Fitur AUTO-HIDE (Melipat jadi 72px & Mekar 250px saat Hover/Pin) */
+      /* 5. Left Sidebar dengan Fitur AUTO-HIDE + Indikator Aktif Emas */
       #mainAppScreen > nav {
         position: fixed !important;
         top: 0 !important;
@@ -4019,18 +4021,17 @@ function initResponsiveDesktopFullScreenLayout() {
         border-radius: 0 !important;
         border-top: none !important;
         border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
-        background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%) !important;
+        background: linear-gradient(180deg, #090d16 0%, #17153b 60%, #0f172a 100%) !important;
         padding: 1rem 0.65rem !important;
         z-index: 50 !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: flex-start !important;
         overflow: hidden !important;
-        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
+        box-shadow: 6px 0 30px rgba(15, 23, 42, 0.22) !important;
         transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.28s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
       }
 
-      /* Mekar penuh saat kursor menyentuh Sidebar ATAU saat tombol Pin dikunci */
       #mainAppScreen > nav:hover,
       #mainAppScreen.sidebar-pinned > nav {
         width: 250px !important;
@@ -4043,31 +4044,41 @@ function initResponsiveDesktopFullScreenLayout() {
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
-        gap: 0.5rem !important;
+        gap: 0.55rem !important;
         width: 100% !important;
         height: auto !important;
       }
 
-      /* Tombol Menu di Sidebar: Rapi saat terlipat (hanya ikon) & jelas saat mekar */
       #mainAppScreen > nav button {
         flex-direction: row !important;
         justify-content: flex-start !important;
         align-items: center !important;
         gap: 0.95rem !important;
-        padding: 0.8rem 0.85rem !important;
-        border-radius: 0.85rem !important;
+        padding: 0.85rem 0.85rem !important;
+        border-radius: 0.9rem !important;
         width: 100% !important;
         height: auto !important;
         margin-top: 0 !important;
         font-size: 0.82rem !important;
         text-align: left !important;
-        color: #e2e8f0 !important;
-        background: rgba(255, 255, 255, 0.05) !important;
+        color: #cbd5e1 !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border-left: 3px solid transparent !important;
         white-space: nowrap !important;
+        transition: all 0.2s ease !important;
+      }
+
+      /* Highlight Menu Aktif di Sidebar */
+      #mainAppScreen > nav button.text-blue-900,
+      #mainAppScreen > nav button.from-amber-400 {
+        background: linear-gradient(90deg, rgba(251, 191, 36, 0.22) 0%, rgba(251, 191, 36, 0.05) 100%) !important;
+        color: #fcd34d !important;
+        border-left: 3px solid #fbbf24 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
       }
 
       #mainAppScreen > nav button:hover {
-        background: rgba(255, 255, 255, 0.15) !important;
+        background: rgba(255, 255, 255, 0.14) !important;
         color: #ffffff !important;
       }
 
@@ -4078,7 +4089,6 @@ function initResponsiveDesktopFullScreenLayout() {
         text-align: center !important;
       }
 
-      /* Sembunyikan teks label saat sidebar terlipat, munculkan halus saat hover/pin */
       #mainAppScreen > nav button span {
         font-size: 0.82rem !important;
         margin-top: 0 !important;
@@ -4094,63 +4104,76 @@ function initResponsiveDesktopFullScreenLayout() {
         width: 100% !important;
         height: auto !important;
         margin-top: 0 !important;
-        border-radius: 0.85rem !important;
-        padding: 0.8rem 0.85rem !important;
+        border-radius: 0.9rem !important;
+        padding: 0.85rem 0.85rem !important;
       }
 
       /* 6. Area Konten Utama (<main>): Lebar Penuh & Terpusat Rapi */
       #mainAppScreen > main {
-        max-width: 1480px !important;
+        max-width: 1520px !important;
         width: 100% !important;
         margin: 0 auto !important;
-        padding: 1.5rem 2rem 3.5rem 2rem !important;
+        padding: 1.5rem 2.25rem 3.5rem 2.25rem !important;
       }
 
-      /* 7. BERANDA MASONRY 2-KOLOM PADAT: Mengalir rapat tanpa lubang kosong! */
+      /* 7. BERANDA MASONRY 2-KOLOM PADAT + HOVER ELEVATION */
       #tabContentBeranda {
         display: block !important;
         column-count: 2 !important;
-        column-gap: 1.25rem !important;
+        column-gap: 1.35rem !important;
         width: 100% !important;
       }
       #tabContentBeranda.hidden {
         display: none !important;
       }
 
-      /* Setiap kartu di Beranda tidak terpotong di tengah kolom & punya jarak vertikal rapi */
       #tabContentBeranda > div {
         break-inside: avoid !important;
         page-break-inside: avoid !important;
-        margin-bottom: 1.25rem !important;
+        margin-bottom: 1.35rem !important;
         width: 100% !important;
+        box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.06) !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
       }
 
-      /* Banner Info Live & Jadwal Aktif di paling atas membentang penuh 2 kolom */
       #tabContentBeranda > div:first-child,
       #liveActiveSessionContainer {
         column-span: all !important;
       }
 
+      /* Efek Hover Mengambang Halus pada Kotak Menu Layanan & Menu Panitia */
+      .service-menu-btn,
+      .pan-box-btn {
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease !important;
+      }
+      .service-menu-btn:hover,
+      .pan-box-btn:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 10px 20px -5px rgba(30, 58, 138, 0.14) !important;
+        border-color: #93c5fd !important;
+      }
+
       /* 8. Tab Sub Rayon, Jadwal & Kinerja: Grid 2 Kolom Rapi di Laptop */
       #srSchoolCardsContainer,
-      #taskCardsContainer {
+      #taskCardsContainer,
+      #jadwalListContainer {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 0.9rem !important;
+        gap: 0.95rem !important;
       }
 
       /* 9. Layar Checker Hotel Full-Screen di Laptop */
       #hotelCheckerDedicatedScreen {
-        max-width: 1320px !important;
+        max-width: 1360px !important;
         width: 100% !important;
         margin: 0 auto !important;
-        padding: 1.75rem 2rem !important;
+        padding: 1.75rem 2.25rem !important;
       }
 
       /* 10. Pop-up Modal Lebih Lega di Laptop */
       #serviceModal > div,
       #taskModal > div {
-        max-width: 58rem !important;
+        max-width: 60rem !important;
         width: 90% !important;
       }
 
@@ -4160,14 +4183,13 @@ function initResponsiveDesktopFullScreenLayout() {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 0.75rem !important;
-        max-height: 28rem !important;
+        max-height: 29rem !important;
       }
     }
   `;
 
   document.head.appendChild(styleEl);
 
-  // Tambahkan tombol Pin / Auto-Hide di bagian atas Left Sidebar (khusus layar laptop)
   const nav = document.querySelector("#mainAppScreen > nav");
   if (nav && !document.getElementById("desktopSidebarPinHeader")) {
     const topPinBar = document.createElement("div");
