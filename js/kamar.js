@@ -1,9 +1,9 @@
 // js/kamar.js
 // Sistem Manajemen Kamar Hotel Rakor K3S 2026:
-// 1. Peserta: Melihat kamarnya sendiri & rekan sekamarnya (Lengkap: Foto Profil yang bisa di-zoom, Nama Kepsek, Asal Sekolah, Sub Rayon, No HP/WA)
-// 2. Ketua Panitia: Menginput, MENGEDIT (nomor, kapasitas, peruntukan + auto-migrasi penghuni), & menghapus nomor kamar.
-// 3. Panitia Inti (PJ, Ketua, Sekretaris, Bendahara): Melihat data rekapitulasi jumlah kamar hotel.
-// 4. Ketua Sub Rayon (+ Ketua & Sekretaris): Menentukan penghuni kamar peserta (validasi anti-melebihi kapasitas).
+// 1. Peserta: Melihat kamarnya sendiri, status Smoking/Non-Smoking, & rekan sekamarnya (Foto Profil Zoom)
+// 2. Ketua Panitia: Menginput, MENGEDIT (nomor, kapasitas, peruntukan, status Smoking/Non-Smoking), & menghapus kamar.
+// 3. Panitia Inti (PJ, Ketua, Sekretaris, Bendahara): Melihat rekapitulasi jumlah kamar hotel.
+// 4. Ketua Sub Rayon (+ Ketua & Sekretaris): Menentukan penghuni kamar peserta (validasi kapasitas).
 // 5. Ketua Panitia & Sekretaris: Download Dokumen Rekapan Kamar (PDF & Excel/CSV).
 import { sb, toast } from './supabase.js';
 
@@ -19,6 +19,19 @@ let logoK3sCache = null;
 
 function normalizeRoomNo(val = "") {
   return String(val || "").trim().toUpperCase();
+}
+
+function normalizeSmokingStatus(val = "") {
+  const v = String(val || "").trim().toUpperCase();
+  return v === "SMOKING" ? "SMOKING" : "NON_SMOKING";
+}
+
+function getSmokingBadgeHtml(smokingStatus, compact = false) {
+  const isSmoking = normalizeSmokingStatus(smokingStatus) === "SMOKING";
+  if (isSmoking) {
+    return `<span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300" title="Kamar Boleh Merokok">🚬 ${compact ? 'Smoking' : 'Smoking Room'}</span>`;
+  }
+  return `<span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200" title="Kamar Bebas Asap Rokok">🚭 ${compact ? 'Non-Smoking' : 'Non-Smoking'}</span>`;
 }
 
 function isSchoolParticipating(s) {
@@ -190,9 +203,10 @@ async function loadMasterRoomsAndPanitiaConfig(sekolahList) {
             const no = normalizeRoomNo(item.nomor);
             const cap = Math.max(1, parseInt(item.kapasitas, 10) || 2);
             const kat = item.kategori === "PANITIA" ? "PANITIA" : "PESERTA";
+            const smoking = normalizeSmokingStatus(item.smoking);
             if (no && no !== "BELUM DITENTUKAN" && !seen.has(no)) {
               seen.add(no);
-              masterRoomsList.push({ nomor: no, kapasitas: cap, kategori: kat });
+              masterRoomsList.push({ nomor: no, kapasitas: cap, kategori: kat, smoking });
             }
           });
         }
@@ -224,7 +238,8 @@ async function loadMasterRoomsAndPanitiaConfig(sekolahList) {
       masterRoomsList.push({
         nomor: rNo,
         kapasitas: Math.max(2, countPesertaRoom[rNo]),
-        kategori: "PESERTA"
+        kategori: "PESERTA",
+        smoking: "NON_SMOKING"
       });
     }
   });
@@ -243,7 +258,8 @@ async function loadMasterRoomsAndPanitiaConfig(sekolahList) {
       masterRoomsList.push({
         nomor: rNo,
         kapasitas: Math.max(2, countPanitiaRoom[rNo]),
-        kategori: "PANITIA"
+        kategori: "PANITIA",
+        smoking: "NON_SMOKING"
       });
     }
   });
@@ -260,9 +276,10 @@ async function saveMasterRoomsConfig(newRoomsArray) {
     const no = normalizeRoomNo(r.nomor);
     const cap = Math.max(1, parseInt(r.kapasitas, 10) || 2);
     const kat = r.kategori === "PANITIA" ? "PANITIA" : "PESERTA";
+    const smoking = normalizeSmokingStatus(r.smoking);
     if (no && no !== "BELUM DITENTUKAN" && !seen.has(no)) {
       seen.add(no);
-      uniqueRooms.push({ nomor: no, kapasitas: cap, kategori: kat });
+      uniqueRooms.push({ nomor: no, kapasitas: cap, kategori: kat, smoking });
     }
   });
   uniqueRooms.sort((a, b) =>
@@ -332,7 +349,7 @@ export async function openRoomManagerModal(activeUser, sekolahList, reloadCallba
 }
 
 // =========================================================================
-// 1. TAMPILAN KHUSUS PESERTA (FOTO PROFIL TEMAN SEKAMAR + ZOOM TANPA LABEL)
+// 1. TAMPILAN KHUSUS PESERTA (INFO KAMAR + STATUS SMOKING/NON-SMOKING)
 // =========================================================================
 function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
   const mySchool = sekolahList.find(x => x.id_sekolah === activeUser?.profile?.id_sekolah) || activeUser?.profile || {};
@@ -345,6 +362,7 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
     : [];
   const roomMeta = myRoomNo ? masterRoomsList.find(r => normalizeRoomNo(r.nomor) === myRoomNo) : null;
   const roomCap = roomMeta ? roomMeta.kapasitas : (roommates.length + 1);
+  const isSmokingRoom = roomMeta && normalizeSmokingStatus(roomMeta.smoking) === "SMOKING";
 
   bodyEl.innerHTML = `
     <div class="p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-violet-950 to-slate-900 text-white text-center space-y-4 shadow-xl">
@@ -366,14 +384,23 @@ function renderPesertaOnlyOwnRoomAndRoommates(activeUser, sekolahList, bodyEl) {
           </p>
         </div>
       ` : `
-        <div class="p-4 rounded-2xl bg-white/10 border border-white/15">
+        <div class="p-4 rounded-2xl bg-white/10 border border-white/15 space-y-2">
           <div class="text-[10px] uppercase tracking-wider text-violet-200 font-bold">Nomor Kamar Hotel Anda</div>
-          <div class="text-2xl font-extrabold ${myRoomNo ? 'text-amber-300' : 'text-slate-300'} mt-1">
+          <div class="text-2xl font-extrabold ${myRoomNo ? 'text-amber-300' : 'text-slate-300'}">
             ${myRoomNo ? `Kamar ${myRoomNo}` : 'Belum Ditentukan'}
           </div>
           ${myRoomNo ? `
-            <div class="text-[10px] text-emerald-300 font-semibold mt-0.5">
-              Kapasitas Kamar: ${roomCap} Orang (Terisi ${roommates.length + 1} Peserta)
+            <div class="flex items-center justify-center gap-2 flex-wrap">
+              <span class="text-[10px] text-emerald-300 font-semibold">
+                Kapasitas: ${roomCap} Orang (Terisi ${roommates.length + 1})
+              </span>
+              <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                isSmokingRoom
+                  ? 'bg-amber-400 text-slate-950'
+                  : 'bg-emerald-500 text-slate-950'
+              }">
+                ${isSmokingRoom ? '🚬 Smoking Room (Boleh Merokok)' : '🚭 Non-Smoking (Bebas Asap Rokok)'}
+              </span>
             </div>
           ` : `
             <div class="text-[10px] text-amber-200/90 mt-1">
@@ -485,6 +512,8 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
   const nonParticipatingCount = (sekolahList || []).length - participatingSchools.length;
   const pesertaRooms = masterRoomsList.filter(r => r.kategori !== "PANITIA");
   const panitiaRooms = masterRoomsList.filter(r => r.kategori === "PANITIA");
+  const smokingRoomsCount = masterRoomsList.filter(r => normalizeSmokingStatus(r.smoking) === "SMOKING").length;
+  const nonSmokingRoomsCount = masterRoomsList.length - smokingRoomsCount;
 
   const totalMasterRooms = masterRoomsList.length;
   const totalPesertaBeds = pesertaRooms.reduce((acc, r) => acc + (Number(r.kapasitas) || 2), 0);
@@ -505,12 +534,12 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
   if (showMasterRoomStats) {
     panitiaIntiSummaryCard = `
       <div class="p-4 rounded-3xl bg-gradient-to-br from-slate-900 via-violet-950 to-slate-900 text-white space-y-3 shadow-xl">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between flex-wrap gap-1">
           <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-md">
             Data Jumlah Kamar Hotel (Khusus Panitia Inti)
           </span>
           <span class="text-[10px] font-bold text-emerald-300">
-            Total: ${totalMasterRooms} Kamar (${totalPesertaBeds + totalPanitiaBeds} Bed)
+            Total: ${totalMasterRooms} Kamar (🚭 ${nonSmokingRoomsCount} • 🚬 ${smokingRoomsCount})
           </span>
         </div>
         <div class="grid grid-cols-2 gap-2 text-left">
@@ -629,39 +658,52 @@ function renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallb
 }
 
 // =========================================================================
-// TAB INPUT, EDIT & HAPUS NOMOR KAMAR (KHUSUS KETUA PANITIA)
+// TAB INPUT, EDIT & HAPUS NOMOR KAMAR + STATUS SMOKING (KHUSUS KETUA PANITIA)
 // =========================================================================
 function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, bodyEl, reloadCallback) {
   container.innerHTML = `
     <div class="p-4 rounded-2xl bg-violet-50 border-2 border-violet-300 space-y-3 shadow-2xs">
       <div class="flex items-center justify-between border-b border-violet-200 pb-2">
         <span class="font-extrabold text-xs text-violet-950">
-          <i class="fa-solid fa-plus-circle text-violet-700 mr-1"></i> Input Nomor Kamar, Kapasitas & Peruntukan
+          <i class="fa-solid fa-plus-circle text-violet-700 mr-1"></i> Input Kamar, Kapasitas & Status Merokok
         </span>
         <span class="text-[9px] font-extrabold uppercase bg-violet-900 text-amber-300 px-2 py-0.5 rounded">
           Otoritas Ketua Panitia
         </span>
       </div>
       <p class="text-[10px] text-slate-600 leading-relaxed">
-        Pilih peruntukan kamar (<b>Kamar Peserta</b> atau <b>Kamar Khusus Panitia</b>), lalu masukkan <b>Nomor Kamar</b> (bisa rentang seperti <code class="bg-violet-100 text-violet-900 px-1 py-0.5 rounded font-mono">101-120</code>).
+        Tentukan peruntukan kamar, status area merokok (<b>Non-Smoking</b> atau <b>Smoking Room</b>), dan <b>Nomor Kamar</b> (bisa rentang seperti <code class="bg-violet-100 text-violet-900 px-1 py-0.5 rounded font-mono">101-120</code>).
       </p>
-      <div>
-        <label class="block text-[10px] font-bold text-slate-700 mb-1">1. Peruntukan Kamar:</label>
-        <select id="inpNewRoomCategory" class="w-full rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-bold text-slate-800">
-          <option value="PESERTA">🏫 Kamar Peserta (Kepala Sekolah SD/MI yang Ikut)</option>
-          <option value="PANITIA">🛡 Kamar Khusus Panitia Rakor</option>
-        </select>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-700 mb-1">1. Peruntukan Kamar:</label>
+          <select id="inpNewRoomCategory" class="w-full rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-bold text-slate-800">
+            <option value="PESERTA">🏫 Kamar Peserta (Kepsek SD/MI)</option>
+            <option value="PANITIA">🛡 Kamar Khusus Panitia Rakor</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-700 mb-1">2. Area Merokok (Smoking Policy):</label>
+          <select id="inpNewRoomSmoking" class="w-full rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-800">
+            <option value="NON_SMOKING">🚭 Non-Smoking (Bebas Asap Rokok)</option>
+            <option value="SMOKING">🚬 Smoking Room (Boleh Merokok)</option>
+          </select>
+        </div>
       </div>
+
       <div class="grid grid-cols-3 gap-2">
         <div class="col-span-2">
-          <label class="block text-[10px] font-bold text-slate-700 mb-0.5">2. Nomor Kamar:</label>
+          <label class="block text-[10px] font-bold text-slate-700 mb-0.5">3. Nomor Kamar:</label>
           <input id="inpNewRoomNumber" type="text" placeholder="Contoh: 101 atau 101-120" class="w-full rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-bold text-slate-900">
         </div>
         <div>
-          <label class="block text-[10px] font-bold text-slate-700 mb-0.5">3. Kapasitas:</label>
+          <label class="block text-[10px] font-bold text-slate-700 mb-0.5">4. Kapasitas:</label>
           <input id="inpNewRoomCap" type="number" inputmode="numeric" min="1" max="10" value="2" class="w-full rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 text-center">
         </div>
       </div>
+
       <button type="button" id="btnAddMasterRoomNow" class="w-full py-2.5 rounded-xl bg-violet-900 hover:bg-violet-800 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition">
         <i class="fa-solid fa-floppy-disk"></i>
         <span>Tambahkan Kamar (Validasi Anti-Ganda)</span>
@@ -671,7 +713,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
     <div class="space-y-2">
       <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-700 uppercase px-1">
         <span>Daftar Kamar Terdaftar (${masterRoomsList.length} Ruangan)</span>
-        <span class="text-[9px] font-semibold text-blue-700 normal-case"><i class="fa-solid fa-pen mr-0.5"></i>Klik ikon pensil untuk edit nomor</span>
+        <span class="text-[9px] font-semibold text-blue-700 normal-case"><i class="fa-solid fa-pen mr-0.5"></i>Klik ikon pensil untuk edit nomor/status</span>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-0.5">
         ${masterRoomsList.length === 0 ? `
@@ -686,6 +728,8 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
           const cap = Number(rm.kapasitas) || 2;
           const isFull = occ.length >= cap;
           const occNames = occ.map(o => isPanRoom ? o.nama_panitia : o.nama_sekolah).join(", ");
+          const smokingBadge = getSmokingBadgeHtml(rm.smoking, true);
+
           return `
             <div class="p-2.5 rounded-2xl bg-white border ${
               isPanRoom ? 'border-indigo-300 bg-indigo-50/20' : isFull ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'
@@ -696,6 +740,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
                   <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
                     isPanRoom ? 'bg-indigo-900 text-amber-300' : 'bg-blue-100 text-blue-900'
                   }">${isPanRoom ? 'PANITIA' : 'PESERTA'}</span>
+                  ${smokingBadge}
                   <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded ${
                     isFull ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
                   }">${occ.length}/${cap}</span>
@@ -705,7 +750,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
                 </div>
               </div>
               <div class="flex items-center gap-1 shrink-0">
-                <button type="button" data-rnum="${rm.nomor}" title="Edit Nomor / Kapasitas Kamar" class="btn-edit-master-room w-7 h-7 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center text-xs transition">
+                <button type="button" data-rnum="${rm.nomor}" title="Edit Nomor, Kapasitas & Status Merokok" class="btn-edit-master-room w-7 h-7 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center text-xs transition">
                   <i class="fa-solid fa-pen"></i>
                 </button>
                 <button type="button" data-rnum="${rm.nomor}" title="Hapus Kamar" class="btn-del-master-room w-7 h-7 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 flex items-center justify-center text-xs transition">
@@ -724,7 +769,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
         <div class="flex items-center justify-between border-b border-slate-100 pb-2">
           <h4 class="text-xs font-extrabold uppercase text-blue-950 flex items-center gap-1.5">
             <i class="fa-solid fa-pen-to-square text-blue-700"></i>
-            <span id="editRoomModalTitle">Edit Nomor Kamar</span>
+            <span id="editRoomModalTitle">Edit Data Kamar</span>
           </h4>
           <button type="button" id="btnCloseEditRoomModal" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-rose-100 text-slate-600 font-bold text-sm flex items-center justify-center">&times;</button>
         </div>
@@ -736,6 +781,14 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
         <div>
           <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Nomor Kamar Baru:</label>
           <input id="inpEditRoomNumber" type="text" placeholder="Contoh: 205" class="w-full rounded-xl border-2 border-blue-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-900 uppercase" />
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Status Area Merokok (Smoking Policy):</label>
+          <select id="selEditRoomSmoking" class="w-full rounded-xl border-2 border-amber-300 bg-amber-50/40 px-3 py-2 text-xs font-extrabold text-slate-900">
+            <option value="NON_SMOKING">🚭 Non-Smoking (Bebas Asap Rokok)</option>
+            <option value="SMOKING">🚬 Smoking Room (Boleh Merokok)</option>
+          </select>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
@@ -770,6 +823,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
     const rawInput = document.getElementById("inpNewRoomNumber")?.value.trim() || "";
     const cap = Math.max(1, parseInt(document.getElementById("inpNewRoomCap")?.value || "2", 10) || 2);
     const kategori = document.getElementById("inpNewRoomCategory")?.value === "PANITIA" ? "PANITIA" : "PESERTA";
+    const smoking = normalizeSmokingStatus(document.getElementById("inpNewRoomSmoking")?.value);
     if (!rawInput) return toast("Masukkan Nomor Kamar terlebih dahulu!");
 
     const existingNumbers = new Set(masterRoomsList.map(r => normalizeRoomNo(r.nomor)));
@@ -789,7 +843,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
           duplicateRooms.push(roomNo);
         } else {
           existingNumbers.add(roomNo);
-          masterRoomsList.push({ nomor: roomNo, kapasitas: cap, kategori });
+          masterRoomsList.push({ nomor: roomNo, kapasitas: cap, kategori, smoking });
           addedRooms.push(roomNo);
         }
       }
@@ -798,7 +852,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
       if (existingNumbers.has(singleNo)) {
         return toast(`Ditolak: Nomor Kamar "${singleNo}" sudah terdaftar! Nomor kamar tidak boleh ganda.`);
       }
-      masterRoomsList.push({ nomor: singleNo, kapasitas: cap, kategori });
+      masterRoomsList.push({ nomor: singleNo, kapasitas: cap, kategori, smoking });
       addedRooms.push(singleNo);
     }
 
@@ -807,7 +861,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
     }
 
     await saveMasterRoomsConfig(masterRoomsList);
-    toast(`Berhasil menambahkan ${addedRooms.length} Kamar ${kategori === 'PANITIA' ? 'Khusus Panitia' : 'Peserta'}!`);
+    toast(`Berhasil menambahkan ${addedRooms.length} Kamar (${smoking === 'SMOKING' ? 'Smoking Room' : 'Non-Smoking'})!`);
     renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback);
   });
 
@@ -832,6 +886,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
       document.getElementById("editRoomModalTitle").textContent = `Edit Kamar ${oldNo}`;
       document.getElementById("editRoomOriginalNumber").value = oldNo;
       document.getElementById("inpEditRoomNumber").value = oldNo;
+      document.getElementById("selEditRoomSmoking").value = normalizeSmokingStatus(rmObj.smoking);
       document.getElementById("selEditRoomCategory").value = isPan ? "PANITIA" : "PESERTA";
       document.getElementById("inpEditRoomCap").value = rmObj.kapasitas || 2;
 
@@ -843,7 +898,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
             : occPes.map(s => s.nama_sekolah).join(", ");
           warnBox.innerHTML = `<i class="fa-solid fa-circle-info mr-1 text-amber-700"></i>Kamar ini sedang dihuni oleh <b>${totalOcc} orang</b> (${names}). Jika nomor kamar diubah, penghuninya akan <b>otomatis dipindahkan</b> ke nomor kamar baru.`;
         } else {
-          warnBox.innerHTML = `<i class="fa-solid fa-check-circle mr-1 text-emerald-700"></i>Kamar ini masih kosong. Anda bebas mengubah nomor, kapasitas, maupun peruntukannya.`;
+          warnBox.innerHTML = `<i class="fa-solid fa-check-circle mr-1 text-emerald-700"></i>Kamar ini masih kosong. Anda bebas mengubah nomor, status merokok, kapasitas, maupun peruntukannya.`;
         }
       }
 
@@ -855,6 +910,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
   document.getElementById("btnSaveEditRoom")?.addEventListener("click", async () => {
     const oldNo = normalizeRoomNo(document.getElementById("editRoomOriginalNumber")?.value);
     const newNo = normalizeRoomNo(document.getElementById("inpEditRoomNumber")?.value);
+    const newSmoking = normalizeSmokingStatus(document.getElementById("selEditRoomSmoking")?.value);
     const newKat = document.getElementById("selEditRoomCategory")?.value === "PANITIA" ? "PANITIA" : "PESERTA";
     const newCap = Math.max(1, parseInt(document.getElementById("inpEditRoomCap")?.value || "2", 10) || 2);
 
@@ -862,7 +918,6 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
       return toast("Nomor kamar baru tidak boleh kosong!");
     }
 
-    // Validasi anti-bentrok jika nomor kamar berubah
     if (newNo !== oldNo) {
       const conflict = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === newNo);
       if (conflict) {
@@ -874,12 +929,10 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
     const occPan = getPanitiaRoomOccupants(oldNo);
     const totalOcc = occPes.length + occPan.length;
 
-    // Validasi kapasitas minimal tidak lebih kecil dari penghuni aktif
     if (newCap < totalOcc) {
       return toast(`Ditolak: Kapasitas (${newCap}) tidak boleh lebih kecil dari jumlah penghuni saat ini (${totalOcc} orang)!`);
     }
 
-    // Validasi perubahan kategori jika sudah terisi penghuni
     if (occPes.length > 0 && newKat === "PANITIA") {
       return toast("Kamar sedang dihuni Peserta! Kosongkan peserta terlebih dahulu jika ingin mengubah ke Kamar Panitia.");
     }
@@ -893,16 +946,15 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
       btnSave.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Menyimpan...`;
     }
 
-    // Update Master Rooms List
     const targetRoom = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === oldNo);
     if (targetRoom) {
       targetRoom.nomor = newNo;
       targetRoom.kategori = newKat;
       targetRoom.kapasitas = newCap;
+      targetRoom.smoking = newSmoking;
     }
     await saveMasterRoomsConfig(masterRoomsList);
 
-    // Jika nomor kamar berubah, pindahkan otomatis seluruh penghuni lama ke nomor kamar baru!
     if (newNo !== oldNo) {
       if (occPes.length > 0) {
         for (const s of occPes) {
@@ -921,8 +973,8 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
     closeEditModal();
     toast(
       newNo !== oldNo
-        ? `Kamar ${oldNo} berhasil diubah menjadi Kamar ${newNo}${totalOcc > 0 ? ` (${totalOcc} penghuni ikut dipindahkan)` : ''}!`
-        : `Data Kamar ${newNo} berhasil diperbarui!`
+        ? `Kamar ${oldNo} diubah menjadi Kamar ${newNo} (${newSmoking === 'SMOKING' ? 'Smoking' : 'Non-Smoking'})!`
+        : `Data Kamar ${newNo} (${newSmoking === 'SMOKING' ? 'Smoking' : 'Non-Smoking'}) berhasil diperbarui!`
     );
     if (reloadCallback) await reloadCallback();
     renderPanitiaRoomModalView(activeUser, sekolahList, bodyEl, reloadCallback);
@@ -949,6 +1001,7 @@ function renderKetuaInputMasterRoomsTab(activeUser, sekolahList, container, body
 function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahList, container, bodyEl, reloadCallback) {
   const myPanitiaId = activeUser?.profile?.id_panitia;
   const myPanitiaRoom = myPanitiaId ? getPanitiaAssignedRoom(myPanitiaId) : "";
+  const myRoomMeta = myPanitiaRoom ? masterRoomsList.find(r => normalizeRoomNo(r.nomor) === myPanitiaRoom) : null;
   const myPanitiaRoommates = myPanitiaRoom
     ? cachedPanitiaList.filter(p => getPanitiaAssignedRoom(p.id_panitia) === myPanitiaRoom && p.id_panitia !== myPanitiaId)
     : [];
@@ -958,9 +1011,12 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
   container.innerHTML = `
     <div class="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white border border-indigo-500/40 flex items-center justify-between gap-3 shadow-md">
       <div class="min-w-0">
-        <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded">
-          Kamar Panitia Anda
-        </span>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded">
+            Kamar Panitia Anda
+          </span>
+          ${myRoomMeta ? getSmokingBadgeHtml(myRoomMeta.smoking, true) : ''}
+        </div>
         <div class="text-xs font-extrabold text-white mt-1 truncate">${activeUser.profile?.nama_panitia || 'Panitia'}</div>
         <div class="text-[10px] text-indigo-200 truncate">
           ${myPanitiaRoommates.length > 0
@@ -1019,9 +1075,10 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
         const occ = getPanitiaRoomOccupants(rNo);
         const isCurrentHere = currentRoom === rNo;
         const isFull = occ.length >= cap && !isCurrentHere;
+        const smokeTag = normalizeSmokingStatus(rm.smoking) === "SMOKING" ? "🚬 Smoking" : "🚭 Non-Smoking";
         optionsHtml += `
           <option value="${rNo}" ${isCurrentHere ? 'selected' : ''} ${isFull ? 'disabled' : ''}>
-            Kamar ${rNo} ${isFull ? `[PENUH ${occ.length}/${cap}]` : `(${occ.length}/${cap} Panitia)`}
+            Kamar ${rNo} [${smokeTag}] ${isFull ? `[PENUH ${occ.length}/${cap}]` : `(${occ.length}/${cap})`}
           </option>
         `;
       });
@@ -1041,6 +1098,7 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
                 <span class="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
                   Kamar ${currentRoom} (${roommates.length + 1}/${roomCap})
                 </span>
+                ${roomMeta ? getSmokingBadgeHtml(roomMeta.smoking, true) : ''}
               ` : ''}
             </div>
             <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${p.nama_panitia}</h4>
@@ -1062,7 +1120,7 @@ function renderKamarKhususPanitiaTab(activeUser, canManagePanitiaRooms, sekolahL
             </a>
           ` : ''}
           ${canManagePanitiaRooms ? `
-            <select class="sel-panitia-room rounded-xl border-2 ${currentRoom ? 'border-indigo-600 bg-indigo-50 text-indigo-950 font-bold' : 'border-slate-300 bg-slate-50 text-slate-700'} px-2 py-1 text-[11px]">
+            <select class="sel-panitia-room rounded-xl border-2 ${currentRoom ? 'border-indigo-600 bg-indigo-50 text-indigo-950 font-bold' : 'border-slate-300 bg-slate-50 text-slate-700'} px-2 py-1 text-[11px] max-w-[165px]">
               ${optionsHtml}
             </select>
           ` : `
@@ -1143,7 +1201,7 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
           <i class="fa-solid fa-user-check"></i>
         </div>
         <div class="text-[10px] text-violet-950 leading-snug">
-          <b>Validasi Peserta Aktif (${isRayonCoord ? 'Ketua Rayon ' + activeUser.profile.tugas_subrayon : activeUser.profile?.divisi}):</b> Atur nomor kamar dengan memilih dari daftar kamar tersedia (Anti Melebihi Kapasitas).
+          <b>Validasi Peserta Aktif (${isRayonCoord ? 'Ketua Rayon ' + activeUser.profile.tugas_subrayon : activeUser.profile?.divisi}):</b> Pilih kamar sesuai status <b>🚭 Non-Smoking</b> atau <b>🚬 Smoking Room</b> yang ditetapkan Ketua Panitia.
         </div>
       </div>
     ` : `
@@ -1235,12 +1293,13 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
         const occList = getPesertaRoomOccupants(sekolahList, rNo);
         const isCurrentSchoolInThisRoom = currentRoom === rNo;
         const isRoomFull = occList.length >= cap && !isCurrentSchoolInThisRoom;
+        const smokeTag = normalizeSmokingStatus(rm.smoking) === "SMOKING" ? "🚬 Smoking" : "🚭 Non-Smoking";
         const statusLabel = isRoomFull
           ? `[PENUH ${occList.length}/${cap}]`
-          : `(${occList.length}/${cap} Terisi)`;
+          : `(${occList.length}/${cap})`;
         roomOptionsHtml += `
           <option value="${rNo}" ${isCurrentSchoolInThisRoom ? 'selected' : ''} ${isRoomFull ? 'disabled' : ''}>
-            Kamar ${rNo} ${statusLabel}
+            Kamar ${rNo} [${smokeTag}] ${statusLabel}
           </option>
         `;
       });
@@ -1264,6 +1323,7 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
                   <span class="text-[9px] font-extrabold bg-violet-100 text-violet-900 px-1.5 py-0.5 rounded">
                     Kamar ${currentRoom} (${currentTotalInRoom}/${roomCap} Org)
                   </span>
+                  ${roomConfig ? getSmokingBadgeHtml(roomConfig.smoking, true) : ''}
                 ` : ''}
               </div>
               <h4 class="font-extrabold text-xs text-slate-900 truncate mt-1">${s.nama_sekolah}</h4>
@@ -1289,7 +1349,7 @@ function renderPembagianPenghuniPerRayonTab(activeUser, canSetOccupants, sekolah
                 Tidak Ikut
               </span>
             ` : canSetOccupants ? `
-              <select class="sel-assign-room rounded-xl border-2 ${currentRoom ? 'border-violet-600 bg-violet-50 text-violet-950 font-bold' : 'border-slate-300 bg-slate-50 text-slate-700'} px-2 py-1 text-[11px]">
+              <select class="sel-assign-room rounded-xl border-2 ${currentRoom ? 'border-violet-600 bg-violet-50 text-violet-950 font-bold' : 'border-slate-300 bg-slate-50 text-slate-700'} px-2 py-1 text-[11px] max-w-[170px]">
                 ${roomOptionsHtml}
               </select>
             ` : `
@@ -1364,6 +1424,7 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
     "No",
     "Kategori Penghuni",
     "Nomor Kamar Hotel",
+    "Status Area Merokok",
     "Kapasitas Kamar",
     "Sub Rayon / Divisi Panitia",
     "NPSN / ID",
@@ -1389,6 +1450,9 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
       : "Belum Ditentukan";
     const rmObj = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === rNo);
     const cap = rmObj ? `${rmObj.kapasitas} Orang` : "-";
+    const smokeText = rmObj
+      ? (normalizeSmokingStatus(rmObj.smoking) === "SMOKING" ? "Smoking Room (Boleh Merokok)" : "Non-Smoking (Bebas Rokok)")
+      : "-";
     const mates = rNo !== "Belum Ditentukan"
       ? participatingOnly
           .filter(x => normalizeRoomNo(x.nomor_kamar) === rNo && x.id_sekolah !== s.id_sekolah)
@@ -1399,6 +1463,7 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
       counter++,
       "PESERTA (IKUT)",
       rNo,
+      smokeText,
       cap,
       `Sub Rayon ${s.subrayon || '-'}`,
       s.npsn || "-",
@@ -1419,6 +1484,9 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
     const rNo = getPanitiaAssignedRoom(p.id_panitia) || "Belum Ditentukan";
     const rmObj = masterRoomsList.find(r => normalizeRoomNo(r.nomor) === rNo);
     const cap = rmObj ? `${rmObj.kapasitas} Orang` : "-";
+    const smokeText = rmObj
+      ? (normalizeSmokingStatus(rmObj.smoking) === "SMOKING" ? "Smoking Room (Boleh Merokok)" : "Non-Smoking (Bebas Rokok)")
+      : "-";
     const mates = rNo !== "Belum Ditentukan"
       ? cachedPanitiaList
           .filter(x => getPanitiaAssignedRoom(x.id_panitia) === rNo && x.id_panitia !== p.id_panitia)
@@ -1429,6 +1497,7 @@ export function exportRoomRecapToSpreadsheet(activeUser, sekolahList) {
       counter++,
       "PANITIA RAKOR",
       rNo,
+      smokeText,
       cap,
       p.divisi || "Panitia",
       p.id_panitia || "-",
@@ -1464,6 +1533,7 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
 
   const roomEntries = masterRoomsList.map((rm, idx) => {
     const isPan = rm.kategori === "PANITIA";
+    const isSmoke = normalizeSmokingStatus(rm.smoking) === "SMOKING";
     const occ = isPan
       ? getPanitiaRoomOccupants(rm.nomor)
       : getPesertaRoomOccupants(sekolahList, rm.nomor);
@@ -1476,7 +1546,8 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
     return {
       no: idx + 1,
       nomor: rm.nomor,
-      kategori: isPan ? "KHUSUS PANITIA" : "PESERTA (IKUT)",
+      kategori: `${isPan ? "PANITIA" : "PESERTA"} • ${isSmoke ? "SMOKING" : "NON-SMOKING"}`,
+      isSmoke,
       kapasitas: `${occ.length} / ${rm.kapasitas || 2} Org`,
       penghuni: penghuniText
     };
@@ -1532,8 +1603,8 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
 
     const startX = 40;
     let y = 172;
-    const colW = [38, 85, 110, 75, 406];
-    const headers = ["No", "No. Kamar", "Peruntukan", "Terisi/Kap", "Nama Penghuni Kamar (Kepala Sekolah Aktif / Panitia)"];
+    const colW = [36, 78, 138, 68, 394];
+    const headers = ["No", "No. Kamar", "Peruntukan & Area", "Terisi/Kap", "Nama Penghuni Kamar (Kepala Sekolah Aktif / Panitia)"];
 
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(startX, y, 714, 28);
@@ -1561,13 +1632,13 @@ export async function generatePdfRoomRecapDocument(activeUser, sekolahList) {
         `Kamar ${item.nomor}`,
         item.kategori,
         item.kapasitas,
-        String(item.penghuni).slice(0, 78)
+        String(item.penghuni).slice(0, 74)
       ];
 
       let curX = startX;
       cells.forEach((txt, cIdx) => {
-        ctx.fillStyle = cIdx === 2 && txt.includes("PANITIA") ? "#312e81" : "#0f172a";
-        ctx.font = (cIdx === 1 || cIdx === 2) ? "bold 9.5px 'Plus Jakarta Sans', Arial, sans-serif" : "9.5px 'Plus Jakarta Sans', Arial, sans-serif";
+        ctx.fillStyle = cIdx === 2 && item.isSmoke ? "#b45309" : cIdx === 2 && txt.includes("PANITIA") ? "#312e81" : "#0f172a";
+        ctx.font = (cIdx === 1 || cIdx === 2) ? "bold 9px 'Plus Jakarta Sans', Arial, sans-serif" : "9.5px 'Plus Jakarta Sans', Arial, sans-serif";
         ctx.fillText(txt, curX + 6, y + 19);
         curX += colW[cIdx];
       });
