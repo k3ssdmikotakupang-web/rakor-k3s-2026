@@ -4906,3 +4906,277 @@ if (!window.__FULLSCREEN_INFOGRAFIS_INTERCEPTOR_BOUND) {
     true
   );
 }
+
+// =========================================================================
+// PENYUNTIKAN KOLOM BIODATA KEPEGAWAIAN (STATUS ASN/PPPK/SWASTA, NIP, PANGKAT/GOL)
+// - Berlaku untuk Biodata & Kontak Aktif Peserta maupun Panitia
+// - Validasi Otomatis: Status ASN / PPPK wajib mengisi NIP & Pangkat/Golongan,
+//   sedangkan Non-ASN / Swasta bersifat opsional (boleh kosong)
+// =========================================================================
+
+const PANGKAT_GOLONGAN_LIST = [
+  "Juru Muda (I/a)",
+  "Juru Muda Tingkat I (I/b)",
+  "Juru (I/c)",
+  "Juru Tingkat I (I/d)",
+  "Pengatur Muda (II/a)",
+  "Pengatur Muda Tingkat I (II/b)",
+  "Pengatur (II/c)",
+  "Pengatur Tingkat I (II/d)",
+  "Penata Muda (III/a)",
+  "Penata Muda Tingkat I (III/b)",
+  "Penata (III/c)",
+  "Penata Tingkat I (III/d)",
+  "Pembina (IV/a)",
+  "Pembina Tingkat I (IV/b)",
+  "Pembina Utama Muda (IV/c)",
+  "Pembina Utama Madya (IV/d)",
+  "Pembina Utama (IV/e)",
+  "Ahli Pertama - Golongan IX (PPPK)",
+  "Ahli Muda - Golongan X (PPPK)",
+  "Ahli Madya - Golongan XI (PPPK)",
+  "Terampil - Golongan VII (PPPK)",
+  "Non-ASN / Yayasan (Swasta)"
+];
+
+let kepegawaianExtraCache = {};
+
+async function loadKepegawaianExtraCache() {
+  try {
+    const { data } = await sb
+      .from("info_layanan")
+      .select("deskripsi")
+      .eq("kode_menu", "biodata_kepegawaian_rakor_2026")
+      .maybeSingle();
+
+    if (data && data.deskripsi) {
+      const parsed = JSON.parse(data.deskripsi);
+      if (parsed && typeof parsed === "object") {
+        kepegawaianExtraCache = parsed;
+      }
+    }
+  } catch (e) {}
+}
+
+function getPersonKepegawaianData(user) {
+  if (!user || !user.profile) {
+    return { status_pegawai: "ASN (PNS)", nip: "", pangkat_golongan: "" };
+  }
+  const isPeserta = user.role === "peserta";
+  const key = isPeserta
+    ? `SEK_${user.profile.id_sekolah}`
+    : `PAN_${user.profile.id_panitia}`;
+  const cached = kepegawaianExtraCache[key] || {};
+
+  const defaultStatus = isPeserta
+    ? (String(user.profile.status_sekolah || "").toLowerCase() === "negeri" ? "ASN (PNS)" : "Non-ASN / Swasta")
+    : "ASN (PNS)";
+
+  const rawNip = isPeserta
+    ? (user.profile.nip_kepsek || user.profile.nip || cached.nip || "")
+    : (user.profile.nip || user.profile.nip_panitia || cached.nip || "");
+
+  const rawPangkat =
+    user.profile.pangkat_golongan ||
+    user.profile.pangkat ||
+    cached.pangkat_golongan ||
+    "";
+
+  const rawStatus =
+    user.profile.status_kepegawaian ||
+    cached.status_pegawai ||
+    (rawNip && String(rawNip).trim() !== "" ? "ASN (PNS)" : defaultStatus);
+
+  return {
+    key,
+    status_pegawai: rawStatus,
+    nip: String(rawNip || "").trim(),
+    pangkat_golongan: String(rawPangkat || "").trim()
+  };
+}
+
+function injectKepegawaianFieldsIntoProfileModal() {
+  if (!activeUser || activeUser.role === "hotel_checker") return;
+
+  const modal = document.getElementById("serviceModal");
+  const titleEl = document.getElementById("serviceModalTitle");
+  const bodyEl = document.getElementById("serviceModalBody");
+  if (!modal || modal.classList.contains("hidden") || !titleEl || !bodyEl) return;
+
+  const titleTxt = (titleEl.textContent || "").toLowerCase();
+  const isProfileEditor =
+    titleTxt.includes("profil") &&
+    (titleTxt.includes("biodata") || titleTxt.includes("kontak") || titleTxt.includes("peserta") || titleTxt.includes("saya"));
+
+  if (!isProfileEditor) return;
+  if (document.getElementById("injectedKepegawaianBiodataSection")) return;
+
+  const info = getPersonKepegawaianData(activeUser);
+  const isMandatory = info.status_pegawai === "ASN (PNS)" || info.status_pegawai === "PPPK (P3K)";
+
+  const section = document.createElement("div");
+  section.id = "injectedKepegawaianBiodataSection";
+  section.className = "p-3.5 rounded-2xl bg-indigo-50/80 border-2 border-indigo-200 space-y-2.5 my-2.5 shadow-2xs";
+  section.innerHTML = `
+    <div class="flex items-center justify-between border-b border-indigo-200/80 pb-1.5">
+      <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+        <i class="fa-solid fa-id-badge text-indigo-700"></i>
+        <span>Data Kepegawaian, NIP & Pangkat/Golongan</span>
+      </span>
+      <span id="badgeKepegawaianRule" class="text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+        isMandatory ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-700"
+      }">
+        ${isMandatory ? "Wajib Diisi (ASN/PPPK)" : "Opsional (Swasta)"}
+      </span>
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-extrabold text-slate-700 mb-1">Status Kepegawaian:</label>
+      <select id="inpBioStatusKepegawaian" class="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-900">
+        <option value="ASN (PNS)" ${info.status_pegawai === "ASN (PNS)" ? "selected" : ""}>ASN (PNS) — Wajib Isi NIP & Pangkat/Golongan</option>
+        <option value="PPPK (P3K)" ${info.status_pegawai === "PPPK (P3K)" ? "selected" : ""}>PPPK (P3K) — Wajib Isi NIP & Golongan</option>
+        <option value="Non-ASN / Swasta" ${info.status_pegawai === "Non-ASN / Swasta" ? "selected" : ""}>Non-ASN / Swasta (Boleh Kosong)</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div>
+        <label class="block text-[10px] font-extrabold text-slate-700 mb-1">
+          NIP <span id="lblReqNipMark" class="text-rose-600">${isMandatory ? "*" : "(Opsional)"}</span>
+        </label>
+        <input id="inpBioNipPegawai" type="text" inputmode="numeric" maxlength="21" value="${info.nip}" placeholder="${isMandatory ? 'Masukkan 18 digit NIP...' : 'Kosongkan jika Non-ASN'}" class="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-900" />
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-extrabold text-slate-700 mb-1">
+          Pangkat & Golongan <span id="lblReqPangkatMark" class="text-rose-600">${isMandatory ? "*" : "(Opsional)"}</span>
+        </label>
+        <input id="inpBioPangkatGol" list="listOpsiPangkatGol" type="text" value="${info.pangkat_golongan}" placeholder="${isMandatory ? 'Pilih / ketik Pangkat & Golongan...' : 'Kosongkan jika Non-ASN'}" class="w-full rounded-xl border border-indigo-300 bg-white px-3 py-2 text-xs font-bold text-slate-900" />
+        <datalist id="listOpsiPangkatGol">
+          ${PANGKAT_GOLONGAN_LIST.map(pg => `<option value="${pg}"></option>`).join("")}
+        </datalist>
+      </div>
+    </div>
+  `;
+
+  // Sisipkan tepat di atas tombol Simpan Biodata di dalam modal profil
+  const submitBtn = Array.from(bodyEl.querySelectorAll("button")).find(b => {
+    const t = (b.textContent || "").toLowerCase();
+    return t.includes("simpan") && !t.includes("catatan") && !t.includes("opacity");
+  });
+
+  if (submitBtn) {
+    submitBtn.insertAdjacentElement("beforebegin", section);
+  } else {
+    bodyEl.appendChild(section);
+  }
+
+  // Sembunyikan input NIP lama di modul profil jika ganda agar tidak membingungkan
+  bodyEl.querySelectorAll("input").forEach(inp => {
+    if (inp.id === "inpBioNipPegawai" || inp.id === "inpBioPangkatGol") return;
+    const lblText = (inp.previousElementSibling?.textContent || inp.placeholder || "").toLowerCase();
+    if (lblText.includes("nip")) {
+      const wrap = inp.closest("div");
+      if (wrap && !wrap.contains(section)) wrap.classList.add("hidden");
+    }
+  });
+
+  const selStatus = document.getElementById("inpBioStatusKepegawaian");
+  const inpNip = document.getElementById("inpBioNipPegawai");
+  const inpPangkat = document.getElementById("inpBioPangkatGol");
+  const badgeRule = document.getElementById("badgeKepegawaianRule");
+  const markNip = document.getElementById("lblReqNipMark");
+  const markPangkat = document.getElementById("lblReqPangkatMark");
+
+  const updateFieldRequirementUI = () => {
+    const st = selStatus?.value || "ASN (PNS)";
+    const wajib = st === "ASN (PNS)" || st === "PPPK (P3K)";
+    if (badgeRule) {
+      badgeRule.textContent = wajib ? "Wajib Diisi (ASN/PPPK)" : "Opsional (Swasta)";
+      badgeRule.className = `text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+        wajib ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-700"
+      }`;
+    }
+    if (markNip) markNip.textContent = wajib ? "*" : "(Opsional)";
+    if (markPangkat) markPangkat.textContent = wajib ? "*" : "(Opsional)";
+    if (inpNip) inpNip.placeholder = wajib ? "Wajib isi 18 digit NIP..." : "Kosongkan jika Non-ASN";
+    if (inpPangkat) inpPangkat.placeholder = wajib ? "Wajib pilih / ketik Pangkat & Gol..." : "Kosongkan jika Non-ASN";
+  };
+
+  selStatus?.addEventListener("change", updateFieldRequirementUI);
+
+  // Validasi & Simpan ke Supabase saat tombol Simpan Profil diklik
+  if (submitBtn && !submitBtn.dataset.kepegawaianBound) {
+    submitBtn.dataset.kepegawaianBound = "true";
+
+    submitBtn.addEventListener(
+      "click",
+      async (e) => {
+        const stVal = selStatus?.value || "ASN (PNS)";
+        const nipVal = inpNip?.value.trim() || "";
+        const pangkatVal = inpPangkat?.value.trim() || "";
+        const wajib = stVal === "ASN (PNS)" || stVal === "PPPK (P3K)";
+
+        if (wajib && (!nipVal || !pangkatVal)) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          toast(`Validasi: Status ${stVal} wajib mengisi NIP serta Pangkat & Golongan!`);
+          if (!nipVal) inpNip?.focus();
+          else inpPangkat?.focus();
+          return;
+        }
+
+        // Simpan ke cache global info_layanan agar selalu persisten
+        kepegawaianExtraCache[info.key] = {
+          status_pegawai: stVal,
+          nip: nipVal,
+          pangkat_golongan: pangkatVal
+        };
+
+        await sb.from("info_layanan").upsert([{
+          kode_menu: "biodata_kepegawaian_rakor_2026",
+          judul: "Data Kepegawaian (NIP & Pangkat/Golongan) Peserta & Panitia",
+          deskripsi: JSON.stringify(kepegawaianExtraCache),
+          url_link: String(Object.keys(kepegawaianExtraCache).length),
+          status_tersedia: "AKTIF"
+        }]);
+
+        // Simpan langsung ke tabel utama (db_sekolah atau panitia_rakor)
+        if (activeUser.role === "peserta") {
+          activeUser.profile.nip_kepsek = nipVal;
+          activeUser.profile.pangkat_golongan = pangkatVal;
+          activeUser.profile.status_kepegawaian = stVal;
+
+          await sb
+            .from("db_sekolah")
+            .update({ nip_kepsek: nipVal })
+            .eq("id_sekolah", activeUser.profile.id_sekolah);
+
+          // Coba simpan kolom tambahan jika tersedia di tabel
+          try {
+            await sb
+              .from("db_sekolah")
+              .update({ pangkat_golongan: pangkatVal, status_kepegawaian: stVal })
+              .eq("id_sekolah", activeUser.profile.id_sekolah);
+          } catch (err) {}
+        } else if (activeUser.role === "panitia") {
+          activeUser.profile.nip = nipVal;
+          activeUser.profile.pangkat_golongan = pangkatVal;
+          activeUser.profile.status_kepegawaian = stVal;
+
+          try {
+            await sb
+              .from("panitia_rakor")
+              .update({ nip: nipVal, pangkat_golongan: pangkatVal, status_kepegawaian: stVal })
+              .eq("id_panitia", activeUser.profile.id_panitia);
+          } catch (err) {}
+        }
+      },
+      true
+    );
+  }
+}
+
+loadKepegawaianExtraCache();
+setInterval(injectKepegawaianFieldsIntoProfileModal, 350);
